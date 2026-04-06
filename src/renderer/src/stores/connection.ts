@@ -17,6 +17,10 @@ export const useConnectionStore = defineStore('connection', () => {
   const servers = ref<ServerConfig[]>([])
 
   async function loadServers() {
+    if (!window.api) {
+      console.warn('[connection] window.api not available (not in Electron)')
+      return
+    }
     servers.value = await window.api.getServers()
   }
 
@@ -27,11 +31,13 @@ export const useConnectionStore = defineStore('connection', () => {
     username: string
     password: string
   }) {
+    if (!window.api) return
     await window.api.saveServer(server)
     await loadServers()
   }
 
   async function deleteServer(id: string) {
+    if (!window.api) return
     await window.api.removeServer(id)
     await loadServers()
     if (currentServer.value?.id === id) {
@@ -41,7 +47,7 @@ export const useConnectionStore = defineStore('connection', () => {
 
   async function connect(serverId: string) {
     status.value = 'connecting'
-    const password = await window.api.decryptPassword(serverId)
+    const password = window.api ? await window.api.decryptPassword(serverId) : null
     const server = servers.value.find((s) => s.id === serverId)
     if (!server || !password) {
       status.value = 'error'
