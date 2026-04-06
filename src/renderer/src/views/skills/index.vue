@@ -17,11 +17,25 @@ import {
 import { RefreshOutline, SearchOutline } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useSkillStore } from '../../stores/skill'
-import type { Skill } from '../../api/types'
+import { useMonitorSkills } from '../../composables/useMonitorApi'
+import type { Skill, SkillMetric } from '../../api/types'
 
 const skillStore = useSkillStore()
 const { t } = useI18n()
 const searchQuery = ref('')
+
+// Monitor metrics
+const { data: metricsResp, refresh: refreshMetrics } = useMonitorSkills()
+const skillMetrics = computed<Record<string, SkillMetric>>(() => {
+  const list = (metricsResp.value?.data as SkillMetric[] | null) ?? []
+  const map: Record<string, SkillMetric> = {}
+  for (const m of list) map[m.name] = m
+  return map
+})
+
+function getMetrics(name: string): SkillMetric | null {
+  return skillMetrics.value[name] ?? null
+}
 
 onMounted(() => {
   skillStore.fetchSkills()
@@ -128,7 +142,7 @@ const pluginGroups = computed(() => {
             <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.showBundledInChat') }}</NText>
             <NSwitch v-model:value="skillStore.showBundledInChat" size="small" />
           </NSpace>
-          <NButton size="small" class="app-toolbar-btn app-toolbar-btn--refresh" @click="skillStore.fetchSkills()">
+          <NButton size="small" class="app-toolbar-btn app-toolbar-btn--refresh" @click="() => { skillStore.fetchSkills(); refreshMetrics() }">
             <template #icon><NIcon :component="RefreshOutline" /></template>
             {{ t('common.refresh') }}
           </NButton>
@@ -205,6 +219,13 @@ const pluginGroups = computed(() => {
                     <NText depth="3" class="skill-desc">
                       {{ skill.description || t('common.noDescription') }}
                     </NText>
+
+                    <!-- Monitor metrics row -->
+                    <NSpace v-if="getMetrics(skill.name)" :size="12" style="font-size: 11px; color: var(--text-color-3)">
+                      <span>调用: {{ getMetrics(skill.name)!.total_calls }}</span>
+                      <span>成功率: {{ (getMetrics(skill.name)!.success_rate * 100).toFixed(0) }}%</span>
+                      <span>均耗: {{ getMetrics(skill.name)!.avg_duration_ms.toFixed(0) }}ms</span>
+                    </NSpace>
 
                     <NSpace justify="space-between" align="center">
                       <NText depth="3" style="font-size: 12px;">

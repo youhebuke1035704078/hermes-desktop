@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import Sidebar from './Sidebar.vue'
+import TopBar from './TopBar.vue'
 </script>
 
 <template>
@@ -9,20 +11,15 @@
     <div class="layout-body">
       <TopBar />
       <main class="layout-content">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </main>
     </div>
   </div>
 </template>
-
-<script lang="ts">
-import Sidebar from './Sidebar.vue'
-import TopBar from './TopBar.vue'
-
-export default {
-  components: { Sidebar, TopBar }
-}
-</script>
 
 <style scoped>
 .main-layout {
@@ -49,5 +46,14 @@ export default {
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

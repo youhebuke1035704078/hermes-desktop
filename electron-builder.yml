@@ -1,5 +1,5 @@
 appId: com.openclaw.desktop
-productName: openclaw-desktop
+productName: OpenClaw Desktop
 directories:
   buildResources: build
 files:
@@ -13,11 +13,20 @@ asarUnpack:
   - 'resources/**'
 win:
   executableName: openclaw-desktop
+  target:
+    - target: nsis
+      arch:
+        - x64
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
+  shortcutName: OpenClaw Desktop
+  uninstallDisplayName: OpenClaw Desktop
   createDesktopShortcut: always
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerLanguages:
+    - 2052
+  language: 2052
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -33,7 +42,7 @@ linux:
     - AppImage
     - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: openclaw.dev
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}

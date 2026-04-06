@@ -53,6 +53,9 @@ export default {
     search: '搜索',
     filter: '筛选',
     export: '导出',
+    refresh: '刷新',
+    noDescription: '暂无描述',
+    itemsCount: '{count} 项',
     disconnected: '连接已断开，正在重连...',
     cannotConnect: '无法连接到服务器，请检查网络',
     reconnect: '手动重连',
@@ -69,6 +72,45 @@ export default {
     offline: '离线',
     starting: '启动中',
     paused: '已暂停'
+  },
+  pages: {
+    skills: {
+      title: '技能管理',
+      info: '技能是 OpenClaw 的核心能力单元，可通过插件系统扩展。',
+      showBundled: '显示内置',
+      showBundledInChat: '聊天中显示内置',
+      searchPlaceholder: '搜索技能...',
+      loadFailed: '加载失败: {error}',
+      hasUpdate: '有更新',
+      version: 'v{version}',
+      noVersion: '无版本号',
+      eligibleOk: '可用',
+      eligibleRestricted: '受限',
+      noMatches: '没有匹配的技能',
+      sources: {
+        workspace: '工作区',
+        managed: '托管',
+        extra: '扩展',
+        bundled: '内置'
+      },
+      stats: {
+        total: '可用技能总数',
+        bundledAvailable: '内置可用',
+        user: '用户技能'
+      },
+      groups: {
+        user: {
+          title: '用户技能',
+          description: '工作区、托管和扩展来源的技能',
+          empty: '暂无用户技能'
+        },
+        bundled: {
+          title: '内置技能',
+          description: '系统自带的技能',
+          empty: '暂无内置技能'
+        }
+      }
+    }
   },
   dashboard: {
     title: '系统总览',
