@@ -232,3 +232,66 @@ export interface VersionInfo {
   latest?: string
   updateAvailable: boolean
 }
+
+// === Gateway Admin Types (used by migrated Admin pages) ===
+
+export interface ConfigPatch {
+  op?: 'add' | 'remove' | 'replace'
+  path: string
+  value?: unknown
+}
+
+export interface OpenClawConfig {
+  [key: string]: unknown
+}
+
+export interface Skill {
+  name: string
+  description?: string
+  source?: string
+  installed?: boolean
+  version?: string
+  [key: string]: unknown
+}
+
+export interface Tool {
+  name: string
+  type?: string
+  description?: string
+  source?: string
+  [key: string]: unknown
+}
+
+export interface DeviceNode {
+  id: string
+  name?: string
+  platform?: string
+  status?: string
+  capabilities?: string[]
+  [key: string]: unknown
+}
+
+export interface AgentInfo {
+  id: string
+  name?: string
+  displayName?: string
+  workspace?: string
+  model?: string
+  identity?: Record<string, unknown>
+  [key: string]: unknown
+}
+
+export interface ModelInfo {
+  id?: string
+  provider?: string
+  model?: string
+  name?: string
+  [key: string]: unknown
+}
+
+export interface PluginPackage {
+  name: string
+  installed: boolean
+  version?: string
+  [key: string]: unknown
+}

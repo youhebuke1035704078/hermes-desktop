@@ -18,6 +18,12 @@ export const useTerminalStore = defineStore('terminal', () => {
   const disconnectedCallback = ref<(() => void) | null>(null)
 
   const isConnected = computed(() => connectionState.value === 'connected')
+  const isConnecting = computed(() => connectionState.value === 'connecting')
+  const hasError = computed(() => connectionState.value === 'error')
+
+  function setConfig(newConfig: Partial<typeof config.value>) {
+    config.value = { ...config.value, ...newConfig }
+  }
 
   function onOutput(cb: (data: string) => void) { outputCallback.value = cb }
   function onConnected(cb: (id: string) => void) { connectedCallback.value = cb }
@@ -140,8 +146,8 @@ export const useTerminalStore = defineStore('terminal', () => {
   }
 
   return {
-    connectionState, currentSession, config, error, isConnected,
-    onOutput, onConnected, onDisconnected,
+    connectionState, currentSession, config, error, isConnected, isConnecting, hasError,
+    setConfig, onOutput, onConnected, onDisconnected,
     connect, disconnect, sendInput, resize
   }
 })

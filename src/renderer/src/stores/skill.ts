@@ -52,5 +52,21 @@ export const useSkillStore = defineStore('skill', () => {
     }
   }
 
-  return { skills, loading, installing, error, showBundled, fetchSkills, installSkill, updateSkills }
+  const showBundledInChat = ref(false)
+
+  function isSkillVisibleInChat(name: string): boolean {
+    const skill = skills.value.find((s: any) => s.name === name)
+    if (!skill) return true
+    if (skill.source === 'bundled') return showBundledInChat.value
+    return true
+  }
+
+  function setSkillVisibleInChat(_name: string, _visible: boolean) {
+    // Simplified version - no localStorage persistence needed in desktop app
+  }
+
+  return {
+    skills, loading, installing, error, showBundled, showBundledInChat,
+    fetchSkills, installSkill, updateSkills, isSkillVisibleInChat, setSkillVisibleInChat
+  }
 })
