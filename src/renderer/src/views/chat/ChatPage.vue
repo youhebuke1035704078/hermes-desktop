@@ -1,18 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   NAlert,
   NButton,
   NCard,
   NEmpty,
-  NForm,
-  NFormItem,
   NGrid,
   NGridItem,
   NIcon,
   NInput,
   NModal,
-  NPopconfirm,
   NSelect,
   NSpace,
   NSpin,
@@ -31,7 +28,7 @@ import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { useSkillStore } from '@/stores/skill'
 import { useWebSocketStore } from '@/stores/websocket'
-import { formatDate, formatRelativeTime, parseSessionKey, truncate } from '@/utils/format'
+import { formatDate, formatRelativeTime, parseSessionKey } from '@/utils/format'
 import { renderSimpleMarkdown } from '@/utils/markdown'
 import type { AgentInstance, ChatMessage, ChatMessageContent, SessionsUsageSession, Skill } from '@/api/types'
 
@@ -49,14 +46,6 @@ const draft = ref('')
 const roleFilter = ref<'all' | 'user' | 'assistant' | 'system'>('all')
 const autoFollowBottom = ref(true)
 const transcriptRef = ref<HTMLElement | null>(null)
-const quickReplySearch = ref('')
-const showQuickReplyModal = ref(false)
-const quickReplyModalMode = ref<'create' | 'edit'>('create')
-const editingQuickReplyId = ref('')
-const quickReplyForm = reactive({
-  title: '',
-  content: '',
-})
 const showAgentDetails = ref(false)
 const aborting = ref(false)
 const nowMs = ref(Date.now())
@@ -73,17 +62,10 @@ const roleFilterOptions = computed<SelectOption[]>(() => [
 ])
 
 const BOTTOM_GAP = 32
-const QUICK_REPLY_STORAGE_KEY = 'openclaw_chat_quick_replies_v1'
 const SESSION_KEY_STORAGE_KEY = 'openclaw_chat_selected_session_v1'
 let pendingForceScroll = false
 let pendingScroll = false
 let destroyed = false
-const quickReplies = ref<Array<{
-  id: string
-  title: string
-  content: string
-  updatedAt: number
-}>>([])
 
 const expandedToolCalls = ref(new Set<string>())
 const expandedToolResults = ref(new Set<string>())
@@ -976,20 +958,6 @@ const renderedMessages = computed<RenderMessage[]>(() => {
   return visibleMessageEntries.value.filter((entry) => entry.item.role === role)
 })
 
-const filteredQuickReplies = computed(() => {
-  const query = quickReplySearch.value.trim().toLowerCase()
-  const list = [...quickReplies.value].sort((a, b) => b.updatedAt - a.updatedAt)
-  if (!query) return list
-  return list.filter((item) =>
-    [item.title, item.content].some((field) => field.toLowerCase().includes(query))
-  )
-})
-
-const workspaceRoot = computed(() => configStore.config?.agents?.defaults?.workspace || '~/.openclaw/workspace')
-const workspaceQuickReplyDir = computed(() => {
-  const root = workspaceRoot.value.endsWith('/') ? workspaceRoot.value.slice(0, -1) : workspaceRoot.value
-  return `${root}/prompts/common-replies`
-})
 
 const selectedSlashCommandIndex = ref(0)
 const slashFirstLine = computed(() => (draft.value.split('\n')[0] || '').trimStart())
@@ -2039,126 +2007,7 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
   }
 }
 
-function loadQuickReplies() {
-  try {
-    const raw = localStorage.getItem(QUICK_REPLY_STORAGE_KEY)
-    if (!raw) {
-      quickReplies.value = []
-      return
-    }
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      quickReplies.value = []
-      return
-    }
-    quickReplies.value = parsed
-      .map((item) => {
-        if (!item || typeof item !== 'object' || Array.isArray(item)) return null
-        const row = item as Record<string, unknown>
-        const title = asString(row.title).trim()
-        const content = asString(row.content).trim()
-        if (!title || !content) return null
-        const id = asString(row.id).trim() || `quick-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-        const updatedAt = asNumber(row.updatedAt) || Date.now()
-        return {
-          id,
-          title,
-          content,
-          updatedAt,
-        }
-      })
-      .filter((item): item is { id: string; title: string; content: string; updatedAt: number } => !!item)
-  } catch {
-    quickReplies.value = []
-  }
-}
 
-function persistQuickReplies() {
-  localStorage.setItem(QUICK_REPLY_STORAGE_KEY, JSON.stringify(quickReplies.value))
-}
-
-function resetQuickReplyForm() {
-  quickReplyForm.title = ''
-  quickReplyForm.content = ''
-}
-
-function openCreateQuickReply() {
-  quickReplyModalMode.value = 'create'
-  editingQuickReplyId.value = ''
-  resetQuickReplyForm()
-  showQuickReplyModal.value = true
-}
-
-function openEditQuickReply(item: { id: string; title: string; content: string }) {
-  quickReplyModalMode.value = 'edit'
-  editingQuickReplyId.value = item.id
-  quickReplyForm.title = item.title
-  quickReplyForm.content = item.content
-  showQuickReplyModal.value = true
-}
-
-function handleDeleteQuickReply(id: string) {
-  quickReplies.value = quickReplies.value.filter((item) => item.id !== id)
-  persistQuickReplies()
-  message.success(t('pages.chat.quickReplies.messages.deleted'))
-}
-
-function handleInsertQuickReply(item: { title: string; content: string }) {
-  const text = item.content.trim()
-  if (!text) return
-  draft.value = draft.value.trim() ? `${draft.value}\n${text}` : text
-  message.success(t('pages.chat.quickReplies.messages.inserted', { title: item.title }))
-}
-
-async function handleSendQuickReply(item: { content: string }) {
-  draft.value = item.content
-  await handleSend()
-}
-
-function handleSaveQuickReply() {
-  const title = quickReplyForm.title.trim()
-  const content = quickReplyForm.content.trim()
-  if (!title) {
-    message.warning(t('pages.chat.quickReplies.messages.titleRequired'))
-    return
-  }
-  if (!content) {
-    message.warning(t('pages.chat.quickReplies.messages.contentRequired'))
-    return
-  }
-
-  if (quickReplyModalMode.value === 'edit' && editingQuickReplyId.value) {
-    quickReplies.value = quickReplies.value.map((item) =>
-      item.id === editingQuickReplyId.value
-        ? { ...item, title, content, updatedAt: Date.now() }
-        : item
-    )
-    message.success(t('pages.chat.quickReplies.messages.updated'))
-  } else {
-    quickReplies.value = [
-      {
-        id: `quick-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        title,
-        content,
-        updatedAt: Date.now(),
-      },
-      ...quickReplies.value,
-    ]
-    message.success(t('pages.chat.quickReplies.messages.created'))
-  }
-
-  persistQuickReplies()
-  showQuickReplyModal.value = false
-}
-
-async function handleCopyWorkspaceDir() {
-  try {
-    await navigator.clipboard.writeText(workspaceQuickReplyDir.value)
-    message.success(t('pages.chat.quickReplies.messages.dirCopied'))
-  } catch {
-    message.warning(t('pages.chat.quickReplies.messages.dirCopyFailed'))
-  }
-}
 
 function normalizeSlashArguments(line: string): string {
   const trimmed = line.trimStart()
@@ -2474,7 +2323,6 @@ onMounted(async () => {
     nowMs.value = Date.now()
   }, 1000)
 
-  loadQuickReplies()
   void configStore.fetchConfig()
   void skillStore.fetchSkills()
 
@@ -2633,60 +2481,6 @@ async function handleSend() {
                 />
               </div>
 
-              <div class="chat-quick-panel">
-                <NSpace justify="space-between" align="center">
-                  <NText strong>{{ t('pages.chat.quickReplies.title') }}</NText>
-                  <NButton size="tiny" type="primary" secondary @click="openCreateQuickReply">{{ t('pages.chat.quickReplies.add') }}</NButton>
-                </NSpace>
-                <NInput
-                  v-model:value="quickReplySearch"
-                  size="small"
-                  style="margin-top: 8px;"
-                  :placeholder="t('pages.chat.quickReplies.searchPlaceholder')"
-                />
-
-                <div v-if="filteredQuickReplies.length" class="chat-quick-list">
-                  <div v-for="item in filteredQuickReplies" :key="item.id" class="chat-quick-item">
-                    <NSpace justify="space-between" align="start" :wrap="false">
-                      <div style="min-width: 0; flex: 1;">
-                        <NText strong>{{ item.title }}</NText>
-                        <NText depth="3" style="display: block; font-size: 12px; margin-top: 4px;">
-                          {{ truncate(item.content, 78) }}
-                        </NText>
-                      </div>
-                      <NSpace :size="2">
-                        <NButton size="tiny" text @click="handleInsertQuickReply(item)">{{ t('pages.chat.quickReplies.insert') }}</NButton>
-                        <NButton size="tiny" text type="primary" @click="handleSendQuickReply(item)">{{ t('pages.chat.actions.send') }}</NButton>
-                        <NButton size="tiny" text @click="openEditQuickReply(item)">{{ t('common.edit') }}</NButton>
-                        <NPopconfirm
-                          :positive-text="t('common.delete')"
-                          :negative-text="t('common.cancel')"
-                          @positive-click="handleDeleteQuickReply(item.id)"
-                        >
-                          <template #trigger>
-                            <NButton size="tiny" text type="error">{{ t('common.delete') }}</NButton>
-                          </template>
-                          {{ t('pages.chat.quickReplies.confirmDelete') }}
-                        </NPopconfirm>
-                      </NSpace>
-                    </NSpace>
-                  </div>
-                </div>
-                <NEmpty v-else :description="t('pages.chat.quickReplies.empty')" style="padding: 14px 0 8px;" />
-
-                <div class="chat-quick-footnote">
-                  <NText depth="3" style="font-size: 12px;">
-                    {{ t('pages.chat.quickReplies.storageHint') }}
-                  </NText>
-                  <NText depth="3" style="display: block; font-size: 12px; margin-top: 4px;">
-                    {{ t('pages.chat.quickReplies.dirLabel') }}<code>{{ workspaceQuickReplyDir }}</code>
-                  </NText>
-                  <NButton size="tiny" text @click="handleCopyWorkspaceDir" style="margin-top: 4px;">
-                    {{ t('pages.chat.quickReplies.copyDir') }}
-                  </NButton>
-                </div>
-              </div>
-
               <div class="chat-side-switches">
                 <NSpace justify="space-between" align="center">
                   <NText>{{ t('pages.chat.preferences.autoFollow') }}</NText>
@@ -2703,27 +2497,22 @@ async function handleSend() {
                 </NSpace>
               </div>
 
-              <div class="chat-side-kv">
-                <div v-if="selectedSession?.label" class="chat-kv-row">
-                  <span>{{ t('pages.chat.session.label') }}</span>
-                  <code class="chat-kv-label">{{ selectedSession.label }}</code>
-                </div>
-                <div class="chat-kv-row">
-                  <span>Agent</span>
-                  <code>{{ selectedSession?.agentId || sessionMeta.agent }}</code>
-                </div>
-                <div class="chat-kv-row">
-                  <span>Channel</span>
-                  <code>{{ sessionChannelDisplay }}</code>
-                </div>
-                <div class="chat-kv-row">
-                  <span>Peer</span>
-                  <code>{{ selectedSession?.peer || sessionMeta.peer || '-' }}</code>
-                </div>
-                <div class="chat-kv-row">
-                  <span>{{ t('pages.chat.session.model') }}</span>
-                  <code>{{ selectedSession?.model || '-' }}</code>
-                </div>
+              <div class="chat-meta-bar">
+                <NTag v-if="selectedSession?.label" size="small" :bordered="false" round>
+                  {{ t('pages.chat.session.label') }}: {{ selectedSession.label }}
+                </NTag>
+                <NTag size="small" :bordered="false" round type="info">
+                  Agent: {{ selectedSession?.agentId || sessionMeta.agent }}
+                </NTag>
+                <NTag size="small" :bordered="false" round>
+                  Channel: {{ sessionChannelDisplay }}
+                </NTag>
+                <NTag size="small" :bordered="false" round>
+                  Peer: {{ selectedSession?.peer || sessionMeta.peer || '-' }}
+                </NTag>
+                <NTag size="small" :bordered="false" round type="default">
+                  {{ t('pages.chat.session.model') }}: {{ selectedSession?.model || '-' }}
+                </NTag>
               </div>
             </NSpace>
           </NCard>
@@ -3222,39 +3011,6 @@ async function handleSend() {
     </NCard>
 
     <NModal
-      v-model:show="showQuickReplyModal"
-      preset="card"
-      :title="quickReplyModalMode === 'edit'
-        ? t('pages.chat.quickReplies.modal.editTitle')
-        : t('pages.chat.quickReplies.modal.createTitle')"
-      style="width: 640px; max-width: calc(100vw - 28px);"
-    >
-      <NForm label-placement="left" label-width="72">
-        <NFormItem :label="t('pages.chat.quickReplies.modal.title')" required>
-          <NInput v-model:value="quickReplyForm.title" :placeholder="t('pages.chat.quickReplies.modal.titlePlaceholder')" />
-        </NFormItem>
-        <NFormItem :label="t('pages.chat.quickReplies.modal.content')" required>
-          <NInput
-            v-model:value="quickReplyForm.content"
-            type="textarea"
-            :autosize="{ minRows: 4, maxRows: 10 }"
-            :placeholder="t('pages.chat.quickReplies.modal.contentPlaceholder')"
-          />
-        </NFormItem>
-      </NForm>
-      <template #footer>
-        <NSpace justify="end">
-          <NButton @click="showQuickReplyModal = false">{{ t('common.cancel') }}</NButton>
-          <NButton type="primary" @click="handleSaveQuickReply">
-            {{ quickReplyModalMode === 'edit'
-              ? t('pages.chat.quickReplies.modal.saveChanges')
-              : t('pages.chat.quickReplies.add') }}
-          </NButton>
-        </NSpace>
-      </template>
-    </NModal>
-
-    <NModal
       v-model:show="showImagePreviewModal"
       preset="card"
       :title="t('pages.chat.image.preview')"
@@ -3547,7 +3303,6 @@ async function handleSend() {
 
 .chat-side-switches,
 .chat-side-stats,
-.chat-side-kv,
 .chat-quick-panel {
   padding: 10px;
   border: 1px solid var(--border-color);
@@ -3610,30 +3365,15 @@ async function handleSend() {
   color: var(--text-secondary);
 }
 
-.chat-kv-row {
+.chat-meta-bar {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  font-size: 12px;
-  border-bottom: 1px dashed var(--border-color);
-}
-
-.chat-kv-row:last-child {
-  border-bottom: none;
-}
-
-.chat-kv-row code {
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  word-break: break-all;
-}
-
-.chat-kv-label {
-  font-style: italic;
-  color: var(--text-secondary);
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
 }
 
 .chat-transcript-card,
@@ -3683,6 +3423,7 @@ async function handleSend() {
 }
 
 .chat-compose-card {
+  order: -1;
   flex-shrink: 0;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
