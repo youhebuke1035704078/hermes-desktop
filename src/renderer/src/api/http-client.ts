@@ -297,7 +297,7 @@ export class ApiClient {
       client: {
         id: 'openclaw-control-ui',
         displayName: 'OpenClaw Desktop',
-        version: '0.1.0',
+        version: __APP_VERSION__,
         platform: this.detectPlatform(),
         mode: 'ui',
       },
