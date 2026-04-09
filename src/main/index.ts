@@ -537,7 +537,7 @@ function setupAutoUpdater(): void {
   })
 
   ipcMain.handle('updater:install', () => {
-    autoUpdater.quitAndInstall(false, true)
+    autoUpdater.quitAndInstall(true, true)
   })
 
   // Check for updates 5s after launch (non-dev only)
