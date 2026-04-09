@@ -68,51 +68,21 @@ function sourceType(source: Skill['source']): 'info' | 'success' | 'warning' {
 
 const userPlugins = computed(() => skillStore.skills.filter((skill) => isUserPlugin(skill)))
 const visiblePlugins = computed(() => {
-  const base = skillStore.skills.filter((skill) => matchesQuery(skill))
-  if (skillStore.showBundled) return base
-  return base.filter((skill) => skill.source !== 'bundled')
+  return skillStore.skills.filter((skill) => matchesQuery(skill) && skill.source !== 'bundled')
 })
-const bundledAvailablePlugins = computed(() =>
-  skillStore.skills.filter(
-    (skill) => skill.source === 'bundled' && skill.eligible !== false && !skill.disabled
-  )
-)
-const availableTotalPlugins = computed(
-  () => userPlugins.value.length + bundledAvailablePlugins.value.length
-)
-
-const bundledPlugins = computed(() =>
-  visiblePlugins.value.filter(
-    (skill) => skill.source === 'bundled' && skill.eligible !== false && !skill.disabled
-  )
-)
 const userVisiblePlugins = computed(() =>
   visiblePlugins.value.filter((skill) => isUserPlugin(skill))
 )
 
-const pluginGroups = computed(() => {
-  const groups = [
-    {
-      key: 'user',
-      title: t('pages.skills.groups.user.title'),
-      description: t('pages.skills.groups.user.description'),
-      emptyText: t('pages.skills.groups.user.empty'),
-      skills: userVisiblePlugins.value,
-    },
-  ]
-
-  if (skillStore.showBundled) {
-    groups.push({
-      key: 'bundled',
-      title: t('pages.skills.groups.bundled.title'),
-      description: t('pages.skills.groups.bundled.description'),
-      emptyText: t('pages.skills.groups.bundled.empty'),
-      skills: bundledPlugins.value,
-    })
-  }
-
-  return groups
-})
+const pluginGroups = computed(() => [
+  {
+    key: 'user',
+    title: t('pages.skills.groups.user.title'),
+    description: t('pages.skills.groups.user.description'),
+    emptyText: t('pages.skills.groups.user.empty'),
+    skills: userVisiblePlugins.value,
+  },
+])
 </script>
 
 <template>
@@ -120,14 +90,6 @@ const pluginGroups = computed(() => {
     <NCard :title="t('pages.skills.title')" class="app-card">
       <template #header-extra>
         <NSpace :size="8" class="app-toolbar">
-          <NSpace :size="8" align="center">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.showBundled') }}</NText>
-            <NSwitch v-model:value="skillStore.showBundled" size="small" />
-          </NSpace>
-          <NSpace :size="8" align="center">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.showBundledInChat') }}</NText>
-            <NSwitch v-model:value="skillStore.showBundledInChat" size="small" />
-          </NSpace>
           <NButton size="small" class="app-toolbar-btn app-toolbar-btn--refresh" @click="skillStore.fetchSkills()">
             <template #icon><NIcon :component="RefreshOutline" /></template>
             {{ t('common.refresh') }}
@@ -143,17 +105,11 @@ const pluginGroups = computed(() => {
           {{ t('pages.skills.loadFailed', { error: skillStore.error }) }}
         </NAlert>
 
-        <NGrid cols="1 s:2 m:3" responsive="screen" :x-gap="12" :y-gap="12">
+        <NGrid cols="1 s:2" responsive="screen" :x-gap="12" :y-gap="12">
           <NGridItem>
             <NCard embedded :bordered="false" style="border-radius: var(--radius);">
               <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.stats.total') }}</NText>
-              <div style="font-size: 22px; font-weight: 600; margin-top: 6px;">{{ availableTotalPlugins }}</div>
-            </NCard>
-          </NGridItem>
-          <NGridItem>
-            <NCard embedded :bordered="false" style="border-radius: var(--radius);">
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.stats.bundledAvailable') }}</NText>
-              <div style="font-size: 22px; font-weight: 600; margin-top: 6px;">{{ bundledAvailablePlugins.length }}</div>
+              <div style="font-size: 22px; font-weight: 600; margin-top: 6px;">{{ userPlugins.length }}</div>
             </NCard>
           </NGridItem>
           <NGridItem>
