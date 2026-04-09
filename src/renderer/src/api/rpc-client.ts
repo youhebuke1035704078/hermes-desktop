@@ -2586,6 +2586,39 @@ export class RPCClient {
     return this.call('agents.delete', { agentId })
   }
 
+  /**
+   * Try to list a remote directory on the gateway server.
+   * Attempts multiple RPC method names; returns null if gateway doesn't support it.
+   */
+  async remoteReaddir(dirPath: string): Promise<Array<{
+    name: string; path: string; type: 'file' | 'directory'; size?: number; mtimeMs?: number; extension?: string
+  }> | null> {
+    const methods = ['fs.readdir', 'workspace.readdir', 'files.readdir']
+    const paramsList = [{ path: dirPath }, { dir: dirPath }, { dirPath }]
+    try {
+      const payload = await this.callWithMethodAndParamsFallback<unknown>(methods, paramsList)
+      const row = this.asRecord(payload)
+      const items = this.normalizeList<unknown>(payload, ['entries', 'files', 'items', 'list', 'data'])
+      if (items.length === 0 && !row.entries && !row.files && !row.items) return null
+      return items.map((item) => {
+        const r = this.asRecord(item)
+        const name = this.asString(r.name)
+        const isDir = r.isDirectory === true || r.type === 'directory' || r.kind === 'directory'
+        const ext = name.includes('.') ? name.split('.').pop() || '' : ''
+        return {
+          name,
+          path: this.asString(r.path || r.fullPath, `${dirPath}/${name}`),
+          type: (isDir ? 'directory' : 'file') as 'file' | 'directory',
+          size: typeof r.size === 'number' ? r.size : undefined,
+          mtimeMs: typeof r.mtimeMs === 'number' ? r.mtimeMs : (typeof r.modifiedAt === 'number' ? r.modifiedAt : undefined),
+          extension: isDir ? undefined : ext,
+        }
+      }).filter((e) => !!e.name)
+    } catch {
+      return null
+    }
+  }
+
   listAgentFiles(agentId: string): Promise<AgentFilesListResult> {
     return this.callWithMethodAndParamsFallback<unknown>(
       ['agents.files.list', 'agent.files.list'],

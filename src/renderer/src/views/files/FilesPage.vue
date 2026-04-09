@@ -57,6 +57,7 @@ import {
   ChevronForwardOutline,
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
+import { useConnectionStore } from '@/stores/connection'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useMemoryStore } from '@/stores/memory'
 import { formatRelativeTime } from '@/utils/format'
@@ -88,6 +89,7 @@ interface AgentSelectOption extends SelectOption {
 
 const { t } = useI18n()
 const message = useMessage()
+const connectionStore = useConnectionStore()
 const wsStore = useWebSocketStore()
 const memoryStore = useMemoryStore()
 
@@ -484,6 +486,72 @@ function resolveAbsDir(relativePath: string): string {
 
 /** Whether the last browse used local FS (for readFileContent fallback) */
 const isLocalWorkspace = ref(false)
+/** Whether remote HTTP file server is available */
+const useRemoteFs = ref(false)
+/** Cached remote file server base URL */
+const remoteFileServerUrl = ref('')
+
+/**
+ * Derive the file-server URL from the gateway connection URL.
+ * Gateway runs on port X (e.g., 18789), file-server on port X+2 (e.g., 18791).
+ */
+function getFileServerUrl(): string {
+  if (remoteFileServerUrl.value) return remoteFileServerUrl.value
+  const server = connectionStore.currentServer
+  if (!server?.url) return ''
+  try {
+    const u = new URL(server.url.replace(/^ws/, 'http'))
+    const gwPort = parseInt(u.port || '18789', 10)
+    u.port = String(gwPort + 2)
+    remoteFileServerUrl.value = u.origin
+    return remoteFileServerUrl.value
+  } catch {
+    return ''
+  }
+}
+
+/** Try fetching directory listing from the remote HTTP file server */
+async function remoteHttpReaddir(dirPath: string): Promise<FileEntry[] | null> {
+  const base = getFileServerUrl()
+  if (!base) return null
+  try {
+    const url = `${base}/api/readdir?path=${encodeURIComponent(dirPath)}`
+    const res = window.api
+      ? await window.api.httpFetch(url)
+      : { ok: false, body: '' }
+    if (!res.ok) return null
+    const data = JSON.parse(res.body)
+    if (!data.ok || !Array.isArray(data.entries)) return null
+    return data.entries.map((e: any) => ({
+      name: e.name,
+      path: e.path,
+      type: e.type,
+      size: e.size,
+      modifiedAt: e.mtimeMs ? new Date(e.mtimeMs).toISOString() : undefined,
+      extension: e.extension,
+    }))
+  } catch {
+    return null
+  }
+}
+
+/** Try reading a file from the remote HTTP file server */
+async function remoteHttpReadFile(filePath: string): Promise<{ content: string; encoding: string } | null> {
+  const base = getFileServerUrl()
+  if (!base) return null
+  try {
+    const url = `${base}/api/readfile?path=${encodeURIComponent(filePath)}`
+    const res = window.api
+      ? await window.api.httpFetch(url)
+      : { ok: false, body: '' }
+    if (!res.ok) return null
+    const data = JSON.parse(res.body)
+    if (!data.ok) return null
+    return { content: data.content || '', encoding: 'utf-8' }
+  } catch {
+    return null
+  }
+}
 
 async function browsePath(path: string) {
   if (!currentWorkspace.value) {
@@ -517,14 +585,40 @@ async function browsePath(path: string) {
       console.log('[FilesPage] local FS failed for', absDir, ':', result.error, '→ trying RPC')
     }
 
-    // Fallback: RPC-based file list (remote gateway)
+    // Try remote HTTP file server (runs on gateway machine, port+2)
     isLocalWorkspace.value = false
+    const httpEntries = await remoteHttpReaddir(absDir)
+    if (httpEntries !== null) {
+      console.log('[FilesPage] browsePath REMOTE HTTP:', absDir, `(${httpEntries.length} items)`)
+      useRemoteFs.value = true
+      entries.value = httpEntries
+      currentPath.value = path
+      return
+    }
+
+    // Try remote directory listing via gateway RPC (fs.readdir)
+    const remoteEntries = await wsStore.rpc.remoteReaddir(absDir)
+    if (remoteEntries !== null) {
+      console.log('[FilesPage] browsePath REMOTE RPC:', absDir, `(${remoteEntries.length} items)`)
+      entries.value = remoteEntries.map((e) => ({
+        name: e.name,
+        path: e.path,
+        type: e.type,
+        size: e.size,
+        modifiedAt: e.mtimeMs ? new Date(e.mtimeMs).toISOString() : undefined,
+        extension: e.extension,
+      }))
+      currentPath.value = path
+      return
+    }
+
+    // Last resort: agent files only (limited to .md)
     if (allFiles.value.length === 0) {
       const agentId = selectedAgentId.value || 'main'
       const result = await wsStore.rpc.listAgentFiles(agentId)
       allFiles.value = result.files || []
     }
-    console.log('[FilesPage] browsePath RPC:', `${allFiles.value.length} files from gateway`)
+    console.log('[FilesPage] browsePath agent files fallback:', `${allFiles.value.length} files`)
     entries.value = allFiles.value.map((f) => ({
       name: f.name,
       path: f.path || f.name,
@@ -582,12 +676,18 @@ function navigateToPath(index: number) {
 }
 
 async function readFileContent(filePath: string): Promise<{ content: string; encoding: string }> {
+  // 1. Local filesystem
   if (isLocalWorkspace.value && window.api?.fsReadFile) {
     const result = await window.api.fsReadFile(filePath)
     if (!result.ok) throw new Error(result.error || 'Read failed')
     return { content: result.content || '', encoding: result.encoding || 'utf-8' }
   }
-  // Remote: use RPC
+  // 2. Remote HTTP file server (all file types)
+  if (useRemoteFs.value) {
+    const remote = await remoteHttpReadFile(filePath)
+    if (remote) return remote
+  }
+  // 3. Fallback: agent files RPC (only .md)
   const agentId = selectedAgentId.value || 'main'
   const result = await wsStore.rpc.getAgentFile(agentId, filePath)
   return { content: result.file.content || '', encoding: 'utf-8' }
