@@ -244,6 +244,7 @@ async function confirmRestart() {
     const res = await wsStore.rpc.runUpdate({
       note: 'restart via desktop UI',
       restartDelayMs: delayMs,
+      timeoutMs: 10000,
     })
     if (res.restart?.ok) {
       restartResult.value = {
@@ -257,9 +258,20 @@ async function confirmRestart() {
       message.error(reason)
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : t('pages.system.restart.failed')
-    restartResult.value = { ok: false, message: msg }
-    message.error(msg)
+    // Gateway restarts → WebSocket drops → RPC never gets a response → timeout.
+    // Treat timeout / connection errors as "restart initiated successfully".
+    const msg = err instanceof Error ? err.message : ''
+    const isRestartSideEffect = /timeout|close|disconnect|ECONNR/i.test(msg)
+    if (isRestartSideEffect) {
+      restartResult.value = {
+        ok: true,
+        message: t('pages.system.restart.scheduled', { delay: restartDelaySec.value }),
+      }
+      message.success(t('pages.system.restart.scheduled', { delay: restartDelaySec.value }))
+    } else {
+      restartResult.value = { ok: false, message: msg || t('pages.system.restart.failed') }
+      message.error(msg || t('pages.system.restart.failed'))
+    }
   } finally {
     restarting.value = false
   }
