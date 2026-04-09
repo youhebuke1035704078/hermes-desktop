@@ -34,11 +34,22 @@ export interface ConnectParams {
 
 const DEFAULT_MIN_PROTOCOL = 3
 const DEFAULT_MAX_PROTOCOL = 3
-const DEFAULT_CLIENT_ID: ConnectParams['client']['id'] = 'cli'
-const DEFAULT_CLIENT_MODE: ConnectParams['client']['mode'] = 'cli'
+const DEFAULT_CLIENT_ID: ConnectParams['client']['id'] = 'desktop'
+const DEFAULT_CLIENT_MODE: ConnectParams['client']['mode'] = 'operator'
 
 function getClientVersion(): string {
-  return import.meta.env.VITE_APP_VERSION || ''
+  return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : (import.meta.env.VITE_APP_VERSION || '')
+}
+
+/** Persistent instance ID so the gateway can distinguish Desktop app instances */
+function getInstanceId(): string {
+  const KEY = 'desktop-instance-id'
+  let id = localStorage.getItem(KEY)
+  if (!id) {
+    id = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    localStorage.setItem(KEY, id)
+  }
+  return id
 }
 
 function getClientPlatform(): string {
@@ -64,10 +75,11 @@ export function buildConnectParamsLegacy(token: string): ConnectParams {
     maxProtocol: DEFAULT_MAX_PROTOCOL,
     client: {
       id: DEFAULT_CLIENT_ID,
-      displayName: 'OpenClaw Admin',
+      displayName: `OpenClaw Desktop (${getClientPlatform()})`,
       version: getClientVersion(),
       platform: getClientPlatform(),
       mode: DEFAULT_CLIENT_MODE,
+      instanceId: getInstanceId(),
     },
     role: 'operator',
     scopes: ['operator.read', 'operator.write', 'operator.admin'],
