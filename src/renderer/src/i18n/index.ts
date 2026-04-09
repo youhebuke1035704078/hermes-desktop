@@ -1,9 +1,18 @@
 import { createI18n } from 'vue-i18n'
-import zhCN from './zh-CN'
+import zhCN from './messages/zh-CN'
+import enUS from './messages/en-US'
+import { getPreferredLocale, type AppLocale } from './locale'
+
+const DEFAULT_LOCALE: AppLocale = 'zh-CN'
 
 export const i18n = createI18n({
-  locale: 'zh-CN',
-  fallbackLocale: 'zh-CN',
   legacy: false,
-  messages: { 'zh-CN': zhCN }
+  globalInjection: true,
+  locale: getPreferredLocale(),
+  fallbackLocale: DEFAULT_LOCALE,
+  messages: {
+    'zh-CN': zhCN,
+    'en-US': enUS,
+  },
 })
+

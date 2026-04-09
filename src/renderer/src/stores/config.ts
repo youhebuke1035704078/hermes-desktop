@@ -1,33 +1,35 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { useGatewayStore } from './gateway'
+import { useWebSocketStore } from './websocket'
+import type { OpenClawConfig, ConfigPatch } from '@/api/types'
 
 export const useConfigStore = defineStore('config', () => {
-  const config = ref<any | null>(null)
+  const config = ref<OpenClawConfig | null>(null)
   const loading = ref(false)
   const saving = ref(false)
   const lastError = ref<string | null>(null)
 
-  const gwStore = useGatewayStore()
+  const wsStore = useWebSocketStore()
 
   async function fetchConfig() {
     loading.value = true
     lastError.value = null
     try {
-      config.value = await gwStore.rpc.getConfig()
+      config.value = await wsStore.rpc.getConfig()
     } catch (error) {
       config.value = null
       lastError.value = error instanceof Error ? error.message : String(error)
+      console.error('[ConfigStore] fetchConfig failed:', error)
     } finally {
       loading.value = false
     }
   }
 
-  async function patchConfig(patches: any[]) {
+  async function patchConfig(patches: ConfigPatch[]) {
     saving.value = true
     lastError.value = null
     try {
-      await gwStore.rpc.patchConfig({ patches })
+      await wsStore.rpc.patchConfig(patches)
       await fetchConfig()
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : String(error)
@@ -37,11 +39,11 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
-  async function setConfig(newConfig: any) {
+  async function setConfig(newConfig: OpenClawConfig) {
     saving.value = true
     lastError.value = null
     try {
-      await gwStore.rpc.setConfig(newConfig)
+      await wsStore.rpc.setConfig(newConfig)
       await fetchConfig()
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : String(error)
@@ -55,7 +57,7 @@ export const useConfigStore = defineStore('config', () => {
     saving.value = true
     lastError.value = null
     try {
-      await gwStore.rpc.applyConfig()
+      await wsStore.rpc.applyConfig()
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : String(error)
       throw error
@@ -64,5 +66,14 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
-  return { config, loading, saving, lastError, fetchConfig, patchConfig, setConfig, applyConfig }
+  return {
+    config,
+    loading,
+    saving,
+    lastError,
+    fetchConfig,
+    patchConfig,
+    setConfig,
+    applyConfig,
+  }
 })

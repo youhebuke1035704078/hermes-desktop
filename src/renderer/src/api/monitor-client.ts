@@ -1,4 +1,4 @@
-import { apiFetch } from './http-client'
+import { apiFetch } from './desktop-http-client'
 import type {
   SystemSummary,
   TrendData,
@@ -14,12 +14,13 @@ import type {
   NoiseOutputReport,
   NoiseAlert,
   VersionInfo,
+  MetricsData,
   MonitorResponse,
   PaginatedResponse,
   TaskQueryParams,
   AlertQueryParams,
   LogQueryParams
-} from './types'
+} from './monitor-types'
 
 function buildQuery(params?: Record<string, unknown>): string {
   if (!params) return ''
@@ -30,57 +31,63 @@ function buildQuery(params?: Record<string, unknown>): string {
 
 export const monitorApi = {
   getSummary: () =>
-    apiFetch<MonitorResponse<SystemSummary>>('/api/monitor/summary'),
+    apiFetch<MonitorResponse<SystemSummary>>('/api/summary'),
 
   getServices: (params?: Record<string, string>) =>
-    apiFetch<MonitorResponse<Service[]>>(`/api/monitor/services${buildQuery(params)}`),
+    apiFetch<MonitorResponse<Service[]>>(`/api/services${buildQuery(params)}`),
 
   getService: (id: string) =>
     apiFetch<MonitorResponse<{ service: Service; instances: ServiceInstance[] }>>(
-      `/api/monitor/services/${id}`
+      `/api/services/${id}`
     ),
 
   getMetrics: () =>
-    apiFetch<MonitorResponse<Record<string, unknown>>>('/api/monitor/metrics'),
+    apiFetch<MonitorResponse<MetricsData>>('/api/metrics'),
 
   getTrends: (window = '24h') =>
-    apiFetch<MonitorResponse<TrendData>>(`/api/monitor/trends?window=${window}`),
+    apiFetch<MonitorResponse<TrendData>>(`/api/trends?window=${window}`),
 
   getAlerts: (params?: AlertQueryParams) =>
     apiFetch<MonitorResponse<PaginatedResponse<AlertEvent>>>(
-      `/api/monitor/alerts${buildQuery(params as unknown as Record<string, unknown>)}`
+      `/api/alerts${buildQuery(params as unknown as Record<string, unknown>)}`
     ),
 
   getLogs: (params?: LogQueryParams) =>
     apiFetch<MonitorResponse<PaginatedResponse<LogEntry>>>(
-      `/api/monitor/logs${buildQuery(params as unknown as Record<string, unknown>)}`
+      `/api/logs${buildQuery(params as unknown as Record<string, unknown>)}`
     ),
 
   getTasks: (params?: TaskQueryParams) =>
     apiFetch<MonitorResponse<PaginatedResponse<TaskExecution>>>(
-      `/api/monitor/tasks${buildQuery(params as unknown as Record<string, unknown>)}`
+      `/api/tasks${buildQuery(params as unknown as Record<string, unknown>)}`
     ),
 
   getSkills: () =>
-    apiFetch<MonitorResponse<SkillMetric[]>>('/api/monitor/skills'),
+    apiFetch<MonitorResponse<SkillMetric[]>>('/api/skills'),
 
   getTools: (type?: string) =>
     apiFetch<MonitorResponse<ToolMetric[]>>(
-      `/api/monitor/tools${type ? `?type=${type}` : ''}`
+      `/api/tools${type ? `?type=${type}` : ''}`
     ),
 
   getModels: () =>
-    apiFetch<MonitorResponse<ModelMetric[]>>('/api/monitor/models'),
+    apiFetch<MonitorResponse<ModelMetric[]>>('/api/models'),
 
   getNoiseLogs: () =>
-    apiFetch<MonitorResponse<NoiseLogReport>>('/api/monitor/noise/logs'),
+    apiFetch<MonitorResponse<NoiseLogReport>>('/api/noise/logs'),
 
   getNoiseOutputs: () =>
-    apiFetch<MonitorResponse<NoiseOutputReport>>('/api/monitor/noise/outputs'),
+    apiFetch<MonitorResponse<NoiseOutputReport>>('/api/noise/outputs'),
 
   getNoiseAlerts: () =>
-    apiFetch<MonitorResponse<NoiseAlert[]>>('/api/monitor/noise/alerts'),
+    apiFetch<MonitorResponse<NoiseAlert[]>>('/api/noise/alerts'),
 
   getVersion: () =>
-    apiFetch<MonitorResponse<VersionInfo>>('/api/monitor/version')
+    apiFetch<MonitorResponse<VersionInfo>>('/api/version'),
+
+  restartService: (id: string, action: 'restart' | 'stop' | 'start' = 'restart') =>
+    apiFetch<MonitorResponse<{ id: string; action: string; success: boolean }>>(
+      `/api/monitor/services/${id}/restart`,
+      { method: 'POST', body: JSON.stringify({ action }) }
+    )
 }

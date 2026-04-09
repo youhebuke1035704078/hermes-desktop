@@ -1,32 +1,40 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { useGatewayStore } from './gateway'
+import { useWebSocketStore } from './websocket'
+import type { Channel, ChannelAuthParams, PairParams } from '@/api/types'
 
 export const useChannelStore = defineStore('channel', () => {
-  const channels = ref<any[]>([])
+  const channels = ref<Channel[]>([])
   const loading = ref(false)
 
-  const gwStore = useGatewayStore()
+  const wsStore = useWebSocketStore()
 
   async function fetchChannels() {
     loading.value = true
     try {
-      channels.value = (await gwStore.rpc.listChannels()) as any[]
-    } catch {
+      channels.value = await wsStore.rpc.listChannels()
+    } catch (error) {
       channels.value = []
+      console.error('[ChannelStore] fetchChannels failed:', error)
     } finally {
       loading.value = false
     }
   }
 
-  async function authChannel(params: any) {
-    return await gwStore.rpc.authChannel(params)
+  async function authChannel(params: ChannelAuthParams) {
+    return await wsStore.rpc.authChannel(params)
   }
 
-  async function pairChannel(params: any) {
-    await gwStore.rpc.pairChannel(params)
+  async function pairChannel(params: PairParams) {
+    await wsStore.rpc.pairChannel(params)
     await fetchChannels()
   }
 
-  return { channels, loading, fetchChannels, authChannel, pairChannel }
+  return {
+    channels,
+    loading,
+    fetchChannels,
+    authChannel,
+    pairChannel,
+  }
 })

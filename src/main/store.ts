@@ -17,6 +17,10 @@ export function getServers(): Omit<ServerConfig, 'encryptedPassword'>[] {
   return store.get('servers').map(({ encryptedPassword: _, ...rest }) => rest)
 }
 
+export function isEncryptionAvailable(): boolean {
+  return safeStorage.isEncryptionAvailable()
+}
+
 export function saveServer(server: {
   id: string
   name: string
@@ -25,7 +29,11 @@ export function saveServer(server: {
   password: string
 }): void {
   const servers = store.get('servers')
-  const encrypted = safeStorage.isEncryptionAvailable()
+  const encryptionOk = safeStorage.isEncryptionAvailable()
+  if (!encryptionOk) {
+    console.warn('[store] ⚠️  safeStorage encryption not available — credentials stored with base64 encoding only (NOT encrypted). This is insecure.')
+  }
+  const encrypted = encryptionOk
     ? safeStorage.encryptString(server.password).toString('base64')
     : Buffer.from(server.password).toString('base64')
 

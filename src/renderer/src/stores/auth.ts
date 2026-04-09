@@ -1,40 +1,39 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { apiFetch, setAuthToken, clearAuthToken } from '../api/http-client'
+import { getBaseURL, setAuthToken, getAuthToken, clearAuthToken } from '@/api/desktop-http-client'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(null)
+  // Single source of truth: sessionStorage via desktop-http-client (cleared on app restart)
+  const token = ref<string | null>(getAuthToken() || null)
+  const authEnabled = ref(true)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
   const isAuthenticated = computed(() => !!token.value)
 
-  async function login(username: string, password: string): Promise<boolean> {
-    loading.value = true
-    error.value = null
+  function setToken(newToken: string | null) {
+    token.value = newToken
+    if (newToken) {
+      setAuthToken(newToken)
+    } else {
+      clearAuthToken()
+    }
+  }
 
+  /** Build absolute URL using Desktop's base URL */
+  function apiUrl(path: string): string {
+    const base = getBaseURL()
+    return base ? `${base}${path}` : path
+  }
+
+  async function checkAuthConfig() {
     try {
-      const data = await apiFetch<{ ok: boolean; token?: string; error?: string }>(
-        '/api/auth/login',
-        {
-          method: 'POST',
-          body: JSON.stringify({ username, password })
-        }
-      )
-
-      if (data.ok && data.token) {
-        token.value = data.token
-        setAuthToken(data.token)
-        loading.value = false
-        return true
-      } else {
-        error.value = data.error || '登录失败'
-        loading.value = false
-        return false
-      }
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : '网络错误'
-      loading.value = false
+      const response = await fetch(apiUrl('/api/auth/config'))
+      const data = await response.json()
+      authEnabled.value = data.enabled
+      return data.enabled
+    } catch {
+      authEnabled.value = false
       return false
     }
   }
@@ -43,11 +42,52 @@ export const useAuthStore = defineStore('auth', () => {
     if (!token.value) return false
 
     try {
-      const res = await apiFetch<{ ok: boolean }>('/api/auth/check')
-      return res.ok
+      const response = await fetch(apiUrl('/api/auth/check'), {
+        headers: {
+          'Authorization': `Bearer ${token.value}`,
+        },
+      })
+
+      if (response.ok) {
+        return true
+      } else {
+        setToken(null)
+        return false
+      }
     } catch {
-      token.value = null
-      clearAuthToken()
+      return false
+    }
+  }
+
+  async function login(username: string, password: string): Promise<boolean> {
+    loading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(apiUrl('/api/auth/login'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.ok) {
+        if (data.token) {
+          setToken(data.token)
+        }
+        loading.value = false
+        return true
+      } else {
+        error.value = data.error || 'Login failed'
+        loading.value = false
+        return false
+      }
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Network error'
+      loading.value = false
       return false
     }
   }
@@ -55,22 +95,34 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     try {
       if (token.value) {
-        await apiFetch('/api/auth/logout', { method: 'POST' })
+        await fetch(apiUrl('/api/auth/logout'), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token.value}`,
+          },
+        })
       }
     } catch {
       // ignore
     }
-    token.value = null
-    clearAuthToken()
+    setToken(null)
+  }
+
+  function getToken(): string | null {
+    return token.value
   }
 
   return {
     token,
+    authEnabled,
     loading,
     error,
     isAuthenticated,
-    login,
+    checkAuthConfig,
     checkAuth,
-    logout
+    setToken,
+    login,
+    logout,
+    getToken,
   }
 })

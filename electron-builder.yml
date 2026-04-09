@@ -24,8 +24,6 @@ nsis:
   createDesktopShortcut: always
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerLanguages:
-    - 2052
   language: 2052
 mac:
   entitlementsInherit: build/entitlements.mac.plist
@@ -35,6 +33,13 @@ mac:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
+  target:
+    - target: dmg
+      arch:
+        - universal
+    - target: zip
+      arch:
+        - universal
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
@@ -48,5 +53,7 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: youhebuke1035704078
+  repo: openclaw-desktop
+  releaseType: release

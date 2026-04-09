@@ -1,28 +1,30 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { useGatewayStore } from './gateway'
+import { useWebSocketStore } from './websocket'
+import type { CronJob, CronRunLogEntry, CronStatus, CronUpsertParams } from '@/api/types'
 
 export const useCronStore = defineStore('cron', () => {
-  const jobs = ref<any[]>([])
-  const status = ref<any | null>(null)
+  const jobs = ref<CronJob[]>([])
+  const status = ref<CronStatus | null>(null)
   const selectedJobId = ref<string | null>(null)
-  const runs = ref<any[]>([])
+  const runs = ref<CronRunLogEntry[]>([])
   const loading = ref(false)
   const statusLoading = ref(false)
   const runsLoading = ref(false)
   const saving = ref(false)
   const lastError = ref<string | null>(null)
 
-  const gwStore = useGatewayStore()
+  const wsStore = useWebSocketStore()
 
   async function fetchJobs() {
     loading.value = true
     lastError.value = null
     try {
-      jobs.value = (await gwStore.rpc.listCrons()) as any[]
+      jobs.value = await wsStore.rpc.listCrons()
     } catch (error) {
       jobs.value = []
       lastError.value = error instanceof Error ? error.message : String(error)
+      console.error('[CronStore] fetchJobs failed:', error)
     } finally {
       loading.value = false
     }
@@ -30,10 +32,13 @@ export const useCronStore = defineStore('cron', () => {
 
   async function fetchStatus() {
     statusLoading.value = true
+    lastError.value = null
     try {
-      status.value = await gwStore.rpc.getCronStatus()
-    } catch {
+      status.value = await wsStore.rpc.getCronStatus()
+    } catch (error) {
       status.value = null
+      lastError.value = error instanceof Error ? error.message : String(error)
+      console.error('[CronStore] fetchStatus failed:', error)
     } finally {
       statusLoading.value = false
     }
@@ -41,15 +46,23 @@ export const useCronStore = defineStore('cron', () => {
 
   async function fetchOverview() {
     await Promise.all([fetchJobs(), fetchStatus()])
+    // Clear stale selection if the selected job was deleted externally
+    if (selectedJobId.value && !jobs.value.some((j) => j.id === selectedJobId.value)) {
+      selectedJobId.value = null
+      clearRuns()
+    }
   }
 
   async function fetchRuns(jobId: string, limit = 50) {
     selectedJobId.value = jobId
     runsLoading.value = true
+    lastError.value = null
     try {
-      runs.value = (await gwStore.rpc.listCronRuns({ jobId, limit })) as any[]
-    } catch {
+      runs.value = await wsStore.rpc.listCronRuns(jobId, limit)
+    } catch (error) {
       runs.value = []
+      lastError.value = error instanceof Error ? error.message : String(error)
+      console.error('[CronStore] fetchRuns failed:', error)
     } finally {
       runsLoading.value = false
     }
@@ -60,10 +73,11 @@ export const useCronStore = defineStore('cron', () => {
     runs.value = []
   }
 
-  async function createJob(params: any) {
+  async function createJob(params: CronUpsertParams) {
     saving.value = true
+    lastError.value = null
     try {
-      await gwStore.rpc.createCron(params)
+      await wsStore.rpc.createCron(params)
       await fetchOverview()
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : String(error)
@@ -73,12 +87,15 @@ export const useCronStore = defineStore('cron', () => {
     }
   }
 
-  async function updateJob(id: string, params: any) {
+  async function updateJob(id: string, params: Partial<CronUpsertParams>) {
     saving.value = true
+    lastError.value = null
     try {
-      await gwStore.rpc.updateCron({ id, ...params })
+      await wsStore.rpc.updateCron(id, params)
       await fetchOverview()
-      if (selectedJobId.value === id) await fetchRuns(id)
+      if (selectedJobId.value === id) {
+        await fetchRuns(id)
+      }
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : String(error)
       throw error
@@ -89,9 +106,12 @@ export const useCronStore = defineStore('cron', () => {
 
   async function deleteJob(id: string) {
     saving.value = true
+    lastError.value = null
     try {
-      await gwStore.rpc.deleteCron({ id })
-      if (selectedJobId.value === id) clearRuns()
+      await wsStore.rpc.deleteCron(id)
+      if (selectedJobId.value === id) {
+        clearRuns()
+      }
       await fetchOverview()
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : String(error)
@@ -101,10 +121,29 @@ export const useCronStore = defineStore('cron', () => {
     }
   }
 
+  async function batchSetModel(model: string): Promise<number> {
+    let count = 0
+    for (const job of jobs.value) {
+      if (job.payload?.kind === 'agentTurn' && job.payload.model !== model) {
+        try {
+          await wsStore.rpc.updateCron(job.id, {
+            payload: { ...job.payload, model },
+          })
+          count++
+        } catch {
+          // skip failed jobs
+        }
+      }
+    }
+    await fetchOverview()
+    return count
+  }
+
   async function runJob(id: string, mode: 'force' | 'due' = 'force') {
     saving.value = true
+    lastError.value = null
     try {
-      await gwStore.rpc.runCron({ id, mode })
+      await wsStore.rpc.runCron(id, mode)
       await fetchOverview()
       await fetchRuns(id)
     } catch (error) {
@@ -116,7 +155,24 @@ export const useCronStore = defineStore('cron', () => {
   }
 
   return {
-    jobs, status, selectedJobId, runs, loading, statusLoading, runsLoading, saving, lastError,
-    fetchJobs, fetchStatus, fetchOverview, fetchRuns, clearRuns, createJob, updateJob, deleteJob, runJob
+    jobs,
+    status,
+    selectedJobId,
+    runs,
+    loading,
+    statusLoading,
+    runsLoading,
+    saving,
+    lastError,
+    fetchJobs,
+    fetchStatus,
+    fetchOverview,
+    fetchRuns,
+    clearRuns,
+    createJob,
+    updateJob,
+    deleteJob,
+    batchSetModel,
+    runJob,
   }
 })

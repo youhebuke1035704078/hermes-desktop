@@ -1,38 +1,58 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, watch } from "vue";
+import { useRoute } from "vue-router";
 import {
-  NMessageProvider, NDialogProvider, NConfigProvider, NNotificationProvider,
-  zhCN, dateZhCN, darkTheme, type GlobalThemeOverrides
-} from 'naive-ui'
+  NConfigProvider,
+  NMessageProvider,
+  NDialogProvider,
+  NNotificationProvider,
+  zhCN,
+  enUS,
+  dateZhCN,
+  dateEnUS,
+} from "naive-ui";
+import { useI18n } from "vue-i18n";
+import { useTheme } from "@/composables/useTheme";
+import { useLocaleStore } from "@/stores/locale";
 
-const isDark = ref(
-  window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
-)
+const { theme } = useTheme();
+const route = useRoute();
+const localeStore = useLocaleStore();
+const { t } = useI18n();
 
-// Listen for OS theme changes
-window.matchMedia?.('(prefers-color-scheme: dark)')
-  .addEventListener('change', (e) => { isDark.value = e.matches })
+const naiveLocale = computed(() =>
+  localeStore.locale === "zh-CN" ? zhCN : enUS,
+);
+const naiveDateLocale = computed(() =>
+  localeStore.locale === "zh-CN" ? dateZhCN : dateEnUS,
+);
 
-const theme = computed(() => isDark.value ? darkTheme : null)
-
-const themeOverrides: GlobalThemeOverrides = {
-  common: {
-    primaryColor: '#18a058',
-    primaryColorHover: '#36ad6a',
-    primaryColorPressed: '#0c7a43',
-    primaryColorSuppl: '#36ad6a',
-    borderRadius: '6px',
-    borderRadiusSmall: '4px'
-  }
-}
+watch(
+  () =>
+    [route.meta.titleKey as string | undefined, localeStore.locale] as const,
+  ([titleKey]) => {
+    if (typeof document === "undefined") return;
+    if (!titleKey) {
+      document.title = "OpenClaw Desktop";
+      return;
+    }
+    const title = t(titleKey);
+    document.title = `${title} - OpenClaw Desktop`;
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
-  <NConfigProvider :locale="zhCN" :date-locale="dateZhCN" :theme="theme" :theme-overrides="themeOverrides">
+  <NConfigProvider
+    :theme="theme"
+    :locale="naiveLocale"
+    :date-locale="naiveDateLocale"
+  >
     <NNotificationProvider>
       <NMessageProvider>
         <NDialogProvider>
-          <router-view />
+          <RouterView />
         </NDialogProvider>
       </NMessageProvider>
     </NNotificationProvider>

@@ -19,13 +19,131 @@ const api = {
   decryptPassword: (id: string): Promise<string | null> =>
     ipcRenderer.invoke('store:decryptPassword', id),
 
+  isEncryptionAvailable: (): Promise<boolean> =>
+    ipcRenderer.invoke('store:isEncryptionAvailable'),
+
   minimize: (): void => ipcRenderer.send('window:minimize'),
   maximize: (): void => ipcRenderer.send('window:maximize'),
   close: (): void => ipcRenderer.send('window:close'),
 
   notify: (title: string, body: string): void => ipcRenderer.send('notify', title, body),
 
-  getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion')
+  notifyAlert: (opts: {
+    title: string
+    body: string
+    severity?: 'critical' | 'warning' | 'info'
+    silent?: boolean
+  }): void => ipcRenderer.send('notify:alert', opts),
+
+  setBadge: (count: number): void => ipcRenderer.send('badge:set', count),
+  clearBadge: (): void => ipcRenderer.send('badge:clear'),
+
+  /** Listen for navigation events from main process (e.g. notification click) */
+  onNavigate: (callback: (path: string) => void): (() => void) => {
+    const handler = (_: any, path: string) => callback(path)
+    ipcRenderer.on('navigate', handler)
+    return () => ipcRenderer.removeListener('navigate', handler)
+  },
+
+  // ── WebSocket bridge (main-process WS with custom Origin) ──
+  wsConnect: (url: string, origin?: string): Promise<void> => ipcRenderer.invoke('ws:connect', url, origin),
+  wsSend: (data: string): void => { ipcRenderer.send('ws:send', data) },
+  wsClose: (code?: number, reason?: string): void => { ipcRenderer.send('ws:close', code, reason) },
+  onWsOpen: (cb: () => void): (() => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('ws:open', handler)
+    return () => { ipcRenderer.removeListener('ws:open', handler) }
+  },
+  onWsMessage: (cb: (data: string) => void): (() => void) => {
+    const handler = (_: unknown, data: string) => cb(data)
+    ipcRenderer.on('ws:message', handler)
+    return () => { ipcRenderer.removeListener('ws:message', handler) }
+  },
+  onWsClose: (cb: (code: number, reason: string) => void): (() => void) => {
+    const handler = (_: unknown, code: number, reason: string) => cb(code, reason)
+    ipcRenderer.on('ws:close', handler)
+    return () => { ipcRenderer.removeListener('ws:close', handler) }
+  },
+  onWsError: (cb: (error: string) => void): (() => void) => {
+    const handler = (_: unknown, error: string) => cb(error)
+    ipcRenderer.on('ws:error', handler)
+    return () => { ipcRenderer.removeListener('ws:error', handler) }
+  },
+
+  // ── HTTP proxy (main-process fetch, no CORS) ──
+  httpFetch: (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; body: string }> =>
+    ipcRenderer.invoke('http:fetch', url, init),
+
+  // ── Backup system ──
+  backupList: (): Promise<{ ok: boolean; backups: Array<{ filename: string; size: number; createdAt: string; date: string }>; error?: string }> =>
+    ipcRenderer.invoke('backup:list'),
+  backupCreate: (): Promise<{ ok: boolean; filename?: string; size?: number; error?: string }> =>
+    ipcRenderer.invoke('backup:create'),
+  backupDelete: (filename: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('backup:delete', filename),
+  backupDownload: (filename: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('backup:download', filename),
+  backupRestore: (filename: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('backup:restore', filename),
+  backupUpload: (): Promise<{ ok: boolean; filename?: string; size?: number; error?: string }> =>
+    ipcRenderer.invoke('backup:upload'),
+  onBackupProgress: (cb: (data: { progress: number; message: string; status: string }) => void): (() => void) => {
+    const handler = (_: unknown, data: { progress: number; message: string; status: string }) => cb(data)
+    ipcRenderer.on('backup:progress', handler)
+    return () => ipcRenderer.removeListener('backup:progress', handler)
+  },
+
+  // ── Local filesystem browsing ──
+  fsReaddir: (dirPath: string): Promise<{
+    ok: boolean
+    entries: Array<{
+      name: string
+      path: string
+      type: 'file' | 'directory'
+      size?: number
+      mtimeMs?: number
+      extension?: string
+    }>
+    error?: string
+  }> => ipcRenderer.invoke('fs:readdir', dirPath),
+
+  fsReadFile: (filePath: string, encoding?: string): Promise<{
+    ok: boolean
+    content?: string
+    encoding?: string
+    name?: string
+    size?: number
+    error?: string
+  }> => ipcRenderer.invoke('fs:readFile', filePath, encoding),
+
+  getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+
+  npmVersions: (): Promise<{ ok: boolean; versions: string[]; error?: string }> =>
+    ipcRenderer.invoke('openclaw:npmVersions'),
+
+  npmUpdate: (version: string): Promise<{ ok: boolean; message?: string; error?: string }> =>
+    ipcRenderer.invoke('openclaw:npmUpdate', version),
+
+  // ── App auto-updater ──
+  updaterCheck: (): Promise<{ ok: boolean; version?: string; error?: string }> =>
+    ipcRenderer.invoke('updater:check'),
+  updaterDownload: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('updater:download'),
+  updaterInstall: (): void => { ipcRenderer.invoke('updater:install') },
+  onUpdaterStatus: (cb: (data: {
+    event: 'checking' | 'available' | 'not-available' | 'progress' | 'downloaded' | 'error'
+    version?: string
+    releaseDate?: string
+    percent?: number
+    bytesPerSecond?: number
+    transferred?: number
+    total?: number
+    error?: string
+  }) => void): (() => void) => {
+    const handler = (_: unknown, data: any) => cb(data)
+    ipcRenderer.on('updater:status', handler)
+    return () => ipcRenderer.removeListener('updater:status', handler)
+  }
 }
 
 if (process.contextIsolated) {
