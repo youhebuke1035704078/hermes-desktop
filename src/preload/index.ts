@@ -117,6 +117,7 @@ const api = {
   }> => ipcRenderer.invoke('fs:readFile', filePath, encoding),
 
   getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+  getHomedir: (): Promise<string> => ipcRenderer.invoke('app:homedir'),
 
   npmVersions: (): Promise<{ ok: boolean; versions: string[]; error?: string }> =>
     ipcRenderer.invoke('openclaw:npmVersions'),

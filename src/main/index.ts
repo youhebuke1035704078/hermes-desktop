@@ -201,6 +201,9 @@ function registerIpcHandlers(): void {
     }
   })
 
+  // Return local home directory path (for constructing ~/.openclaw path)
+  ipcMain.handle('app:homedir', () => homedir())
+
   // Local filesystem browsing (scoped to workspace directories)
   ipcMain.handle('fs:readdir', async (_, dirPath: string) => {
     try {

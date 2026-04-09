@@ -26,6 +26,7 @@ interface OpenClawAPI {
   clearBadge(): void
   onNavigate(callback: (path: string) => void): () => void
   getVersion(): Promise<string>
+  getHomedir(): Promise<string>
   npmVersions(): Promise<{ ok: boolean; versions: string[]; error?: string }>
   npmUpdate(version: string): Promise<{ ok: boolean; message?: string; error?: string }>
 

@@ -292,8 +292,16 @@ const selectedAgentId = computed({
   }
 })
 
-/** Use .openclaw root instead of workspace subdirectory */
+/** Local home directory (fetched once from Electron main process) */
+const localHomedir = ref('')
+
+/** Resolved local workspace path: always prefer local ~/.openclaw */
 const currentWorkspace = computed(() => {
+  // If we have the local home directory, always use it
+  if (localHomedir.value) {
+    return `${localHomedir.value}/.openclaw`
+  }
+  // Fallback: derive from gateway workspace path
   const ws = memoryStore.workspace
   if (!ws) return ''
   const idx = ws.indexOf('/.openclaw/')
@@ -480,12 +488,26 @@ function resolveAbsDir(relativePath: string): string {
 const isLocalWorkspace = ref<boolean | null>(null)
 async function checkLocalWorkspace(): Promise<boolean> {
   if (isLocalWorkspace.value !== null) return isLocalWorkspace.value
-  if (!window.api?.fsReaddir || !currentWorkspace.value) {
+  if (!window.api?.fsReaddir) {
     isLocalWorkspace.value = false
     return false
   }
-  // Try reading the workspace root — if it fails, it's a remote path
+
+  // Fetch local home directory if not yet available
+  if (!localHomedir.value && window.api?.getHomedir) {
+    try {
+      localHomedir.value = await window.api.getHomedir()
+    } catch { /* ignore */ }
+  }
+
+  if (!currentWorkspace.value) {
+    isLocalWorkspace.value = false
+    return false
+  }
+
+  // Try reading the workspace root
   const result = await window.api.fsReaddir(currentWorkspace.value)
+  console.log('[FilesPage] checkLocalWorkspace:', currentWorkspace.value, '→', result.ok ? 'LOCAL' : `REMOTE (${result.error})`)
   isLocalWorkspace.value = result.ok
   return result.ok
 }
@@ -505,6 +527,7 @@ async function browsePath(path: string) {
 
     // Use Electron local FS only when workspace is on this machine
     if (useLocalFs && window.api?.fsReaddir) {
+      console.log('[FilesPage] browsePath LOCAL:', absDir)
       const result = await window.api.fsReaddir(absDir)
       if (!result.ok) {
         throw new Error(result.error || t('pages.files.loadFailed'))
@@ -518,6 +541,7 @@ async function browsePath(path: string) {
         extension: e.extension,
       }))
     } else {
+      console.log('[FilesPage] browsePath RPC fallback, useLocalFs=', useLocalFs, 'workspace=', currentWorkspace.value)
       // Remote connection: use RPC-based file list
       if (allFiles.value.length === 0) {
         const agentId = selectedAgentId.value || 'main'
@@ -893,14 +917,21 @@ async function uploadPastedImage(_file: File) {
 }
 
 async function initialize() {
+  // Fetch local home directory early so currentWorkspace uses the local path
+  if (!localHomedir.value && window.api?.getHomedir) {
+    try {
+      localHomedir.value = await window.api.getHomedir()
+    } catch { /* ignore */ }
+  }
+
   if (memoryStore.agents.length === 0) {
     await memoryStore.fetchAgents()
   }
-  
+
   if (!memoryStore.selectedAgentId && memoryStore.agents.length > 0) {
     memoryStore.selectedAgentId = memoryStore.defaultAgentId || memoryStore.agents[0]?.id || 'main'
   }
-  
+
   if (memoryStore.selectedAgentId && !memoryStore.workspace) {
     await memoryStore.fetchFiles(memoryStore.selectedAgentId)
   }
