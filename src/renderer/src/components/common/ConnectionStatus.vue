@@ -296,17 +296,17 @@ async function handleCustomUpdate() {
   <NSpace :size="8" align="center">
     <!-- Desktop App version & update -->
     <NPopover
-      v-if="appUpdateAvailable || appDownloading || appDownloaded"
+      v-if="appVersion"
       trigger="click"
       placement="bottom"
-      :width="300"
+      :width="320"
     >
       <template #trigger>
         <NTag
           size="small"
           :bordered="false"
           round
-          :type="appDownloaded ? 'success' : 'warning'"
+          :type="appDownloaded ? 'success' : appUpdateAvailable ? 'warning' : appDownloading ? 'warning' : 'default'"
           style="cursor: pointer;"
         >
           {{
@@ -314,13 +314,15 @@ async function handleCustomUpdate() {
               ? `Desktop 新版本已就绪`
               : appDownloading
               ? `Desktop 下载中 ${Math.round(appDownloadPercent)}%`
-              : `Desktop 新版本 v${appNewVersion}`
+              : appUpdateAvailable
+              ? `Desktop 可升级到 v${appNewVersion}`
+              : `Desktop v${appVersion}`
           }}
         </NTag>
       </template>
       <div style="padding: 12px;">
         <div style="margin-bottom: 8px; font-size: 13px;">
-          当前 Desktop 版本 v{{ appVersion }}
+          当前 Desktop 版本 v{{ appVersion }}{{ appUpdateAvailable && appNewVersion ? `，可升级到 v${appNewVersion}` : '' }}
         </div>
 
         <!-- Download progress -->
@@ -333,14 +335,27 @@ async function handleCustomUpdate() {
         />
 
         <NSpace :size="8">
+          <!-- No update detected yet: check button -->
           <NButton
-            v-if="!appDownloaded && !appDownloading"
+            v-if="!appUpdateAvailable && !appDownloading && !appDownloaded"
+            size="small"
+            :type="appChecking ? 'default' : 'primary'"
+            :loading="appChecking"
+            :disabled="appChecking"
+            @click="checkAppUpdate"
+          >
+            {{ appChecking ? '检查中...' : '检查新版本' }}
+          </NButton>
+          <!-- Update available: download button -->
+          <NButton
+            v-if="appUpdateAvailable && !appDownloading && !appDownloaded"
             size="small"
             type="primary"
             @click="downloadAppUpdate"
           >
             下载 v{{ appNewVersion }}
           </NButton>
+          <!-- Downloaded: install button -->
           <NButton
             v-if="appDownloaded"
             size="small"
@@ -354,19 +369,11 @@ async function handleCustomUpdate() {
         <div v-if="appUpdateError" style="margin-top: 6px; font-size: 12px; color: #d03050;">
           {{ appUpdateError }}
         </div>
+        <div v-else-if="!appUpdateAvailable && !appDownloading && !appDownloaded && !appChecking && !appUpdateError" style="margin-top: 6px; font-size: 12px; color: var(--text-color-3);">
+          点击检查是否有新版本可用
+        </div>
       </div>
     </NPopover>
-    <NTag
-      v-else-if="appVersion"
-      size="small"
-      :bordered="false"
-      round
-      :type="appChecking ? undefined : 'default'"
-      style="cursor: pointer;"
-      @click="checkAppUpdate"
-    >
-      Desktop v{{ appVersion }}{{ appChecking ? ' · 检查中...' : '' }}
-    </NTag>
 
     <!-- Version: up to date (green) -->
     <NTag
