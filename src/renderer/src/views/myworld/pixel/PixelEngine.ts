@@ -272,6 +272,14 @@ export class PixelEngine {
     if (path.length > 0) ch.path = path
   }
 
+  /** Public API: move a character by id to the given tile */
+  moveCharacterTo(id: string, tx: number, ty: number): boolean {
+    const ch = this.characters.get(id)
+    if (!ch) return false
+    this.walkTo(ch, tx, ty)
+    return true
+  }
+
   private findFreeDeskIndex(): number {
     for (let i = 0; i < DESK_WAYPOINTS.length; i++) {
       if (!this.usedDesks.has(i)) return i

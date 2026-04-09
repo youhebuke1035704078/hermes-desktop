@@ -132,6 +132,13 @@ async function handleEngineEvent(evt: any) {
 
     case 'click-floor':
       showSessionPicker.value = false
+      // Move the selected agent (or first agent) to the clicked tile
+      if (engine) {
+        const agentId = officeStore.selectedAgentId || officeStore.officeAgents[0]?.id
+        if (agentId) {
+          engine.moveCharacterTo(agentId, evt.tx, evt.ty)
+        }
+      }
       break
   }
 }
