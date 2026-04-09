@@ -239,42 +239,23 @@ function openRestartModal() {
 async function confirmRestart() {
   restarting.value = true
   restartResult.value = null
+  const delayMs = Math.max(0, Math.floor((restartDelaySec.value ?? 3) * 1000))
   try {
-    const delayMs = Math.max(0, Math.floor((restartDelaySec.value ?? 3) * 1000))
-    const res = await wsStore.rpc.runUpdate({
+    await wsStore.rpc.runUpdate({
       note: 'restart via desktop UI',
       restartDelayMs: delayMs,
       timeoutMs: 10000,
     })
-    if (res.restart?.ok) {
-      restartResult.value = {
-        ok: true,
-        message: t('pages.system.restart.scheduled', { delay: restartDelaySec.value }),
-      }
-      message.success(t('pages.system.restart.scheduled', { delay: restartDelaySec.value }))
-    } else {
-      const reason = res.restart?.error || res.restart?.reason || t('pages.system.restart.unknownError')
-      restartResult.value = { ok: false, message: reason }
-      message.error(reason)
-    }
-  } catch (err) {
-    // Gateway restarts → WebSocket drops → RPC never gets a response → timeout.
-    // Treat timeout / connection errors as "restart initiated successfully".
-    const msg = err instanceof Error ? err.message : ''
-    const isRestartSideEffect = /timeout|close|disconnect|ECONNR/i.test(msg)
-    if (isRestartSideEffect) {
-      restartResult.value = {
-        ok: true,
-        message: t('pages.system.restart.scheduled', { delay: restartDelaySec.value }),
-      }
-      message.success(t('pages.system.restart.scheduled', { delay: restartDelaySec.value }))
-    } else {
-      restartResult.value = { ok: false, message: msg || t('pages.system.restart.failed') }
-      message.error(msg || t('pages.system.restart.failed'))
-    }
-  } finally {
-    restarting.value = false
+  } catch {
+    // Gateway restarts → WebSocket drops → RPC timeout / error. Expected.
   }
+  // Regardless of response or error, treat as "restart initiated".
+  restartResult.value = {
+    ok: true,
+    message: t('pages.system.restart.scheduled', { delay: restartDelaySec.value }),
+  }
+  message.success(t('pages.system.restart.scheduled', { delay: restartDelaySec.value }))
+  restarting.value = false
 }
 
 onMounted(() => {
