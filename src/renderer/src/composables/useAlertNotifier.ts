@@ -1,7 +1,7 @@
 import { ref, onUnmounted } from 'vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useCronStore } from '@/stores/cron'
-import { isChannelLinked } from '@/utils/health'
+import { isChannelExplicitlyUnlinked } from '@/utils/health'
 
 /**
  * Polls gateway health + cron state to detect alerts.
@@ -45,12 +45,13 @@ export function useAlertNotifier(options: { interval?: number } = {}) {
         const health = await wsStore.rpc.getHealth()
         if (health?.channels) {
           for (const [name, ch] of Object.entries(health.channels)) {
-            // Use isChannelLinked() — multi-account channels (e.g. feishu)
-            // store per-account linked state under `ch.accounts[id].linked`
-            // and leave the top-level `ch.linked` as undefined. A naive
-            // `!ch.linked` check therefore fires false-positive alerts for
-            // every multi-account channel, regardless of actual health.
-            if (ch.configured && !isChannelLinked(ch)) {
+            // Only alert when we have an EXPLICIT unlinked signal. The old
+            // `!ch.linked` check and even the boolean `isChannelLinked()`
+            // fire false positives when the gateway omits the `linked`
+            // field (webhook-only plugins, older gateways, multi-account
+            // channels with partial account data). Use the tri-state
+            // helper so 'unknown' states don't turn into desktop noise.
+            if (ch.configured && isChannelExplicitlyUnlinked(ch)) {
               alertIds.push({ id: `channel-${name}`, title: `通道异常: ${name}`, severity: 'warning' })
             }
           }

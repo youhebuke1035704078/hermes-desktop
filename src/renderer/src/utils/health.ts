@@ -1,28 +1,62 @@
 import type { HealthChannelSummary } from '@/api/types'
 
 /**
- * Decide whether a channel is actually linked to its upstream.
+ * Tri-state channel link result:
+ *   - 'linked'   — we have a positive signal that the channel is linked
+ *   - 'unlinked' — we have an explicit negative signal (linked === false)
+ *   - 'unknown'  — the field is simply missing / undefined
  *
- * Gateway's HealthChannelSummary has a top-level `linked` field that is only
- * populated for single-account channels. Multi-account channels (e.g. feishu
- * with one or more webhook accounts) put the real per-account state under
- * `accounts[accountId].linked` and leave the top-level `linked` as `undefined`.
- *
- * A naive `!ch.linked` check therefore flags EVERY multi-account channel as
- * "abnormal" because `!undefined === true`. We aggregate here: a channel is
- * considered linked when either
- *   - the top-level `linked` is explicitly `true`, OR
- *   - `accounts` is populated and at least one account has `linked === true`.
- *
- * Returning `false` when `linked` is merely missing (no accounts at all) is
- * intentional — we don't want to assume health just because the server
- * omitted the field.
+ * The `unknown` state is important: webhook-only channels (e.g. a feishu
+ * plugin that only uses incoming webhooks) often don't report a `linked`
+ * field at all, and some gateway versions omit the field for configured
+ * channels. Treating `unknown` as `unlinked` produces false-positive alerts,
+ * so callers that raise alerts should only react to the explicit 'unlinked'
+ * state.
  */
-export function isChannelLinked(ch: HealthChannelSummary): boolean {
-  if (ch.linked === true) return true
+export type ChannelLinkState = 'linked' | 'unlinked' | 'unknown'
+
+export function getChannelLinkState(ch: HealthChannelSummary): ChannelLinkState {
+  // Explicit top-level positive signal
+  if (ch.linked === true) return 'linked'
+
+  // Multi-account aggregation (e.g. feishu with multiple webhook accounts).
+  // Any explicit `linked === true` in any account wins.
   const accounts = ch.accounts
   if (accounts && Object.keys(accounts).length > 0) {
-    return Object.values(accounts).some((acc) => acc?.linked === true)
+    const states = Object.values(accounts).map((acc) => acc?.linked)
+    if (states.some((s) => s === true)) return 'linked'
+    if (states.length > 0 && states.every((s) => s === false)) return 'unlinked'
+    // At least one account has linked === undefined — can't say for sure.
+    // Respect an explicit top-level 'false' if present, else unknown.
+    if (ch.linked === false) return 'unlinked'
+    return 'unknown'
   }
-  return false
+
+  // No accounts array at all. Respect explicit top-level linked === false,
+  // otherwise the field is simply missing — don't pretend it's unlinked.
+  if (ch.linked === false) return 'unlinked'
+  return 'unknown'
+}
+
+/**
+ * Returns true when the channel is positively known to be linked.
+ * Use this for UI classification ("running" vs "configured") where we
+ * want to be conservative — only show the "running" state when we have
+ * affirmative evidence.
+ *
+ * Note: `unknown` maps to `false` here, so callers that want to avoid
+ * false-positive alerts should use `isChannelExplicitlyUnlinked()` instead.
+ */
+export function isChannelLinked(ch: HealthChannelSummary): boolean {
+  return getChannelLinkState(ch) === 'linked'
+}
+
+/**
+ * Returns true ONLY when the channel has an explicit "unlinked" signal.
+ * Use this when raising alerts — we don't want to alert on `unknown`
+ * states because many channels (webhook-only, custom plugins, older
+ * gateway versions) don't report a `linked` field at all.
+ */
+export function isChannelExplicitlyUnlinked(ch: HealthChannelSummary): boolean {
+  return getChannelLinkState(ch) === 'unlinked'
 }

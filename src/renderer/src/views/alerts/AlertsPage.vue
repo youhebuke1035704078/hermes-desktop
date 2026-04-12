@@ -15,7 +15,7 @@ import { RefreshOutline } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useCronStore } from '@/stores/cron'
-import { isChannelLinked } from '@/utils/health'
+import { getChannelLinkState, isChannelExplicitlyUnlinked } from '@/utils/health'
 
 interface GatewayAlert {
   id: string
@@ -79,18 +79,22 @@ async function refresh() {
         // Check individual channels for issues
         if (health.channels) {
           for (const [name, ch] of Object.entries(health.channels)) {
-            // Use isChannelLinked() so multi-account channels (where the
-            // per-account `linked` lives under `ch.accounts`, not at the
-            // top level) aren't flagged as abnormal just because the
-            // top-level `linked` field is undefined.
-            const notOk = ch.configured && !isChannelLinked(ch)
-            if (notOk) {
+            // Only alert when we have an EXPLICIT "unlinked" signal
+            // (tri-state: linked | unlinked | unknown). Gateways that
+            // omit the `linked` field — webhook-only plugins, older
+            // versions, multi-account channels with partial account
+            // state — should not produce alerts. See utils/health.ts
+            // for the full rationale.
+            if (ch.configured && isChannelExplicitlyUnlinked(ch)) {
+              const accountCount = ch.accounts ? Object.keys(ch.accounts).length : 0
               collected.push({
                 id: `channel-${name}`,
                 severity: 'warning',
                 state: 'active',
                 title: `${t('pages.alerts.channelIssue')}: ${name}`,
-                message: `configured=${ch.configured} linked=${isChannelLinked(ch)}`,
+                // Include diagnostic detail so future false positives can
+                // be root-caused without requiring a dev-tools session.
+                message: `state=${getChannelLinkState(ch)} top=${String(ch.linked)} accounts=${accountCount}`,
                 source: name,
                 createdAt: new Date().toISOString(),
               })

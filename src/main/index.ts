@@ -186,27 +186,56 @@ function registerIpcHandlers(): void {
   // App info
   ipcMain.handle('app:getVersion', () => app.getVersion())
 
-  // OpenClaw npm update — runs in Electron's shell so npm is in PATH
+  // OpenClaw version lookup — fetch directly from the npm registry HTTPS
+  // endpoint instead of shelling out to `npm view`. Electron apps launched
+  // outside a login shell often don't have `npm` in PATH (especially on
+  // Windows where it's installed via nvm-windows or node MSI and the cmd.exe
+  // environment doesn't inherit user PATH). Hitting registry.npmjs.org
+  // directly removes the dependency entirely and works through corporate
+  // proxies that already route to the registry.
   ipcMain.handle('openclaw:npmVersions', async () => {
-    return new Promise((resolve) => {
-      const shell = process.platform === 'win32' ? 'cmd' : '/bin/zsh'
-      const args = process.platform === 'win32'
-        ? ['/c', 'npm view openclaw versions --json']
-        : ['-l', '-c', 'npm view openclaw versions --json']
-      execFile(shell, args, { timeout: 30000 }, (err, stdout) => {
-        if (err) {
-          resolve({ ok: false, error: err.message, versions: [] })
-          return
-        }
-        try {
-          const parsed = JSON.parse(stdout)
-          const versions = (Array.isArray(parsed) ? parsed : [parsed]).reverse()
-          resolve({ ok: true, versions })
-        } catch {
-          resolve({ ok: false, error: 'Failed to parse versions', versions: [] })
-        }
+    try {
+      const res = await fetch('https://registry.npmjs.org/openclaw', {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(30000),
       })
-    })
+      if (!res.ok) {
+        return { ok: false, error: `Registry HTTP ${res.status}`, versions: [] }
+      }
+      const data = (await res.json()) as {
+        versions?: Record<string, unknown>
+        'dist-tags'?: { latest?: string }
+        time?: Record<string, string>
+      }
+      const versionKeys = data.versions ? Object.keys(data.versions) : []
+      if (versionKeys.length === 0) {
+        return { ok: false, error: 'Registry returned no versions', versions: [] }
+      }
+      // Sort by publish time desc (newest first). Fall back to string
+      // compare for versions that lack a time entry.
+      const time = data.time || {}
+      const sorted = [...versionKeys].sort((a, b) => {
+        const ta = time[a] ? Date.parse(time[a]) : 0
+        const tb = time[b] ? Date.parse(time[b]) : 0
+        if (tb !== ta) return tb - ta
+        return b.localeCompare(a)
+      })
+      // If dist-tags.latest is available, pin it to the front just in case
+      // a newer version was published with an older timestamp (prerelease
+      // re-publish, etc).
+      const latest = data['dist-tags']?.latest
+      if (latest && sorted[0] !== latest) {
+        const idx = sorted.indexOf(latest)
+        if (idx > 0) {
+          sorted.splice(idx, 1)
+          sorted.unshift(latest)
+        }
+      }
+      return { ok: true, versions: sorted }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, error: msg, versions: [] }
+    }
   })
 
   ipcMain.handle('openclaw:npmUpdate', async (_, version: string) => {
