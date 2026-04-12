@@ -149,9 +149,48 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
 
+/**
+ * Wait for the WebSocket store to report a CONNECTED state, with a timeout.
+ * After a gateway restart the connection drops and the client auto-reconnects;
+ * once the `connected` handshake completes, `wsStore.state` flips back to
+ * 'connected' and `wsStore.gatewayVersion` is populated with the new version.
+ */
+function waitForReconnect(timeoutMs = 60000): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (wsStore.state === ConnectionState.CONNECTED) {
+      resolve(true)
+      return
+    }
+    const timer = setTimeout(() => {
+      cleanup()
+      resolve(false)
+    }, timeoutMs)
+    // Poll state — simpler and more reliable than trying to hook into
+    // the emitter from a component (the store is reactive).
+    const poll = setInterval(() => {
+      if (wsStore.state === ConnectionState.CONNECTED) {
+        clearTimeout(timer)
+        clearInterval(poll)
+        resolve(true)
+      }
+    }, 500)
+    const cleanup = () => clearInterval(poll)
+  })
+}
+
+/**
+ * Returns true when an RPC error looks like a disconnect / timeout that is
+ * expected during a gateway restart (i.e. the update probably succeeded but
+ * the response was lost when the connection dropped).
+ */
+function isDisconnectOrTimeout(errMsg: string): boolean {
+  return /timeout|timed out|not open|closed|disconnect/i.test(errMsg)
+}
+
 async function handleUpgrade() {
   if (!selectedVersion.value) return
   const version = selectedVersion.value
+  const versionBefore = wsStore.gatewayVersion
   isUpdating.value = true
   updateProgress.value = 0
   updateStatusMessage.value = '正在准备升级...'
@@ -164,7 +203,7 @@ async function handleUpgrade() {
       stopProgressSim()
       if (result.ok) {
         updateProgress.value = 100
-        const before = result.result?.before?.version || wsStore.gatewayVersion
+        const before = result.result?.before?.version || versionBefore
         const after = result.result?.after?.version || version
         updateStatusMessage.value = result.restart?.ok
           ? `升级成功 ${before} → ${after}，网关重启中...`
@@ -178,6 +217,48 @@ async function handleUpgrade() {
       break
     } catch (err: any) {
       const errMsg = err?.message || '未知错误'
+
+      // ── Expected disconnect / timeout during gateway restart ──
+      // update.run tells the gateway to `npm install -g openclaw@ver`
+      // and then restart itself. When the gateway exits, the WebSocket
+      // drops and the pending RPC promise rejects with a timeout or
+      // "not open" error. This is the NORMAL success path — the
+      // update worked but we lost the response. Wait for the client
+      // to auto-reconnect and verify the new version.
+      if (isDisconnectOrTimeout(errMsg)) {
+        updateStatusMessage.value = '网关正在重启，等待重新连接...'
+        const reconnected = await waitForReconnect(60000)
+        stopProgressSim()
+        if (reconnected) {
+          // Give one tick for gatewayVersion to be populated from the
+          // `connected` event payload.
+          await sleep(500)
+          const newVersion = wsStore.gatewayVersion
+          if (newVersion && newVersion !== versionBefore) {
+            updateProgress.value = 100
+            updateStatusMessage.value = `升级成功 ${versionBefore} → ${newVersion}`
+            message.success(updateStatusMessage.value)
+          } else {
+            // Reconnected but version didn't change — update may have
+            // failed silently, or the target version was the same.
+            updateProgress.value = 100
+            updateStatusMessage.value = newVersion === version
+              ? `版本已是 ${version}`
+              : `网关已重连 (当前版本: ${newVersion || '未知'})，请确认升级结果`
+            message.info(updateStatusMessage.value)
+          }
+        } else {
+          updateProgress.value = 0
+          updateStatusMessage.value = '网关重启后未能重新连接，请手动检查'
+          message.warning(updateStatusMessage.value)
+        }
+        // Refresh page data after reconnection
+        fetchData()
+        fetchNpmVersions()
+        break
+      }
+
+      // ── Rate-limit retry ──
       const retryDelay = parseRetryDelay(errMsg)
       if (retryDelay && attempt < 3) {
         const secs = Math.ceil(retryDelay / 1000)
@@ -187,6 +268,8 @@ async function handleUpgrade() {
         }
         continue
       }
+
+      // ── Genuine failure ──
       stopProgressSim()
       updateProgress.value = 0
       updateStatusMessage.value = errMsg
