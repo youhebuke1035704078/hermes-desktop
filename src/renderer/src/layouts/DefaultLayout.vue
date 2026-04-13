@@ -5,17 +5,20 @@ import { NLayout, NLayoutSider, NLayoutHeader, NLayoutContent } from 'naive-ui'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import { useWebSocketStore } from '@/stores/websocket'
+import { useConnectionStore } from '@/stores/connection'
 import { ConnectionState } from '@/api/types'
 
 const collapsed = ref(false)
 const router = useRouter()
 const wsStore = useWebSocketStore()
+const connectionStore = useConnectionStore()
 
 let cleanupNavigate: (() => void) | undefined
 
 onMounted(() => {
-  // Only connect if not already connected (connection store handles initial connect)
-  if (wsStore.state === ConnectionState.DISCONNECTED || wsStore.state === ConnectionState.FAILED) {
+  // Skip WebSocket reconnect in Hermes REST mode (no WS needed)
+  const isHermesRest = connectionStore.serverType === 'hermes-rest'
+  if (!isHermesRest && (wsStore.state === ConnectionState.DISCONNECTED || wsStore.state === ConnectionState.FAILED)) {
     wsStore.connect().catch((err) => {
       console.warn('[DefaultLayout] Background reconnect failed:', err)
     })

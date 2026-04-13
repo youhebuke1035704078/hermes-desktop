@@ -23,7 +23,7 @@ const DEFAULT_CONFIG: Required<Omit<WebSocketConfig, 'auth' | 'getToken' | 'onUn
   onUnauthorized: undefined,
 }
 
-export class OpenClawWebSocket {
+export class HermesWebSocket {
   private apiClient: ApiClient
   private config: Required<Omit<WebSocketConfig, 'auth' | 'getToken' | 'onUnauthorized'>> & { auth?: string; getToken?: () => string | null; onUnauthorized?: () => void }
   private listeners = new Map<string, Set<EventHandler>>()

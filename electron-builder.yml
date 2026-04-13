@@ -1,5 +1,5 @@
-appId: com.openclaw.desktop
-productName: OpenClaw Desktop
+appId: com.nousresearch.hermes-desktop
+productName: Hermes Desktop
 directories:
   buildResources: build
 files:
@@ -12,43 +12,34 @@ files:
 asarUnpack:
   - 'resources/**'
 win:
-  executableName: openclaw-desktop
+  executableName: hermes-desktop
   target:
     - target: nsis
       arch:
         - x64
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: OpenClaw Desktop
-  uninstallDisplayName: OpenClaw Desktop
+  shortcutName: Hermes Desktop
+  uninstallDisplayName: Hermes Desktop
   createDesktopShortcut: always
   oneClick: true
   language: 2052
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
   target:
     - target: dmg
       arch:
-        - x64
-        - arm64
-    - target: zip
-      arch:
-        - x64
         - arm64
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
   target:
     - AppImage
-    - snap
-    - deb
-  maintainer: openclaw.dev
+  maintainer: hermes-desktop
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
@@ -56,5 +47,5 @@ npmRebuild: false
 publish:
   provider: github
   owner: youhebuke1035704078
-  repo: openclaw-desktop
+  repo: hermes-desktop
   releaseType: release

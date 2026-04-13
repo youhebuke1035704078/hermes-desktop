@@ -1,32 +1,16 @@
-import { defineStore } from 'pinia'
+/**
+ * Stub store — the full wideMode store was removed during the Hermes Desktop fork.
+ * Provides the minimal interface consumed by AppHeader.
+ */
 import { ref } from 'vue'
+import { defineStore } from 'pinia'
 
 export const useWideModeStore = defineStore('wideMode', () => {
   const isWideMode = ref(false)
 
   function toggle() {
     isWideMode.value = !isWideMode.value
-    updateBodyClass()
   }
 
-  function setWideMode(value: boolean) {
-    isWideMode.value = value
-    updateBodyClass()
-  }
-
-  function updateBodyClass() {
-    if (typeof document !== 'undefined') {
-      if (isWideMode.value) {
-        document.body.classList.add('wide-mode')
-      } else {
-        document.body.classList.remove('wide-mode')
-      }
-    }
-  }
-
-  return {
-    isWideMode,
-    toggle,
-    setWideMode,
-  }
+  return { isWideMode, toggle }
 })

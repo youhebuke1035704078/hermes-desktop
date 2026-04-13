@@ -16,12 +16,12 @@
 import { ipcMain, type WebContents } from 'electron'
 import WebSocket from 'ws'
 
-// Debug logging: gated behind OC_WS_DEBUG env var so production builds don't
+// Debug logging: gated behind HERMES_WS_DEBUG env var so production builds don't
 // flood stderr or leak JSON-RPC payload previews. The previous implementation
 // unconditionally appended every message to /tmp/ws-bridge.log which (1) grew
 // unbounded on macOS/Linux, (2) silently failed on Windows where /tmp doesn't
 // exist, and (3) persisted fragments of auth-bearing WebSocket traffic.
-const DEBUG_WS = !!process.env.OC_WS_DEBUG
+const DEBUG_WS = !!process.env.HERMES_WS_DEBUG
 
 function dbg(...args: unknown[]): void {
   if (!DEBUG_WS) return

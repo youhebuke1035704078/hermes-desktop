@@ -1,5 +1,5 @@
 /**
- * ApiClient — Native WebSocket client for OpenClaw Gateway protocol v3.
+ * ApiClient — Native WebSocket client for Hermes Gateway protocol v3.
  *
  * Connection flow:
  *   1. Open WebSocket to ws(s)://<host>/
@@ -293,8 +293,8 @@ export class ApiClient {
       minProtocol: 3,
       maxProtocol: 3,
       client: {
-        id: 'openclaw-control-ui',
-        displayName: 'OpenClaw Desktop',
+        id: 'hermes-desktop',
+        displayName: 'Hermes Desktop',
         version: __APP_VERSION__,
         platform: this.detectPlatform(),
         mode: 'ui',

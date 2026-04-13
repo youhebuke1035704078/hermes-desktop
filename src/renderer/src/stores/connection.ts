@@ -27,13 +27,81 @@ export class ConnectionError extends Error {
 
 /** Maximum time (ms) for the entire connect flow before we abort */
 const CONNECT_TIMEOUT = 15_000
+/** Shorter timeout for auto-connect to local server (snappier UX) */
+const LOCAL_CONNECT_TIMEOUT = 5_000
+
+/** Default local Hermes server — no saved config / IPC needed */
+const LOCAL_SERVER: ServerConfig = {
+  id: '__local__',
+  name: '本地 Hermes',
+  url: 'http://localhost:8642',
+  username: '_noauth_',
+}
 
 export const useConnectionStore = defineStore('connection', () => {
   const currentServer = ref<ServerConfig | null>(null)
   const status = ref<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
   const servers = ref<ServerConfig[]>([])
+  /**
+   * Server type: 'hermes-rest' for Hermes Agent REST API, 'acp-ws' for ACP WebSocket gateway.
+   * Determined automatically during connection by probing /health endpoint.
+   */
+  const serverType = ref<'hermes-rest' | 'acp-ws' | null>(null)
+  /** Actual underlying model name from ~/.hermes/config.yaml (e.g. "gpt-5.4") */
+  const hermesRealModel = ref<string | null>(null)
   /** Stops the watcher that syncs status with wsStore.state after initial connect */
   let stopStateSync: (() => void) | null = null
+
+  /** Check whether a URL points to the local machine */
+  function isLocalUrl(url: string): boolean {
+    try {
+      const host = new URL(url).hostname
+      return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+    } catch { return false }
+  }
+
+  /**
+   * Fetch the actual underlying model name for a Hermes REST server.
+   * Strategy:
+   *  1. Probe GET /hermes/info on the server (future-proof: works for remote servers
+   *     if Hermes Agent ever exposes model info via API)
+   *  2. For local servers only: read ~/.hermes/config.yaml via IPC
+   *  3. Graceful fallback: hermesRealModel stays null → UI shows proxy model name
+   */
+  async function fetchHermesModel() {
+    const serverUrl = currentServer.value?.url
+    if (!serverUrl) return
+
+    // Strategy 1: Try remote /hermes/info endpoint
+    try {
+      const infoResp = window.api
+        ? await window.api.httpFetch(`${serverUrl}/hermes/info`)
+        : await fetch(`${serverUrl}/hermes/info`, { signal: AbortSignal.timeout(3000) })
+            .then(r => ({ ok: r.ok, status: r.status, body: '' }))
+      if (infoResp.ok) {
+        const body = typeof infoResp.body === 'string' && infoResp.body
+          ? infoResp.body : ''
+        const data = body ? JSON.parse(body) : {}
+        if (data?.model) {
+          hermesRealModel.value = data.model
+          return
+        }
+      }
+    } catch { /* endpoint not available — fall through */ }
+
+    // Strategy 2: Read local config file (only for localhost)
+    if (isLocalUrl(serverUrl) && window.api?.hermesConfig) {
+      try {
+        const result = await window.api.hermesConfig()
+        if (result.ok && result.model) {
+          hermesRealModel.value = result.model
+          return
+        }
+      } catch { /* config read failed */ }
+    }
+
+    // Strategy 3: Fallback — hermesRealModel remains null
+  }
 
   async function loadServers() {
     if (!window.api) {
@@ -98,14 +166,40 @@ export const useConnectionStore = defineStore('connection', () => {
       const isNoAuth = server.username === '_noauth_' && password === '_noauth_'
 
       if (isNoAuth) {
-        // Server has auth disabled — no token needed
         authStore.authEnabled = false
       } else {
-        // Gateway uses WebSocket token-based auth (protocol v3).
-        // Set the password/token directly — the WS handshake will authenticate.
         authStore.authEnabled = true
         authStore.setToken(password)
       }
+
+      // Probe /health to auto-detect Hermes Agent REST API server.
+      // If the health endpoint returns { status: 'ok' }, treat it as Hermes REST
+      // and skip WebSocket entirely. ACP gateways don't expose /health.
+      let isHermesRest = false
+      try {
+        const healthResp = window.api
+          ? await window.api.httpFetch(`${server.url}/health`)
+          : await fetch(`${server.url}/health`, { signal: AbortSignal.timeout(5000) })
+              .then(r => ({ ok: r.ok, status: r.status, body: '' }))
+        if (healthResp.ok) {
+          const data = typeof healthResp.body === 'string' && healthResp.body
+            ? JSON.parse(healthResp.body) : {}
+          if (data?.status === 'ok') isHermesRest = true
+        }
+      } catch { /* health probe failed — fall through to WebSocket */ }
+
+      if (isHermesRest) {
+        // Hermes Agent REST API — no WebSocket needed
+        serverType.value = 'hermes-rest'
+        currentServer.value = server
+        status.value = 'connected'
+        safeSet('lastConnectedServerId', serverId)
+        fetchHermesModel() // non-blocking: read actual model name from config
+        return
+      }
+
+      // ACP WebSocket gateway path
+      serverType.value = 'acp-ws'
 
       // Start native WebSocket connection and wait for protocol v3 handshake
       const wsStore = useWebSocketStore()
@@ -165,17 +259,70 @@ export const useConnectionStore = defineStore('connection', () => {
     }
     clearAuthToken()
     authStore.authEnabled = true  // Reset to default
+    serverType.value = null
+    hermesRealModel.value = null
     currentServer.value = null
     status.value = 'disconnected'
   }
 
   /**
-   * Try to auto-connect to the last used server (e.g. after update restart).
-   * Returns true on success, false if no last server or connect failed.
+   * Connect directly to the local Hermes server (localhost:8642).
+   * Hermes exposes an OpenAI-compatible REST API — NOT ACP WebSocket.
+   * We confirm the server is alive via GET /health, then mark connected.
+   */
+  async function connectLocal(): Promise<void> {
+    // If already connected to another server, clean up first
+    if (currentServer.value) {
+      try { await disconnect() } catch { /* best-effort */ }
+    }
+
+    status.value = 'connecting'
+    clearAuthToken()
+
+    setBaseURL(LOCAL_SERVER.url)
+    const authStore = useAuthStore()
+    authStore.authEnabled = false // local server without API_SERVER_KEY
+
+    try {
+      // Use Electron main-process fetch to bypass CORS restrictions
+      const resp = window.api
+        ? await window.api.httpFetch(`${LOCAL_SERVER.url}/health`)
+        : await fetch(`${LOCAL_SERVER.url}/health`, { signal: AbortSignal.timeout(LOCAL_CONNECT_TIMEOUT) }).then(r => ({ ok: r.ok, status: r.status, body: '' }))
+
+      if (!resp.ok) throw new Error(`health check returned ${resp.status}`)
+
+      const data = typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}
+      if (data?.status !== 'ok') throw new Error('unexpected health response')
+
+      serverType.value = 'hermes-rest'
+      currentServer.value = { ...LOCAL_SERVER }
+      status.value = 'connected'
+      safeSet('lastConnectedServerId', LOCAL_SERVER.id)
+      fetchHermesModel() // non-blocking: read actual model name from config
+    } catch (e) {
+      status.value = 'error'
+      if (e instanceof ConnectionError) throw e
+      throw new ConnectionError('network', '无法连接到本地 Hermes 服务器')
+    }
+  }
+
+  /**
+   * Auto-connect on app launch:
+   *  1. Try localhost:8642 first (zero-config experience)
+   *  2. Fall back to last saved server
    */
   async function autoConnect(): Promise<boolean> {
+    // 1. Always try local Hermes server first
+    try {
+      await connectLocal()
+      return true
+    } catch {
+      // Local not running — fall through
+    }
+
+    // 2. Fall back to last manually-saved server
     const lastId = safeGet('lastConnectedServerId')
-    if (!lastId) return false
+    if (!lastId || lastId === LOCAL_SERVER.id) return false
 
     await loadServers()
     const server = servers.value.find((s) => s.id === lastId)
@@ -189,5 +336,5 @@ export const useConnectionStore = defineStore('connection', () => {
     }
   }
 
-  return { currentServer, status, servers, loadServers, addServer, deleteServer, connect, disconnect, autoConnect }
+  return { currentServer, status, servers, serverType, hermesRealModel, loadServers, addServer, deleteServer, connect, connectLocal, disconnect, autoConnect }
 })

@@ -33,11 +33,11 @@ watch(
   ([titleKey]) => {
     if (typeof document === "undefined") return;
     if (!titleKey) {
-      document.title = "OpenClaw Desktop";
+      document.title = "Hermes Desktop";
       return;
     }
     const title = t(titleKey);
-    document.title = `${title} - OpenClaw Desktop`;
+    document.title = `${title} - Hermes Desktop`;
   },
   { immediate: true },
 );

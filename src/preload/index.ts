@@ -74,6 +74,19 @@ const api = {
   httpFetch: (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; body: string }> =>
     ipcRenderer.invoke('http:fetch', url, init),
 
+  // ── Hermes config (read ~/.hermes/config.yaml for actual model name) ──
+  hermesConfig: (): Promise<{ ok: boolean; model: string | null; fullModel: string | null; provider: string | null }> =>
+    ipcRenderer.invoke('hermes:config'),
+
+  // ── Hermes streaming chat (SSE via main-process) ──
+  hermesChat: (url: string, body: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('hermes:chat', url, body),
+  onHermesChatChunk: (cb: (chunk: { done: boolean; data?: any }) => void): (() => void) => {
+    const handler = (_: unknown, chunk: { done: boolean; data?: any }) => cb(chunk)
+    ipcRenderer.on('hermes:chat:chunk', handler)
+    return () => ipcRenderer.removeListener('hermes:chat:chunk', handler)
+  },
+
   // ── Backup system ──
   backupList: (): Promise<{ ok: boolean; backups: Array<{ filename: string; size: number; createdAt: string; date: string }>; error?: string }> =>
     ipcRenderer.invoke('backup:list'),
@@ -116,14 +129,27 @@ const api = {
     error?: string
   }> => ipcRenderer.invoke('fs:readFile', filePath, encoding),
 
+  fsWriteFile: (filePath: string, content: string): Promise<{
+    ok: boolean
+    error?: string
+  }> => ipcRenderer.invoke('fs:writeFile', filePath, content),
+
+  hermesRestart: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('hermes:restart'),
+  hermesVersion: (): Promise<{ ok: boolean; version?: string; date?: string; error?: string }> =>
+    ipcRenderer.invoke('hermes:version'),
+  hermesCheckUpdate: (): Promise<{ ok: boolean; current?: string; latest?: string; updateAvailable?: boolean; error?: string }> =>
+    ipcRenderer.invoke('hermes:checkUpdate'),
+  hermesUpdate: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('hermes:update'),
+  onHermesUpdateProgress: (cb: (data: string) => void): (() => void) => {
+    const handler = (_: unknown, data: string) => cb(data)
+    ipcRenderer.on('hermes:update:progress', handler)
+    return () => ipcRenderer.removeListener('hermes:update:progress', handler)
+  },
+
   getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
   getHomedir: (): Promise<string> => ipcRenderer.invoke('app:homedir'),
-
-  npmVersions: (): Promise<{ ok: boolean; versions: string[]; error?: string }> =>
-    ipcRenderer.invoke('openclaw:npmVersions'),
-
-  npmUpdate: (version: string): Promise<{ ok: boolean; message?: string; error?: string }> =>
-    ipcRenderer.invoke('openclaw:npmUpdate', version),
 
   // ── App auto-updater ──
   updaterCheck: (): Promise<{ ok: boolean; version?: string; error?: string }> =>

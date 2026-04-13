@@ -1,4 +1,4 @@
-export interface OpenClawConfig {
+export interface HermesConfig {
   agents?: AgentConfig
   channels?: Record<string, ChannelConfig>
   plugins?: PluginsConfig

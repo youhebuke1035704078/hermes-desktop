@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage, session, dialog } from 'electron'
 import { join, resolve, extname, basename } from 'path'
 import { execFile } from 'child_process'
-import { readdir, stat, readFile, mkdir, unlink, copyFile, realpath } from 'fs/promises'
+import { readdir, stat, readFile, writeFile, mkdir, unlink, copyFile, realpath } from 'fs/promises'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -44,7 +44,7 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
-    title: 'OpenClaw Desktop',
+    title: 'Hermes Desktop',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 12, y: 12 },
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -118,12 +118,13 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
 }
 
 function createTray(): void {
   const trayIcon = nativeImage.createFromPath(icon).resize({ width: 16, height: 16 })
   tray = new Tray(trayIcon)
-  tray.setToolTip('OpenClaw 桌面管理终端')
+  tray.setToolTip('Hermes 桌面管理终端')
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -186,80 +187,6 @@ function registerIpcHandlers(): void {
   // App info
   ipcMain.handle('app:getVersion', () => app.getVersion())
 
-  // OpenClaw version lookup — fetch directly from the npm registry HTTPS
-  // endpoint instead of shelling out to `npm view`. Electron apps launched
-  // outside a login shell often don't have `npm` in PATH (especially on
-  // Windows where it's installed via nvm-windows or node MSI and the cmd.exe
-  // environment doesn't inherit user PATH). Hitting registry.npmjs.org
-  // directly removes the dependency entirely and works through corporate
-  // proxies that already route to the registry.
-  ipcMain.handle('openclaw:npmVersions', async () => {
-    try {
-      const res = await fetch('https://registry.npmjs.org/openclaw', {
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(30000),
-      })
-      if (!res.ok) {
-        return { ok: false, error: `Registry HTTP ${res.status}`, versions: [] }
-      }
-      const data = (await res.json()) as {
-        versions?: Record<string, unknown>
-        'dist-tags'?: { latest?: string }
-        time?: Record<string, string>
-      }
-      const versionKeys = data.versions ? Object.keys(data.versions) : []
-      if (versionKeys.length === 0) {
-        return { ok: false, error: 'Registry returned no versions', versions: [] }
-      }
-      // Sort by publish time desc (newest first). Fall back to string
-      // compare for versions that lack a time entry.
-      const time = data.time || {}
-      const sorted = [...versionKeys].sort((a, b) => {
-        const ta = time[a] ? Date.parse(time[a]) : 0
-        const tb = time[b] ? Date.parse(time[b]) : 0
-        if (tb !== ta) return tb - ta
-        return b.localeCompare(a)
-      })
-      // If dist-tags.latest is available, pin it to the front just in case
-      // a newer version was published with an older timestamp (prerelease
-      // re-publish, etc).
-      const latest = data['dist-tags']?.latest
-      if (latest && sorted[0] !== latest) {
-        const idx = sorted.indexOf(latest)
-        if (idx > 0) {
-          sorted.splice(idx, 1)
-          sorted.unshift(latest)
-        }
-      }
-      return { ok: true, versions: sorted }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      return { ok: false, error: msg, versions: [] }
-    }
-  })
-
-  ipcMain.handle('openclaw:npmUpdate', async (_, version: string) => {
-    return new Promise((resolve) => {
-      // Validate version to prevent shell injection
-      if (version && !/^[0-9a-zA-Z._-]+$/.test(version)) {
-        resolve({ ok: false, error: 'Invalid version format' })
-        return
-      }
-      const pkg = version ? `openclaw@${version}` : 'openclaw'
-      const shell = process.platform === 'win32' ? 'cmd' : '/bin/zsh'
-      const args = process.platform === 'win32'
-        ? ['/c', `npm install -g ${pkg}`]
-        : ['-l', '-c', `npm install -g ${pkg}`]
-      execFile(shell, args, { timeout: 120000 }, (err, stdout, stderr) => {
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message })
-          return
-        }
-        resolve({ ok: true, message: stdout.trim() })
-      })
-    })
-  })
-
   // HTTP proxy — allows renderer to fetch from external URLs without CORS restrictions.
   // URL scheme is validated to block file://, data:, javascript:, etc.
   ipcMain.handle('http:fetch', async (_, url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => {
@@ -279,7 +206,81 @@ function registerIpcHandlers(): void {
     }
   })
 
-  // Return local home directory path (for constructing ~/.openclaw path)
+  // ── Hermes REST API: streaming chat via SSE ──
+  // Main-process fetch bypasses renderer CORS; SSE chunks are forwarded via IPC events.
+  ipcMain.handle('hermes:chat', async (event, url: string, body: string) => {
+    if (!isSafeHttpUrl(url)) {
+      return { ok: false, error: 'Blocked: only http/https URLs are allowed' }
+    }
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      })
+      if (!res.ok) {
+        const errBody = await res.text()
+        return { ok: false, error: `HTTP ${res.status}: ${errBody}` }
+      }
+
+      // Stream SSE chunks back to the renderer
+      const reader = res.body?.getReader()
+      if (!reader) return { ok: false, error: 'No readable stream' }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // keep incomplete line in buffer
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed || trimmed.startsWith(':')) continue // skip empty lines and SSE comments
+          if (trimmed.startsWith('data: ')) {
+            const data = trimmed.slice(6)
+            if (data === '[DONE]') {
+              event.sender.send('hermes:chat:chunk', { done: true })
+            } else {
+              try {
+                const parsed = JSON.parse(data)
+                event.sender.send('hermes:chat:chunk', { done: false, data: parsed })
+              } catch { /* skip malformed JSON */ }
+            }
+          }
+        }
+      }
+
+      return { ok: true }
+    } catch (e: any) {
+      return { ok: false, error: e?.message || 'Network error' }
+    }
+  })
+
+  // ── Read Hermes Agent config (to extract actual underlying model name) ──
+  ipcMain.handle('hermes:config', async () => {
+    try {
+      const configPath = join(homedir(), '.hermes/config.yaml')
+      const content = await readFile(configPath, 'utf-8')
+      // Extract model.default (e.g. "openai-codex/gpt-5.4")
+      const modelMatch = content.match(/model:\s*\n\s+default:\s*(.+)/)
+      const providerMatch = content.match(/provider:\s*(.+)/)
+      const rawModel = modelMatch?.[1]?.trim() || null
+      const provider = providerMatch?.[1]?.trim() || null
+      // Extract the short model name (e.g. "gpt-5.4" from "openai-codex/gpt-5.4")
+      const shortModel = rawModel?.includes('/') ? rawModel.split('/').pop() || rawModel : rawModel
+      return { ok: true, model: shortModel, fullModel: rawModel, provider }
+    } catch {
+      return { ok: false, model: null, fullModel: null, provider: null }
+    }
+  })
+
+  // Return local home directory path (for constructing ~/.hermes path)
   ipcMain.handle('app:homedir', () => homedir())
 
   // Local filesystem browsing (scoped to workspace directories).
@@ -363,8 +364,156 @@ function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('fs:writeFile', async (_, filePath: string, content: string) => {
+    try {
+      const realHome = await realpath(homedir())
+      const resolved = resolve(filePath)
+      // If file already exists, resolve symlinks and check bounds
+      let targetPath: string
+      try {
+        targetPath = await realpath(resolved)
+      } catch {
+        // File doesn't exist yet — verify parent directory is under $HOME
+        const parentDir = resolve(resolved, '..')
+        let realParent: string
+        try {
+          realParent = await realpath(parentDir)
+        } catch {
+          return { ok: false, error: 'Parent directory does not exist' }
+        }
+        if (realParent !== realHome && !realParent.startsWith(realHome + '/')) {
+          return { ok: false, error: 'Access denied: path outside home directory' }
+        }
+        targetPath = resolved
+      }
+      if (targetPath !== realHome && !targetPath.startsWith(realHome + '/')) {
+        return { ok: false, error: 'Access denied: path outside home directory' }
+      }
+      await writeFile(targetPath, content, 'utf-8')
+      return { ok: true }
+    } catch (e: any) {
+      return { ok: false, error: e.message }
+    }
+  })
+
+  // ── Hermes service control (macOS launchd) ──
+  ipcMain.handle('hermes:restart', async () => {
+    try {
+      return await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        execFile('launchctl', ['kickstart', '-k', 'gui/' + process.getuid!() + '/ai.hermes.gateway'], (err, _stdout, stderr) => {
+          if (err) {
+            resolve({ ok: false, error: stderr || err.message })
+          } else {
+            resolve({ ok: true })
+          }
+        })
+      })
+    } catch (e: any) {
+      return { ok: false, error: e.message }
+    }
+  })
+
+  // ── Hermes Agent version & update ──
+  const HERMES_BIN = join(homedir(), '.hermes/hermes-agent/hermes')
+  const HERMES_REPO = join(homedir(), '.hermes/hermes-agent')
+
+  ipcMain.handle('hermes:version', async () => {
+    try {
+      return await new Promise<{ ok: boolean; version?: string; date?: string; error?: string }>((resolve) => {
+        execFile(HERMES_BIN, ['--version'], { timeout: 5000 }, (err, stdout) => {
+          if (err) {
+            resolve({ ok: false, error: err.message })
+            return
+          }
+          // Parse: "Hermes Agent v0.8.0 (2026.4.8)"
+          const match = stdout.match(/v([\d.]+)\s*\(([^)]+)\)/)
+          resolve({
+            ok: true,
+            version: match ? match[1] : stdout.trim(),
+            date: match ? match[2] : undefined,
+          })
+        })
+      })
+    } catch (e: any) {
+      return { ok: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('hermes:checkUpdate', async () => {
+    try {
+      // Fetch remote tags, then compare with latest local tag
+      return await new Promise<{ ok: boolean; current?: string; latest?: string; updateAvailable?: boolean; error?: string }>((resolve) => {
+        execFile('git', ['-C', HERMES_REPO, 'fetch', '--tags'], { timeout: 15000 }, (fetchErr) => {
+          if (fetchErr) {
+            resolve({ ok: false, error: 'Failed to fetch: ' + fetchErr.message })
+            return
+          }
+          // Get all tags sorted by date (newest first)
+          execFile('git', ['-C', HERMES_REPO, 'tag', '--sort=-creatordate'], { timeout: 5000 }, (tagErr, tagOut) => {
+            if (tagErr) {
+              resolve({ ok: false, error: tagErr.message })
+              return
+            }
+            const tags = tagOut.trim().split('\n').filter(Boolean)
+            const latest = tags[0] || ''
+            // Compare commit dates: if HEAD is newer than (or equal to) the latest tag, no update needed
+            // This handles repos where tags are on a separate release branch
+            execFile('git', ['-C', HERMES_REPO, 'log', '-1', '--format=%ct', 'HEAD'], { timeout: 5000 }, (_headErr, headTs) => {
+              const headTime = parseInt(headTs?.trim() || '0', 10)
+              if (!latest) {
+                resolve({ ok: true, current: 'dev', latest: '', updateAvailable: false })
+                return
+              }
+              execFile('git', ['-C', HERMES_REPO, 'log', '-1', '--format=%ct', latest], { timeout: 5000 }, (_tagErr, tagTs) => {
+                const tagTime = parseInt(tagTs?.trim() || '0', 10)
+                // HEAD is up-to-date if its commit is same age or newer than latest tag
+                const updateAvailable = tagTime > headTime
+                // Show current as a readable description
+                execFile('git', ['-C', HERMES_REPO, 'describe', '--tags', '--always', 'HEAD'], { timeout: 5000 }, (_dErr, dOut) => {
+                  const current = dOut?.trim() || 'dev'
+                  resolve({ ok: true, current, latest, updateAvailable })
+                })
+              })
+            })
+          })
+        })
+      })
+    } catch (e: any) {
+      return { ok: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('hermes:update', async (event) => {
+    try {
+      return await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        const child = execFile(HERMES_BIN, ['update'], { timeout: 120000 })
+        let output = ''
+        child.stdout?.on('data', (data: string) => {
+          output += data
+          event.sender.send('hermes:update:progress', data.toString())
+        })
+        child.stderr?.on('data', (data: string) => {
+          output += data
+          event.sender.send('hermes:update:progress', data.toString())
+        })
+        child.on('close', (code) => {
+          if (code === 0) {
+            resolve({ ok: true })
+          } else {
+            resolve({ ok: false, error: output || `Exit code ${code}` })
+          }
+        })
+        child.on('error', (err) => {
+          resolve({ ok: false, error: err.message })
+        })
+      })
+    } catch (e: any) {
+      return { ok: false, error: e.message }
+    }
+  })
+
   // ── Backup system ──
-  const BACKUP_DIR = join(homedir(), '.openclaw-desktop-backups')
+  const BACKUP_DIR = join(homedir(), '.hermes-desktop-backups')
 
   ipcMain.handle('backup:list', async () => {
     try {
@@ -394,7 +543,7 @@ function registerIpcHandlers(): void {
     try {
       await mkdir(BACKUP_DIR, { recursive: true })
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const filename = `openclaw-backup-${ts}.tar.gz`
+      const filename = `hermes-backup-${ts}.tar.gz`
       const outPath = join(BACKUP_DIR, filename)
 
       // Notify progress
@@ -404,17 +553,17 @@ function registerIpcHandlers(): void {
         }
       }
 
-      send(10, '正在打包 .openclaw 数据目录...')
+      send(10, '正在打包 .hermes 数据目录...')
 
       await new Promise<void>((resolve, reject) => {
-        // tar the .openclaw directory, excluding large cache dirs
+        // tar the .hermes directory, excluding large cache dirs
         execFile('tar', [
           'czf', outPath,
-          '--exclude', '.openclaw/workspace/node_modules',
-          '--exclude', '.openclaw/workspace/exports',
-          '--exclude', '.openclaw/media',
+          '--exclude', '.hermes/workspace/node_modules',
+          '--exclude', '.hermes/workspace/exports',
+          '--exclude', '.hermes/media',
           '-C', homedir(),
-          '.openclaw',
+          '.hermes',
         ], { timeout: 300000 }, (err) => {
           if (err) reject(new Error(err.message))
           else resolve()
@@ -477,8 +626,8 @@ function registerIpcHandlers(): void {
       }
 
       // Security: list tarball contents first and verify every entry lives
-      // under `.openclaw/`. Rejects absolute paths, `..` traversal, and any
-      // entry that would escape the openclaw data directory. Without this a
+      // under `.hermes/`. Rejects absolute paths, `..` traversal, and any
+      // entry that would escape the hermes data directory. Without this a
       // malicious (or third-party) tarball placed into BACKUP_DIR could
       // overwrite arbitrary files in $HOME when the user hits "restore".
       send(5, '正在校验备份内容...')
@@ -499,11 +648,11 @@ function registerIpcHandlers(): void {
           entry.startsWith('..') ||
           entry.includes('/../') ||
           entry.includes('\\') ||
-          !(entry === '.openclaw' || entry === '.openclaw/' || entry.startsWith('.openclaw/'))
+          !(entry === '.hermes' || entry === '.hermes/' || entry.startsWith('.hermes/'))
         ) {
           return {
             ok: false,
-            error: `Backup rejected: unsafe entry "${entry}". Only .openclaw/* paths are allowed.`,
+            error: `Backup rejected: unsafe entry "${entry}". Only .hermes/* paths are allowed.`,
           }
         }
       }
@@ -684,7 +833,7 @@ function setupAutoUpdater(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.openclaw.desktop')
+  electronApp.setAppUserModelId('com.nousresearch.hermes-desktop')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

@@ -1,29 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+
 import { useRoute, useRouter } from 'vue-router'
-import { NText, NIcon, NTooltip } from 'naive-ui'
+import { NIcon, NTooltip } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useAlertNotifier } from '@/composables/useAlertNotifier'
 import {
   GridOutline,
   ChatboxEllipsesOutline,
   ChatbubblesOutline,
-  BookOutline,
-  CalendarOutline,
-  SparklesOutline,
-  GitNetworkOutline,
-  ExtensionPuzzleOutline,
   CogOutline,
-  PulseOutline,
-  FolderOutline,
-  PeopleOutline,
-  BusinessOutline,
-  StorefrontOutline,
-  ConstructOutline,
-  ArchiveOutline,
-  NotificationsOutline,
 } from '@vicons/ionicons5'
 import { routes } from '@/router/routes'
+import { useConnectionStore } from '@/stores/connection'
 import { safeGet, safeSet } from '@/utils/safe-storage'
 
 defineProps<{ collapsed: boolean }>()
@@ -31,26 +20,18 @@ defineProps<{ collapsed: boolean }>()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
+const connectionStore = useConnectionStore()
 const { activeAlertCount } = useAlertNotifier()
+
+/** Routes that require ACP WebSocket — hide in Hermes REST mode */
+const WS_ONLY_ROUTES = new Set(['Sessions'])
+const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
 const iconMap: Record<string, any> = {
   GridOutline,
   ChatboxEllipsesOutline,
   ChatbubblesOutline,
-  BookOutline,
-  CalendarOutline,
-  SparklesOutline,
-  GitNetworkOutline,
-  ExtensionPuzzleOutline,
   CogOutline,
-  PulseOutline,
-  FolderOutline,
-  PeopleOutline,
-  BusinessOutline,
-  StorefrontOutline,
-  ConstructOutline,
-  ArchiveOutline,
-  NotificationsOutline,
 }
 
 interface MenuItem {
@@ -64,6 +45,7 @@ const baseMenuItems = computed<MenuItem[]>(() => {
   if (!mainRoute?.children) return []
   return mainRoute.children
     .filter((child) => !child.meta?.hidden)
+    .filter((child) => !(isHermesRest.value && WS_ONLY_ROUTES.has(child.name as string)))
     .map((child) => ({
       key: child.name as string,
       titleKey: child.meta?.titleKey as string,
@@ -152,14 +134,18 @@ function resetDrag() {
 <template>
   <div style="display: flex; flex-direction: column; height: 100%;">
     <div class="sidebar-logo" :class="{ 'sidebar-logo--collapsed': collapsed }">
-      <img src="@/assets/logo.png" alt="logo" style="width: 32px; height: 32px; border-radius: 6px;" />
-      <NText
+      <img
         v-if="!collapsed"
-        strong
-        style="font-size: 18px; white-space: nowrap; letter-spacing: -0.5px;"
-      >
-        OpenClaw Desktop
-      </NText>
+        src="@/assets/logo.png"
+        alt="Hermes"
+        style="width: 160px; height: auto;"
+      />
+      <img
+        v-else
+        src="@/assets/logo.png"
+        alt="Hermes"
+        style="width: 36px; height: auto; border-radius: 4px;"
+      />
     </div>
 
     <nav class="sidebar-menu">

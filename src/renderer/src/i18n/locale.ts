@@ -2,7 +2,7 @@ import { safeGet, safeSet } from '@/utils/safe-storage'
 
 export type AppLocale = 'zh-CN' | 'en-US'
 
-const STORAGE_KEY = 'openclaw_locale'
+const STORAGE_KEY = 'hermes_locale'
 
 export function normalizeLocale(input?: string | null): AppLocale | null {
   if (!input) return null

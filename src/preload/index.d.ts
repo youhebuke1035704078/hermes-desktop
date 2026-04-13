@@ -1,6 +1,6 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
-interface OpenClawAPI {
+interface HermesAPI {
   getServers(): Promise<Array<{ id: string; name: string; url: string; username: string }>>
   saveServer(server: {
     id: string
@@ -27,9 +27,6 @@ interface OpenClawAPI {
   onNavigate(callback: (path: string) => void): () => void
   getVersion(): Promise<string>
   getHomedir(): Promise<string>
-  npmVersions(): Promise<{ ok: boolean; versions: string[]; error?: string }>
-  npmUpdate(version: string): Promise<{ ok: boolean; message?: string; error?: string }>
-
   // WebSocket bridge
   wsConnect(url: string, origin?: string): Promise<void>
   wsSend(data: string): void
@@ -41,6 +38,13 @@ interface OpenClawAPI {
 
   // HTTP proxy
   httpFetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; body: string }>
+
+  // Hermes config (read ~/.hermes/config.yaml for actual model name)
+  hermesConfig(): Promise<{ ok: boolean; model: string | null; fullModel: string | null; provider: string | null }>
+
+  // Hermes streaming chat (SSE)
+  hermesChat(url: string, body: string): Promise<{ ok: boolean; error?: string }>
+  onHermesChatChunk(cb: (chunk: { done: boolean; data?: any }) => void): () => void
 
   // Backup system
   backupList(): Promise<{ ok: boolean; backups: Array<{ filename: string; size: number; createdAt: string; date: string }>; error?: string }>
@@ -72,6 +76,17 @@ interface OpenClawAPI {
     size?: number
     error?: string
   }>
+  fsWriteFile(filePath: string, content: string): Promise<{
+    ok: boolean
+    error?: string
+  }>
+
+  // Hermes service control & updates
+  hermesRestart(): Promise<{ ok: boolean; error?: string }>
+  hermesVersion(): Promise<{ ok: boolean; version?: string; date?: string; error?: string }>
+  hermesCheckUpdate(): Promise<{ ok: boolean; current?: string; latest?: string; updateAvailable?: boolean; error?: string }>
+  hermesUpdate(): Promise<{ ok: boolean; error?: string }>
+  onHermesUpdateProgress(cb: (data: string) => void): () => void
 
   // App auto-updater
   updaterCheck(): Promise<{ ok: boolean; version?: string; error?: string }>
@@ -92,6 +107,6 @@ interface OpenClawAPI {
 declare global {
   interface Window {
     electron: ElectronAPI
-    api: OpenClawAPI
+    api: HermesAPI
   }
 }

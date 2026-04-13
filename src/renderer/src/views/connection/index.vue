@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import {
   NCard,
   NButton,
@@ -41,8 +41,10 @@ const { t } = useI18n()
 
 const showAddModal = ref(false)
 const editingServerId = ref<string | null>(null)  // null = adding, string = editing
+const autoConnecting = ref(true)
 const connecting = ref(false)
 const connectingServerId = ref<string | null>(null)
+const connectingLocal = ref(false)
 const serverHealth = ref<Record<string, 'online' | 'offline' | 'checking'>>({})
 const encryptionAvailable = ref(true) // assume safe until checked
 
@@ -144,13 +146,24 @@ async function probeServer() {
 }
 
 onMounted(async () => {
-  // Try auto-reconnect to last server (e.g. after update restart)
-  const ok = await connectionStore.autoConnect()
-  if (ok) {
-    router.replace({ name: 'Dashboard' })
-    return
+  // If navigated here manually (e.g. "切换服务器"), skip auto-connect
+  const route = useRoute()
+  const isManual = route.query.manual === '1'
+
+  if (!isManual) {
+    // Auto-connect: try localhost:8642 first, then last saved server
+    const ok = await connectionStore.autoConnect()
+    if (ok) {
+      router.replace({ name: 'Chat' })
+      return
+    }
+  } else {
+    // Manual switch — disconnect current server first
+    try { await connectionStore.disconnect() } catch { /* best-effort */ }
   }
 
+  // Show manual connection UI
+  autoConnecting.value = false
   await connectionStore.loadServers()
   checkAllServers()
   if (window.api?.isEncryptionAvailable) {
@@ -290,7 +303,7 @@ async function handleConnect(serverId: string) {
   connectingServerId.value = serverId
   try {
     await connectionStore.connect(serverId)
-    router.push({ name: 'Dashboard' })
+    router.push({ name: 'Chat' })
   } catch (e) {
     if (e instanceof ConnectionError) {
       switch (e.type) {
@@ -333,15 +346,34 @@ async function handleDelete(serverId: string) {
     message.error(t('pages.connection.deleteFailed') + ': ' + (e instanceof Error ? e.message : String(e)))
   }
 }
+
+async function connectLocalHermes() {
+  connectingLocal.value = true
+  try {
+    await connectionStore.connectLocal()
+    router.push({ name: 'Chat' })
+  } catch {
+    message.error(t('pages.connection.localConnectFailed'))
+  } finally {
+    connectingLocal.value = false
+  }
+}
 </script>
 
 <template>
   <div class="connection-page">
-    <div class="connection-container">
+    <!-- Auto-connect loading state -->
+    <div v-if="autoConnecting" class="auto-connect-overlay">
+      <img src="@/assets/logo.png" alt="Hermes" class="auto-connect-logo" />
+      <NSpin size="medium" style="margin: 20px 0;" />
+      <p class="auto-connect-text">{{ t('pages.connection.autoConnecting') }}</p>
+    </div>
+
+    <div v-else class="connection-container">
       <!-- Logo + Title -->
       <div class="connection-header">
         <img src="@/assets/logo.png" alt="logo" class="connection-logo" />
-        <h1 class="connection-title">OpenClaw Desktop</h1>
+        <h1 class="connection-title">Hermes Desktop</h1>
         <p class="connection-subtitle">{{ t('pages.connection.subtitle') }}</p>
       </div>
 
@@ -354,6 +386,29 @@ async function handleDelete(serverId: string) {
       >
         {{ t('pages.connection.encryptionWarning') }}
       </NAlert>
+
+      <!-- Quick connect to local Hermes -->
+      <NCard class="server-card" style="margin-bottom: 16px;">
+        <div class="local-hermes-row">
+          <div class="local-hermes-info">
+            <NSpace align="center" :size="8">
+              <NIcon :component="FlashOutline" size="22" color="#63e2b7" />
+              <div>
+                <div style="font-size: 15px; font-weight: 600;">{{ t('pages.connection.localHermes') }}</div>
+                <div style="font-size: 12px; opacity: 0.6;">localhost:8642</div>
+              </div>
+            </NSpace>
+          </div>
+          <NButton
+            type="primary"
+            size="small"
+            :loading="connectingLocal"
+            @click="connectLocalHermes"
+          >
+            {{ t('pages.connection.connectLocal') }}
+          </NButton>
+        </div>
+      </NCard>
 
       <!-- Server List -->
       <NCard class="server-card">
@@ -468,14 +523,14 @@ async function handleDelete(serverId: string) {
       style="width: 520px"
       :bordered="false"
     >
-      <NForm label-placement="left" label-width="90">
+      <NForm label-placement="top">
         <!-- ═══ Required: Address ═══ -->
-        <NFormItem :label="t('pages.connection.labelAddress')">
+        <NFormItem>
           <template #label>
-            <div>
+            <NSpace :size="6" align="center">
               <span>{{ t('pages.connection.labelAddress') }}</span>
-              <div style="font-size: 11px; color: #e8884a; font-weight: normal; white-space: nowrap;">{{ t('pages.connection.labelAddressRequired') }}</div>
-            </div>
+              <NTag size="tiny" type="warning" :bordered="false">{{ t('pages.connection.labelAddressRequired') }}</NTag>
+            </NSpace>
           </template>
           <NInput v-model:value="form.url" :placeholder="t('pages.connection.placeholderAddress')">
             <template #suffix>
@@ -507,10 +562,10 @@ async function handleDelete(serverId: string) {
         <template v-if="!probeResult || probeResult.authEnabled">
           <NFormItem>
             <template #label>
-              <div>
-                <span style="white-space: pre-line;">{{ t('pages.connection.labelToken') }}</span>
-                <div style="font-size: 11px; color: #e8884a; font-weight: normal; white-space: nowrap;">{{ t('pages.connection.labelTokenRequired') }}</div>
-              </div>
+              <NSpace :size="6" align="center">
+                <span>{{ t('pages.connection.labelToken') }}</span>
+                <NTag size="tiny" type="warning" :bordered="false">{{ t('pages.connection.labelTokenRequired') }}</NTag>
+              </NSpace>
             </template>
             <NInput v-model:value="form.password" type="password" show-password-on="click" :placeholder="t('pages.connection.placeholderToken')" />
           </NFormItem>
@@ -522,10 +577,10 @@ async function handleDelete(serverId: string) {
         <!-- ═══ Optional: Name ═══ -->
         <NFormItem>
           <template #label>
-            <div>
+            <NSpace :size="6" align="center">
               <span>{{ t('pages.connection.labelName') }}</span>
-              <div style="font-size: 11px; color: #909399; font-weight: normal;">{{ t('pages.connection.labelNameOptional') }}</div>
-            </div>
+              <NTag size="tiny" :bordered="false">{{ t('pages.connection.labelNameOptional') }}</NTag>
+            </NSpace>
           </template>
           <NInput v-model:value="form.name" :placeholder="t('pages.connection.placeholderName')" />
         </NFormItem>
@@ -534,10 +589,10 @@ async function handleDelete(serverId: string) {
         <template v-if="!probeResult || probeResult.authEnabled">
           <NFormItem>
             <template #label>
-              <div>
+              <NSpace :size="6" align="center">
                 <span>{{ t('pages.connection.labelUsername') }}</span>
-                <div style="font-size: 11px; color: #909399; font-weight: normal;">{{ t('pages.connection.labelUsernameOptional') }}</div>
-              </div>
+                <NTag size="tiny" :bordered="false">{{ t('pages.connection.labelUsernameOptional') }}</NTag>
+              </NSpace>
             </template>
             <NInput v-model:value="form.username" :placeholder="t('pages.connection.placeholderUsername')" />
           </NFormItem>
@@ -575,6 +630,25 @@ async function handleDelete(serverId: string) {
   -webkit-app-region: no-drag;
 }
 
+.auto-connect-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: drag;
+}
+
+.auto-connect-logo {
+  width: 280px;
+  height: auto;
+}
+
+.auto-connect-text {
+  font-size: 14px;
+  color: var(--text-secondary, #64748b);
+  margin: 0;
+}
+
 .connection-header {
   -webkit-app-region: drag;
   text-align: center;
@@ -587,10 +661,9 @@ async function handleDelete(serverId: string) {
 }
 
 .connection-logo {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  margin-bottom: 12px;
+  width: 320px;
+  height: auto;
+  margin-bottom: 16px;
 }
 
 .connection-title {
@@ -683,5 +756,16 @@ async function handleDelete(serverId: string) {
   color: var(--text-secondary);
   margin: 8px 0 0 0;
   line-height: 1.5;
+}
+
+.local-hermes-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.local-hermes-info {
+  flex: 1;
+  min-width: 0;
 }
 </style>

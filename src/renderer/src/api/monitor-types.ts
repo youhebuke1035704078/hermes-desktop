@@ -1,4 +1,4 @@
-// === Monitor Types (from OpenClaw Monitor) ===
+// === Monitor Types (from Hermes Monitor) ===
 
 export type SystemStatus = 'healthy' | 'degraded' | 'down' | 'unknown'
 export type ServiceStatus = 'online' | 'offline' | 'degraded' | 'starting' | 'paused' | 'unknown'
@@ -260,7 +260,7 @@ export interface ConfigPatch {
   value?: unknown
 }
 
-export interface OpenClawConfig {
+export interface HermesConfig {
   [key: string]: unknown
 }
 

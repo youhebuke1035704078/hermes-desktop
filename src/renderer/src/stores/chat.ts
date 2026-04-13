@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useWebSocketStore } from './websocket'
+import { useConnectionStore } from './connection'
 import type { ChatMessage } from '@/api/types'
 import { byLocale, getActiveLocale } from '@/i18n/text'
 
@@ -357,12 +358,18 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const normalizedKey = key.trim()
       sessionKey.value = normalizedKey
-      const fetched = await wsStore.rpc.listChatHistory(normalizedKey)
-      // Rapid session switches can cause an older response to arrive after
-      // a newer one — drop it if the active session has since changed.
-      if (sessionKey.value !== normalizedKey) return
-      messages.value = capMessages(fetched)
-      lastSyncedAt.value = Date.now()
+
+      // Hermes REST mode: history is local-only (sent with each request)
+      if (isHermesRestMode()) {
+        lastSyncedAt.value = Date.now()
+      } else {
+        const fetched = await wsStore.rpc.listChatHistory(normalizedKey)
+        // Rapid session switches can cause an older response to arrive after
+        // a newer one — drop it if the active session has since changed.
+        if (sessionKey.value !== normalizedKey) return
+        messages.value = capMessages(fetched)
+        lastSyncedAt.value = Date.now()
+      }
     } catch (error) {
       if (sessionKey.value !== key.trim()) return
       if (!silent || clearError) {
@@ -890,6 +897,25 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /**
+   * Check if the current connection is a local Hermes REST API server
+   * (as opposed to an ACP WebSocket gateway).
+   */
+  function isHermesRestMode(): boolean {
+    const connectionStore = useConnectionStore()
+    return connectionStore.serverType === 'hermes-rest'
+  }
+
+  /** Replace in-memory messages (used by hermes-chat store to load conversations) */
+  function setMessages(msgs: ChatMessage[]) {
+    messages.value = msgs
+  }
+
+  /** Clear all in-memory messages */
+  function clearMessages() {
+    messages.value = []
+  }
+
   async function sendMessage(content: string, model?: string) {
     const text = content.trim()
     if (!text) return
@@ -917,6 +943,70 @@ export const useChatStore = defineStore('chat', () => {
 
     sending.value = true
     lastError.value = null
+
+    // ── Hermes REST API path (POST /v1/chat/completions with SSE streaming) ──
+    if (isHermesRestMode() && window.api?.hermesChat) {
+      const assistantMsgId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const assistantMessage: ChatMessage = {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date().toISOString(),
+      }
+      messages.value = capMessages([...messages.value, assistantMessage])
+      setAgentStatusPhase(agentId, 'replying', { runId: idempotencyKey, detail: null })
+
+      // Build OpenAI-format messages from local history (exclude the empty assistant placeholder)
+      const apiMessages = messages.value
+        .filter(m => (m.role === 'user' || m.role === 'assistant') && m.id !== assistantMsgId && m.content)
+        .map(m => ({ role: m.role, content: m.content }))
+
+      // Listen for SSE chunks
+      const cleanupChunkListener = window.api.onHermesChatChunk((chunk) => {
+        if (chunk.done) return
+        const delta = chunk.data?.choices?.[0]?.delta
+        if (delta?.content) {
+          const idx = messages.value.findIndex(m => m.id === assistantMsgId)
+          if (idx >= 0) {
+            messages.value[idx] = { ...messages.value[idx], content: messages.value[idx].content + delta.content }
+            messages.value = [...messages.value] // trigger Vue reactivity
+          }
+        }
+      })
+
+      try {
+        const connectionStore = useConnectionStore()
+        const baseUrl = connectionStore.currentServer?.url || 'http://localhost:8642'
+        const result = await window.api.hermesChat(
+          `${baseUrl}/v1/chat/completions`,
+          JSON.stringify({
+            model: model?.trim() || 'hermes-agent',
+            messages: apiMessages,
+            stream: true,
+          }),
+        )
+
+        if (!result.ok) {
+          throw new Error(result.error || 'Chat request failed')
+        }
+
+        setAgentStatusPhase(agentId, 'done', { runId: null, detail: null })
+      } catch (error) {
+        lastError.value = error instanceof Error ? error.message : String(error)
+        // Remove both user and empty assistant messages on failure
+        messages.value = messages.value.filter(
+          (item) => item.id !== idempotencyKey && item.id !== assistantMsgId,
+        )
+        setAgentStatusPhase(agentId, 'error', { runId: null, detail: lastError.value })
+        throw error
+      } finally {
+        cleanupChunkListener()
+        sending.value = false
+      }
+      return
+    }
+
+    // ── Legacy ACP WebSocket path (for non-Hermes servers) ──
     try {
       await wsStore.rpc.sendChatMessage({
         sessionKey: sessionKey.value.trim(),
@@ -961,6 +1051,11 @@ export const useChatStore = defineStore('chat', () => {
 
     setAgentStatusPhase(agentId, 'aborting', { detail: byLocale('停止中...', 'Stopping...', getActiveLocale()) })
     try {
+      if (isHermesRestMode()) {
+        // Local Hermes REST mode — no WS abort RPC, just mark aborted locally
+        setAgentStatusPhase(agentId, 'aborted', { detail: byLocale('已停止', 'Stopped', getActiveLocale()) })
+        return
+      }
       await wsStore.rpc.abortChat(undefined, sessionKey.value.trim())
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
@@ -986,6 +1081,8 @@ export const useChatStore = defineStore('chat', () => {
     handleRealtimeEvent,
     handleAgentStatusEvent,
     clearTimers,
+    setMessages,
+    clearMessages,
     sendMessage,
     abortActiveRun,
   }

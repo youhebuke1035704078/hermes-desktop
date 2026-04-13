@@ -20,7 +20,7 @@ import {
   useMessage,
 } from 'naive-ui'
 import type { SelectOption } from 'naive-ui'
-import { CopyOutline, RefreshOutline, SendOutline, StopCircleOutline, ChevronBackOutline, ChevronForwardOutline } from '@vicons/ionicons5'
+import { AddOutline, CopyOutline, CreateOutline, RefreshOutline, SendOutline, StopCircleOutline, TrashOutline, ChevronBackOutline, ChevronForwardOutline } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
@@ -28,6 +28,8 @@ import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { useSkillStore } from '@/stores/skill'
 import { useWebSocketStore } from '@/stores/websocket'
+import { useConnectionStore } from '@/stores/connection'
+import { useHermesChatStore } from '@/stores/hermes-chat'
 import { formatDate, formatRelativeTime, parseSessionKey } from '@/utils/format'
 import { renderSimpleMarkdown } from '@/utils/markdown'
 import type { AgentInstance, ChatMessage, ChatMessageContent, SessionsUsageSession, Skill } from '@/api/types'
@@ -39,7 +41,27 @@ const configStore = useConfigStore()
 const sessionStore = useSessionStore()
 const skillStore = useSkillStore()
 const wsStore = useWebSocketStore()
+const connectionStore = useConnectionStore()
+const hermesChatStore = useHermesChatStore()
 const { t, locale } = useI18n()
+
+/** True when connected to Hermes Agent REST API (local or remote — no WebSocket) */
+const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
+/** True when connected server is localhost */
+const isLocalServer = computed(() => {
+  const url = connectionStore.currentServer?.url
+  if (!url) return false
+  try {
+    const host = new URL(url).hostname
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+  } catch { return false }
+})
+
+/** Hermes REST mode — model name */
+const hermesModel = ref('hermes-agent')
+/** Hermes REST mode — inline title editing state */
+const editingConvId = ref<string | null>(null)
+const editingConvTitle = ref('')
 
 const sessionKeyInput = ref('')
 const draft = ref('')
@@ -62,7 +84,7 @@ const roleFilterOptions = computed<SelectOption[]>(() => [
 ])
 
 const BOTTOM_GAP = 32
-const SESSION_KEY_STORAGE_KEY = 'openclaw_chat_selected_session_v1'
+const SESSION_KEY_STORAGE_KEY = 'hermes_chat_selected_session_v1'
 let pendingForceScroll = false
 let pendingScroll = false
 let destroyed = false
@@ -255,6 +277,9 @@ function resolveUsageSession(sessions: SessionsUsageSession[], key: string): Ses
 }
 
 async function fetchSessionTokenUsage(rawKey: string) {
+  // Skip in local Hermes REST mode — no WebSocket RPC for token usage
+  if (isHermesRest.value) return
+
   const key = rawKey.trim()
   sessionTokenUsageRequestId += 1
   const requestId = sessionTokenUsageRequestId
@@ -368,12 +393,12 @@ function buildImageUrl(part: ChatMessageContent): string | undefined {
     }
     
     // 从 file:// URL 中提取相对路径
-    // 例如: file:///C:/Users/xxx/.openclaw/media/browser/xxx.png -> browser/xxx.png
+    // 例如: file:///C:/Users/xxx/.hermes/media/browser/xxx.png -> browser/xxx.png
     if (mediaPath.startsWith('file://')) {
-      // 查找 .openclaw/media/ 后面的相对路径
-      const mediaIndex = mediaPath.indexOf('.openclaw/media/')
+      // 查找 .hermes/media/ 后面的相对路径
+      const mediaIndex = mediaPath.indexOf('.hermes/media/')
       if (mediaIndex !== -1) {
-        mediaPath = mediaPath.slice(mediaIndex + '.openclaw/media/'.length)
+        mediaPath = mediaPath.slice(mediaIndex + '.hermes/media/'.length)
       } else {
         // 如果没有找到标准路径，尝试提取文件名
         const lastSlash = mediaPath.lastIndexOf('/')
@@ -398,11 +423,11 @@ function normalizeMediaPath(path: string): string {
   }
   
   // 从 file:// URL 中提取相对路径
-  // 例如: file:///C:/Users/xxx/.openclaw/media/browser/xxx.png -> browser/xxx.png
+  // 例如: file:///C:/Users/xxx/.hermes/media/browser/xxx.png -> browser/xxx.png
   if (path.startsWith('file://')) {
-    const mediaIndex = path.indexOf('.openclaw/media/')
+    const mediaIndex = path.indexOf('.hermes/media/')
     if (mediaIndex !== -1) {
-      return path.slice(mediaIndex + '.openclaw/media/'.length)
+      return path.slice(mediaIndex + '.hermes/media/'.length)
     }
     // 如果没有找到标准路径，尝试提取文件名
     const lastSlash = path.lastIndexOf('/')
@@ -685,7 +710,7 @@ interface SlashSuggestionItem {
   model?: ConfiguredModelOption
 }
 
-// 基于 OpenClaw 官方 docs/tools/slash-commands.md 维护的常用命令清单
+// 基于 Hermes 官方 docs/tools/slash-commands.md 维护的常用命令清单
 const slashCommandPresets = computed<SlashCommandPreset[]>(() => [
   {
     command: '/new',
@@ -2323,38 +2348,51 @@ onMounted(async () => {
     nowMs.value = Date.now()
   }, 1000)
 
-  void configStore.fetchConfig()
-  void skillStore.fetchSkills()
+  // Skip WebSocket-dependent fetches in local Hermes REST mode
+  if (!isHermesRest.value) {
+    void configStore.fetchConfig()
+    void skillStore.fetchSkills()
 
-  eventCleanups.push(
-    wsStore.subscribe('event', (evt: unknown) => {
-      const data = evt as { event?: string; payload?: unknown }
-      const eventName = data.event || ''
-      if (
-        eventName === 'chat' ||
-        eventName.startsWith('chat.') ||
-        eventName === 'agent' ||
-        eventName.startsWith('agent.') ||
-        eventName.startsWith('tool.') ||
-        eventName.startsWith('model.')
-      ) {
-        const name = eventName.toLowerCase()
-        const isStreamingEvent =
-          name.includes('stream') ||
-          name.includes('delta') ||
-          name.includes('chunk') ||
-          name.includes('partial') ||
-          looksLikeStreamingPayload(data.payload)
-        chatStore.handleAgentStatusEvent(eventName, data.payload)
-        chatStore.handleRealtimeEvent(data.payload, {
-          refreshHistory: false,
-          streaming: isStreamingEvent,
-        })
-      }
-    })
-  )
+    eventCleanups.push(
+      wsStore.subscribe('event', (evt: unknown) => {
+        const data = evt as { event?: string; payload?: unknown }
+        const eventName = data.event || ''
+        if (
+          eventName === 'chat' ||
+          eventName.startsWith('chat.') ||
+          eventName === 'agent' ||
+          eventName.startsWith('agent.') ||
+          eventName.startsWith('tool.') ||
+          eventName.startsWith('model.')
+        ) {
+          const name = eventName.toLowerCase()
+          const isStreamingEvent =
+            name.includes('stream') ||
+            name.includes('delta') ||
+            name.includes('chunk') ||
+            name.includes('partial') ||
+            looksLikeStreamingPayload(data.payload)
+          chatStore.handleAgentStatusEvent(eventName, data.payload)
+          chatStore.handleRealtimeEvent(data.payload, {
+            refreshHistory: false,
+            streaming: isStreamingEvent,
+          })
+        }
+      })
+    )
 
-  await sessionStore.fetchSessions()
+    await sessionStore.fetchSessions()
+  } else {
+    // Hermes REST mode: load persisted conversations
+    hermesChatStore.load()
+    hermesModel.value = hermesChatStore.model
+    const conv = hermesChatStore.activeConversation
+    if (conv?.messages?.length) {
+      chatStore.setMessages([...conv.messages])
+    }
+    // Resolved model now comes from connectionStore.hermesRealModel (read from config)
+    chatStore.setSessionKey('main')
+  }
   const routeSessionKey = normalizeSessionSelectValue(
     Array.isArray(route.query.session) ? route.query.session[0] : (route.query.session as string | number | null)
   )
@@ -2389,8 +2427,70 @@ onUnmounted(() => {
   }
 })
 
+// ── Hermes REST conversation management ──
+function handleNewConversation() {
+  // Save current conversation first
+  if (isHermesRest.value && hermesChatStore.activeId) {
+    hermesChatStore.setMessages([...chatStore.messages], connectionStore.hermesRealModel || undefined)
+  }
+  hermesChatStore.createConversation()
+  chatStore.clearMessages()
+  chatStore.setSessionKey('main')
+}
+
+function handleSwitchConversation(id: string) {
+  if (id === hermesChatStore.activeId) return
+  // Save current conversation
+  if (hermesChatStore.activeId) {
+    hermesChatStore.setMessages([...chatStore.messages], connectionStore.hermesRealModel || undefined)
+  }
+  hermesChatStore.switchTo(id)
+  const conv = hermesChatStore.activeConversation
+  chatStore.setMessages(conv?.messages ? [...conv.messages] : [])
+  chatStore.setSessionKey('main')
+}
+
+function handleDeleteConversation(id: string) {
+  hermesChatStore.deleteConversation(id)
+  const conv = hermesChatStore.activeConversation
+  chatStore.setMessages(conv?.messages ? [...conv.messages] : [])
+}
+
+function handleStartEditTitle(id: string, title: string) {
+  editingConvId.value = id
+  editingConvTitle.value = title
+}
+
+function handleConfirmEditTitle() {
+  if (editingConvId.value && editingConvTitle.value.trim()) {
+    hermesChatStore.renameConversation(editingConvId.value, editingConvTitle.value)
+  }
+  editingConvId.value = null
+  editingConvTitle.value = ''
+}
+
+function handleCancelEditTitle() {
+  editingConvId.value = null
+  editingConvTitle.value = ''
+}
+
+function handleHermesModelChange() {
+  hermesChatStore.setModel(hermesModel.value)
+}
+
+const hermesConvStats = computed(() => {
+  const msgs = chatStore.messages
+  return {
+    total: msgs.length,
+    user: msgs.filter(m => m.role === 'user').length,
+    assistant: msgs.filter(m => m.role === 'assistant').length,
+  }
+})
+
 async function handleRefreshChatData() {
-  await sessionStore.fetchSessions()
+  if (!isHermesRest.value) {
+    await sessionStore.fetchSessions()
+  }
   await loadHistoryForKey(ensureSessionKey(), { force: true })
 }
 
@@ -2402,7 +2502,12 @@ async function handleSend() {
   try {
     const key = ensureSessionKey()
     chatStore.setSessionKey(key)
-    await chatStore.sendMessage(content)
+    const sendModel = isHermesRest.value ? hermesModel.value : undefined
+    await chatStore.sendMessage(content, sendModel)
+    // Persist conversation in Hermes REST mode
+    if (isHermesRest.value) {
+      hermesChatStore.setMessages([...chatStore.messages], connectionStore.hermesRealModel || undefined)
+    }
     void fetchSessionTokenUsage(key)
     draft.value = ''
     await nextTick()
@@ -2420,22 +2525,29 @@ async function handleSend() {
     <NCard :title="t('pages.chat.title')" class="app-card chat-root-card">
       <template #header-extra>
         <NSpace :size="8" class="app-toolbar">
-          <div v-if="sessionTokenMetricTags.length" class="chat-token-metrics">
-            <NTag
-              v-for="metric in sessionTokenMetricTags"
-              :key="metric.key"
-              size="small"
-              :bordered="false"
-              round
-              class="chat-token-chip"
-              :class="{ 'chat-token-chip--total': metric.highlight }"
-            >
-              <span class="chat-token-chip__label">{{ metric.label }}</span>
-              <span class="chat-token-chip__value">{{ metric.value }}</span>
+          <!-- ACP Token metrics -->
+          <template v-if="!isHermesRest">
+            <div v-if="sessionTokenMetricTags.length" class="chat-token-metrics">
+              <NTag
+                v-for="metric in sessionTokenMetricTags"
+                :key="metric.key"
+                size="small"
+                :bordered="false"
+                round
+                class="chat-token-chip"
+                :class="{ 'chat-token-chip--total': metric.highlight }"
+              >
+                <span class="chat-token-chip__label">{{ metric.label }}</span>
+                <span class="chat-token-chip__value">{{ metric.value }}</span>
+              </NTag>
+            </div>
+            <NTag v-else size="small" :bordered="false" round class="chat-token-chip chat-token-chip--loading">
+              {{ sessionTokenStatusText }}
             </NTag>
-          </div>
-          <NTag v-else size="small" :bordered="false" round class="chat-token-chip chat-token-chip--loading">
-            {{ sessionTokenStatusText }}
+          </template>
+          <!-- Hermes REST: model indicator (show actual model from config) -->
+          <NTag v-else size="small" :bordered="false" round type="info">
+            {{ connectionStore.hermesRealModel || hermesModel }}
           </NTag>
           <NButton size="small" class="app-toolbar-btn app-toolbar-btn--refresh" :loading="refreshingChatData" @click="handleRefreshChatData">
             <template #icon><NIcon :component="RefreshOutline" /></template>
@@ -2445,30 +2557,60 @@ async function handleSend() {
       </template>
 
       <NGrid cols="1 l:3" responsive="screen" :x-gap="12" :y-gap="12" class="chat-grid" :class="{ 'chat-grid--collapsed': sideCollapsed }">
+        <!-- Unified sidebar — adapts between Hermes REST and ACP WebSocket modes -->
         <NGridItem :span="1" class="chat-grid-side" :class="{ 'chat-grid-side--collapsed': sideCollapsed }">
-          <!-- 折叠按钮 -->
           <div class="chat-side-collapse-btn" @click="sideCollapsed = !sideCollapsed">
             <NIcon :component="ChevronBackOutline" size="14" />
           </div>
-          
+
           <NCard v-show="!sideCollapsed" embedded :bordered="false" class="chat-side-card">
             <NSpace vertical :size="12">
+              <!-- Hermes REST: New conversation button -->
+              <NButton v-if="isHermesRest" type="primary" block size="small" @click="handleNewConversation">
+                <template #icon><NIcon :component="AddOutline" /></template>
+                {{ t('pages.chat.hermes.newConversation') }}
+              </NButton>
+
+              <!-- Stats -->
               <div class="chat-side-stats">
                 <div class="chat-stat-item">
                   <span class="chat-stat-label">{{ t('pages.chat.stats.total') }}</span>
-                  <strong>{{ stats.total }}</strong>
+                  <strong>{{ isHermesRest ? hermesConvStats.total : stats.total }}</strong>
                 </div>
                 <div class="chat-stat-item">
                   <span class="chat-stat-label">{{ t('pages.chat.stats.assistant') }}</span>
-                  <strong>{{ stats.assistant }}</strong>
+                  <strong>{{ isHermesRest ? hermesConvStats.assistant : stats.assistant }}</strong>
                 </div>
-                <div class="chat-stat-item">
+                <div v-if="!isHermesRest" class="chat-stat-item">
                   <span class="chat-stat-label">{{ t('pages.chat.stats.lastMessage') }}</span>
                   <strong>{{ stats.lastMessageAt }}</strong>
                 </div>
               </div>
 
-              <div>
+              <!-- Hermes REST: Model selector + resolved model display -->
+              <div v-if="isHermesRest">
+                <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.hermes.model') }}</NText>
+                <NInput
+                  v-model:value="hermesModel"
+                  size="small"
+                  placeholder="hermes-agent"
+                  style="margin-top: 4px;"
+                  @blur="handleHermesModelChange"
+                />
+                <div v-if="connectionStore.hermesRealModel" style="margin-top: 4px;">
+                  <NTag size="small" :bordered="false" round type="success">
+                    {{ connectionStore.hermesRealModel }}
+                  </NTag>
+                </div>
+                <div v-else-if="isHermesRest && connectionStore.currentServer && !isLocalServer" style="margin-top: 4px;">
+                  <NText depth="3" style="font-size: 11px;">
+                    {{ t('pages.chat.hermes.remoteModelHint') }}
+                  </NText>
+                </div>
+              </div>
+
+              <!-- ACP: Session key -->
+              <div v-if="!isHermesRest">
                 <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.sessionKey') }}</NText>
                 <NSelect
                   v-model:value="sessionKeyInput"
@@ -2481,6 +2623,7 @@ async function handleSend() {
                 />
               </div>
 
+              <!-- Common: auto-follow & message filter -->
               <div class="chat-side-switches">
                 <NSpace justify="space-between" align="center">
                   <NText>{{ t('pages.chat.preferences.autoFollow') }}</NText>
@@ -2497,7 +2640,64 @@ async function handleSend() {
                 </NSpace>
               </div>
 
-              <div class="chat-meta-bar">
+              <!-- Hermes REST: Conversation list -->
+              <div v-if="isHermesRest" class="hermes-conv-list">
+                <div
+                  v-for="conv in hermesChatStore.conversations"
+                  :key="conv.id"
+                  class="hermes-conv-item"
+                  :class="{ 'hermes-conv-item--active': conv.id === hermesChatStore.activeId }"
+                  @click="handleSwitchConversation(conv.id)"
+                >
+                  <NInput
+                    v-if="editingConvId === conv.id"
+                    v-model:value="editingConvTitle"
+                    size="tiny"
+                    autofocus
+                    class="hermes-conv-title-input"
+                    @keyup.enter="handleConfirmEditTitle"
+                    @keyup.escape="handleCancelEditTitle"
+                    @blur="handleConfirmEditTitle"
+                    @click.stop
+                  />
+                  <div
+                    v-else
+                    class="hermes-conv-title"
+                    @dblclick.stop="handleStartEditTitle(conv.id, conv.title || '')"
+                  >
+                    {{ conv.title || t('pages.chat.hermes.untitled') }}
+                  </div>
+                  <div class="hermes-conv-meta">
+                    <NText depth="3" style="font-size: 11px;">
+                      {{ conv.messages.length }} {{ t('pages.chat.hermes.msgCount') }}
+                    </NText>
+                    <NText depth="3" style="font-size: 11px;">
+                      {{ formatRelativeTime(conv.updatedAt) }}
+                    </NText>
+                  </div>
+                  <NButton
+                    v-if="editingConvId !== conv.id"
+                    size="tiny"
+                    text
+                    class="hermes-conv-edit"
+                    @click.stop="handleStartEditTitle(conv.id, conv.title || '')"
+                  >
+                    <template #icon><NIcon :component="CreateOutline" :size="14" /></template>
+                  </NButton>
+                  <NButton
+                    v-if="hermesChatStore.conversations.length > 1 && editingConvId !== conv.id"
+                    size="tiny"
+                    text
+                    class="hermes-conv-delete"
+                    @click.stop="handleDeleteConversation(conv.id)"
+                  >
+                    <template #icon><NIcon :component="TrashOutline" :size="14" /></template>
+                  </NButton>
+                </div>
+              </div>
+
+              <!-- ACP: Metadata tags -->
+              <div v-if="!isHermesRest" class="chat-meta-bar">
                 <NTag v-if="selectedSession?.label" size="small" :bordered="false" round>
                   {{ t('pages.chat.session.label') }}: {{ selectedSession.label }}
                 </NTag>
@@ -2523,10 +2723,10 @@ async function handleSend() {
           <div v-if="sideCollapsed" class="chat-side-expand-btn" @click="sideCollapsed = false">
             <NIcon :component="ChevronForwardOutline" size="14" />
           </div>
-          
+
           <div class="chat-main-column">
             <NCard embedded :bordered="false" class="chat-transcript-card">
-              <NSpace justify="space-between" align="center" style="margin-bottom: 10px;">
+              <NSpace v-if="!isHermesRest" justify="space-between" align="center" style="margin-bottom: 10px;">
                 <NSpace align="center" :size="8">
                   <NTag size="small" type="info" :bordered="false" round>
                     {{ t('pages.chat.sessionTag', { key: normalizedSessionKey }) }}
@@ -3291,6 +3491,86 @@ async function handleSend() {
 
 .chat-side-card {
   border-radius: var(--radius);
+}
+
+/* ── Hermes conversation list ── */
+.hermes-conv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.hermes-conv-item {
+  position: relative;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.hermes-conv-item:hover {
+  background: rgba(99, 226, 183, 0.06);
+  border-color: var(--border-color);
+}
+
+.hermes-conv-item--active {
+  background: rgba(99, 226, 183, 0.1);
+  border-color: #63e2b7;
+}
+
+.hermes-conv-title {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 48px;
+}
+
+.hermes-conv-title-input {
+  font-size: 13px;
+  margin-right: 4px;
+}
+
+.hermes-conv-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.hermes-conv-edit {
+  position: absolute;
+  top: 6px;
+  right: 24px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.hermes-conv-item:hover .hermes-conv-edit {
+  opacity: 0.7;
+}
+
+.hermes-conv-edit:hover {
+  opacity: 1 !important;
+}
+
+.hermes-conv-delete {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.hermes-conv-item:hover .hermes-conv-delete {
+  opacity: 0.7;
+}
+
+.hermes-conv-delete:hover {
+  opacity: 1 !important;
 }
 
 .chat-main-column {

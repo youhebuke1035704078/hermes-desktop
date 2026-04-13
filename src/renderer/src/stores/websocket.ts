@@ -1,6 +1,6 @@
 import { ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import { OpenClawWebSocket } from '@/api/websocket'
+import { HermesWebSocket } from '@/api/websocket'
 import { RPCClient } from '@/api/rpc-client'
 import { ConnectionState } from '@/api/types'
 import { useAuthStore } from './auth'
@@ -37,17 +37,17 @@ export const useWebSocketStore = defineStore('websocket', () => {
   /** Reject callback for a pending connect() Promise — used to cancel stale attempts */
   let pendingConnectReject: ((reason: Error) => void) | null = null
 
-  function createWebSocket(baseUrl?: string): OpenClawWebSocket {
+  function createWebSocket(baseUrl?: string): HermesWebSocket {
     const authStore = useAuthStore()
     const url = baseUrl || currentBaseUrl || ''
-    return new OpenClawWebSocket({
+    return new HermesWebSocket({
       url,
       getToken: () => authStore.getToken(),
       onUnauthorized: () => { triggerUnauthorized() },
     })
   }
 
-  const ws = shallowRef<OpenClawWebSocket>(createWebSocket())
+  const ws = shallowRef<HermesWebSocket>(createWebSocket())
   const rpc = shallowRef<RPCClient>(new RPCClient(ws.value))
 
   function rebindPersistentListeners() {

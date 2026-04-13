@@ -4,7 +4,7 @@ import { safeGet, safeSet } from '@/utils/safe-storage'
 
 export type ThemeMode = 'light' | 'dark'
 
-const STORAGE_KEY = 'openclaw_theme'
+const STORAGE_KEY = 'hermes_theme'
 
 export const useThemeStore = defineStore('theme', () => {
   const stored = safeGet(STORAGE_KEY) as ThemeMode | null
