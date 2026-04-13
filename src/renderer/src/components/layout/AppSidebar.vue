@@ -11,6 +11,7 @@ import {
   ChatbubblesOutline,
   CogOutline,
   CalendarOutline,
+  ExtensionPuzzleOutline,
 } from '@vicons/ionicons5'
 import { routes } from '@/router/routes'
 import { useConnectionStore } from '@/stores/connection'
@@ -26,7 +27,7 @@ const { activeAlertCount } = useAlertNotifier()
 
 /** Routes that require ACP WebSocket — hide in Hermes REST mode */
 const WS_ONLY_ROUTES = new Set<string>([])
-const HERMES_ONLY_ROUTES = new Set(['Dashboard'])
+const HERMES_ONLY_ROUTES = new Set(['Dashboard', 'Skills'])
 const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
 const iconMap: Record<string, any> = {
@@ -35,6 +36,7 @@ const iconMap: Record<string, any> = {
   ChatbubblesOutline,
   CogOutline,
   CalendarOutline,
+  ExtensionPuzzleOutline,
 }
 
 interface MenuItem {

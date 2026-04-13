@@ -47,6 +47,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { titleKey: 'routes.cron', icon: 'CalendarOutline' },
       },
       {
+        path: 'skills',
+        name: 'Skills',
+        component: () => import('@/views/skills/SkillsPage.vue'),
+        meta: { titleKey: 'routes.skills', icon: 'ExtensionPuzzleOutline' },
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/settings/SettingsPage.vue'),
