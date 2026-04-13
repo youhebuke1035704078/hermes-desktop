@@ -368,7 +368,7 @@ const hermesSessionRows = computed(() => {
     key: c.id,
     title: c.title || t('pages.sessions.hermesRest.untitled'),
     messageCount: c.messages?.length || 0,
-    model: c.model || '-',
+    model: connectionStore.hermesRealModel || c.model || '-',
     lastActivity: c.updatedAt,
     createdAt: c.createdAt,
   }))
