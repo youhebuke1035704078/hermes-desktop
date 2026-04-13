@@ -16,6 +16,8 @@ Data sources available in Hermes REST mode:
 
 No new API endpoints are required. All three features consume existing store data.
 
+**Utility note**: For relative time formatting, use the existing `formatRelativeTime` utility from `@/utils/format` (already used in SessionsPage and SessionDetailPage). Do NOT introduce `date-fns` `formatDistanceToNow` as a parallel approach.
+
 ---
 
 ## Feature 1: Dashboard Page
@@ -23,20 +25,30 @@ No new API endpoints are required. All three features consume existing store dat
 ### Files
 - **New**: `src/renderer/src/views/dashboard/DashboardPage.vue`
 - **Modified**: `src/renderer/src/router/routes.ts` (add route)
-- **Modified**: `src/renderer/src/components/layout/AppSidebar.vue` (add icon)
+- **Modified**: `src/renderer/src/components/layout/AppSidebar.vue` (add visibility logic)
 - **Modified**: `src/renderer/src/i18n/messages/zh-CN.ts`, `en-US.ts` (add translations)
 
 ### Route
-- Path: `/dashboard`
-- Name: `Dashboard`
-- Icon: `GridOutline`
-- Position: after Chat, before Sessions
-- Visibility: Hermes REST mode only (add `Dashboard` to `WS_ONLY_ROUTES` inverted — or add a `HERMES_ONLY_ROUTES` set in AppSidebar)
+
+Add to `routes.ts` children array, after Chat and before Sessions:
+
+```typescript
+{
+  path: 'dashboard',
+  name: 'Dashboard',
+  component: () => import('@/views/dashboard/DashboardPage.vue'),
+  meta: { titleKey: 'routes.dashboard', icon: 'GridOutline' },
+},
+```
+
+`GridOutline` is already imported in `AppSidebar.vue`'s `iconMap`.
+
+Visibility: Hermes REST mode only (see Sidebar Visibility Logic section).
 
 ### Data Sources
 - `useHermesChatStore()` — conversations array
 - `useCronStore()` — jobs array
-- `useConnectionStore()` — server info, model name
+- `useConnectionStore()` — server info, model name, `hermesResolvedModel`
 - `hermesChatStore.serverSyncAvailable` — sync status
 
 ### Layout (Option B — Sectioned)
@@ -57,33 +69,34 @@ No new API endpoints are required. All three features consume existing store dat
 |                       | ──────────────────────── |
 | [View all →]          | Server Info              |
 |                       | Model: gpt-5.4           |
-|                       | Version: v0.8.0          |
 |                       | Sync: Connected          |
 +--------------------------------------------------+
 ```
 
-**Metric cards** — `NGrid cols="1 s:2 m:4"` with `NCard embedded`:
+**Metric cards** — `NGrid cols="1 s:2 m:4" responsive="screen"` with `NCard embedded`:
 1. Conversations: `conversations.length`
 2. Messages: sum of all `conv.messages.length`
 3. Cron Jobs: `{enabled} / {total}` with NText type coloring
-4. Server: Online/Offline status + model name + version (from connection store)
+4. Server: Online/Offline (based on connection state) + model name from `connectionStore.hermesResolvedModel`
 
-**Left column — Recent Conversations**:
-- `NGrid cols="1 m:2"`, left item
+**Left column — Recent Conversations** (`NGrid cols="1 m:2" responsive="screen"`, left item):
 - List of up to 5 most recent conversations (sorted by updatedAt desc)
-- Each row: title (truncated), message count, relative time (date-fns `formatDistanceToNow`)
+- Each row: title (truncated), message count, relative time (`formatRelativeTime` from `@/utils/format`)
 - Click navigates to Chat page with `hermesChatStore.switchTo(id)` + `router.push({ name: 'Chat' })`
 - "View all" link at bottom navigates to Sessions page
+- **Empty state**: When no conversations exist, show `NText depth=3` centered: "No conversations yet. Start a chat to see activity here."
 
 **Right column — Cron Runs + Server Info**:
 - Top card: Recent Cron Runs — jobs filtered to those with `state?.lastRunAtMs`, sorted by lastRunAtMs desc, top 5
   - Each row: job name, status tag (ok/error), relative time
   - Click navigates to Cron page
-- Bottom card: Server Info — model, version (from mgmt API or connection store), sync status badge
+  - **Empty state**: When no jobs have run data, show `NText depth=3`: "No cron runs yet."
+- Bottom card: Server Info — model from `connectionStore.hermesResolvedModel`, sync status badge (`hermesChatStore.serverSyncAvailable` ? "Connected" : "Local only")
+  - Note: version is not available from stores directly; show model and sync status only. Version display is already handled in SettingsPage.
 
 ### Refresh Behavior
-- Refresh button calls `cronStore.fetchJobs()` (conversations are already reactive from hermes-chat store)
-- On mount: `cronStore.fetchJobs()` if not already loaded
+- Refresh button calls both `cronStore.fetchJobs()` AND `hermesChatStore.loadFromServer()` (re-syncs conversations from mgmt API if available)
+- On mount: `cronStore.fetchJobs()` if not already loaded; hermes-chat store data is already loaded at app startup
 
 ---
 
@@ -112,24 +125,32 @@ interface SessionRow {
 }
 ```
 
-**Metric cards** (4 columns, same responsive grid):
+**Metric cards** (4 columns, `NGrid cols="1 s:2 m:4" responsive="screen"`):
 1. Total Conversations
 2. Active Today (updatedAt within 24 hours)
 3. Total Messages (sum across all conversations)
 4. Model (display current model name)
 
-**Search/filter**: filter by title and message content (substring match on `conv.title` and `conv.messages[*].content`)
+**Search/filter**: filter by `conv.title` substring match only (title-only search keeps the computed lightweight; searching message content across 50 conversations on every keystroke would be expensive)
 
 **Table columns** (simplified from ACP mode):
 - Title (with fallback "Untitled")
 - Messages (count)
 - Model
-- Last Activity (relative time)
-- Actions: View detail, Export JSON, Delete (with NPopconfirm)
+- Last Activity (relative time via `formatRelativeTime`)
+- Actions: View detail, Open in Chat (switchTo + navigate), Export JSON, Delete (with NPopconfirm)
 
-**Removed in Hermes REST mode**: channel filter, model filter, peer column, batch model assignment, create session button (replaced with "New Conversation" that creates via hermesChatStore and navigates to Chat)
+**"Open in Chat" action**: calls `hermesChatStore.switchTo(id)` + `router.push({ name: 'Chat' })` — available directly from the table row, no need to go through detail page first.
+
+**Export JSON**: serialize the `HermesConversation` object to JSON and trigger a browser download via `URL.createObjectURL(new Blob([json]))` + click on a temporary `<a>` element. No store method needed.
+
+**Removed in Hermes REST mode**: channel filter, model filter, peer column, batch model assignment, create session button (replaced with "New Conversation" that creates via `hermesChatStore.createConversation()` and navigates to Chat)
+
+**Loading state**: hermes-chat store data loads synchronously from localStorage, so no loading spinner is needed for the initial render. The "New Conversation" and "Delete" actions are also synchronous. No `loading` ref is required.
 
 ### SessionDetailPage Changes (Hermes REST mode)
+
+**Routing**: reuses the existing `sessions/:key` route. The `:key` param receives the conversation `id` (e.g., `conv-1713000000-abc123`). These IDs are URL-safe (alphanumeric + hyphens) and do not need encoding.
 
 **Data source**: `hermesChatStore.conversations.find(c => c.id === route.params.key)`
 
@@ -137,7 +158,9 @@ interface SessionRow {
 - Header: conversation title (editable via `hermesChatStore.renameConversation`)
 - Metadata: message count, model, resolvedModel, created/updated timestamps
 - Transcript: iterate `conversation.messages`, render by role with color coding (user=blue, assistant=green, system=gray) — same pattern as ACP mode
-- Actions: Back to list, Export (download as JSON), Delete, Open in Chat (switchTo + navigate)
+- Actions: Back to list, Export JSON (same blob download approach), Delete, Open in Chat (switchTo + navigate)
+
+**Not found**: if conversation ID does not match any conversation, show an empty state with "Conversation not found" and a back button.
 
 ### ACP WebSocket mode
 No changes. All existing logic stays behind `v-if="!isHermesRest"` / `v-else` branches.
@@ -155,28 +178,38 @@ No changes. All existing logic stays behind `v-if="!isHermesRest"` / `v-else` br
 Insert after "nextRun" column, before "status" column:
 
 **lastRun column** (width: 160):
-- Render: `formatDistanceToNow(job.state?.lastRunAtMs)` or `-` if null
-- Uses date-fns (already in dependencies)
+- Render: `formatRelativeTime(job.state?.lastRunAtMs)` from `@/utils/format`, or `-` if null
 
 **lastStatus column** (width: 100):
 - Render: `NTag` with type mapping:
   - `ok` → type="success", text="OK"
   - `error` → type="error", text="Error"
-  - `skipped` → type="warning", text="Skipped"
+  - `skipped` → type="warning", text="Skipped" (defensive; the backend may not currently produce this value, but the type allows it)
   - null → NText depth=3, text="-"
 
 ### Expandable Rows
 
-Enable NDataTable `expandable` via `:row-props` or `expand` slot:
+Enable NDataTable expandable rows via the `render-expand` prop (Naive UI's render function approach):
 
-**Expanded content** — rendered as a small card/description list:
-- Last Run Time: full ISO timestamp formatted for locale (`toLocaleString`)
-- Duration: `lastDurationMs` formatted as `X.Xs` (e.g., "3.2s"), or `-`
-- Consecutive Errors: `consecutiveErrors` value, red NText if > 0
-- Error Detail: `lastError` in NAlert type="error", only when lastStatus === 'error'
-- Next Run: full ISO timestamp of `nextRun`
+```typescript
+// Add to NDataTable props:
+// :render-expand="renderExpand"
 
-**Expand trigger**: NDataTable built-in expand icon column (default-expand-column-width: 32)
+function renderExpand(row: CronJob) {
+  // returns VNode with run detail card
+}
+```
+
+The `render-expand` prop automatically adds an expand icon column (width ~32px) to the left of the table.
+
+**Expanded content** — rendered as `NDescriptions` (label-placement="left", column=1, bordered):
+- Last Run Time: full timestamp formatted via `toLocaleString('zh-CN')`, or `t('pages.cron.expandedRow.noData')`
+- Duration: `lastDurationMs` formatted as `(X.Xs)` (e.g., "3.2s"), or `-`
+- Consecutive Errors: `consecutiveErrors` value, `NText type="error"` if > 0, otherwise `NText depth=3` showing "0"
+- Error Detail: `lastError` in `NAlert type="error"`, only rendered when `lastStatus === 'error'` and `lastError` is truthy
+- Next Run: full timestamp of `nextRun` via `toLocaleString('zh-CN')`, or `-`
+
+**When no run data**: if `!job.state?.lastRunAtMs`, the expanded row shows a single centered `NText depth=3`: "No run data yet"
 
 ### New i18n Keys
 ```
@@ -190,6 +223,14 @@ pages.cron.expandedRow.nextRunTime  — "Next Run Time" / "下次运行时间"
 pages.cron.expandedRow.noData       — "No run data yet" / "暂无运行数据"
 ```
 
+### Incidental cleanup
+
+The cancel button in the CronPage modal currently uses a fragile locale-sniffing pattern:
+```
+t('pages.settings.saveFile') === '保存' ? '取消' : 'Cancel'
+```
+Replace with a proper i18n key: `t('common.cancel')` (add to both locale files if missing).
+
 ---
 
 ## Sidebar Visibility Logic
@@ -198,7 +239,7 @@ Current `AppSidebar.vue` hides `WS_ONLY_ROUTES` (Sessions) in Hermes REST mode. 
 
 - **Remove** Sessions from `WS_ONLY_ROUTES` — Sessions now works in both modes
 - **Add** `HERMES_ONLY_ROUTES = new Set(['Dashboard'])` — Dashboard only shows in Hermes REST mode
-- Filter logic: hide route if `(isHermesRest && WS_ONLY_ROUTES.has(name)) || (!isHermesRest && HERMES_ONLY_ROUTES.has(name))`
+- Filter logic in `baseMenuItems` computed: hide route if `(isHermesRest && WS_ONLY_ROUTES.has(name)) || (!isHermesRest && HERMES_ONLY_ROUTES.has(name))`
 
 ---
 
@@ -209,3 +250,4 @@ Current `AppSidebar.vue` hides `WS_ONLY_ROUTES` (Sessions) in Hermes REST mode. 
 - No persistent Dashboard state (no localStorage for dashboard preferences)
 - No drag-to-reorder Dashboard cards
 - No `/v1/runs` monitoring (API does not exist on Hermes Agent)
+- No version display on Dashboard (already handled in SettingsPage; adding it here would require an extra mgmt API call)
