@@ -49,6 +49,8 @@ export const useConnectionStore = defineStore('connection', () => {
   const serverType = ref<'hermes-rest' | 'acp-ws' | null>(null)
   /** Actual underlying model name from ~/.hermes/config.yaml (e.g. "gpt-5.4") */
   const hermesRealModel = ref<string | null>(null)
+  /** API auth token for Hermes REST servers (API_SERVER_KEY) */
+  const hermesAuthToken = ref<string | null>(null)
   /** Stops the watcher that syncs status with wsStore.state after initial connect */
   let stopStateSync: (() => void) | null = null
 
@@ -191,6 +193,7 @@ export const useConnectionStore = defineStore('connection', () => {
       if (isHermesRest) {
         // Hermes Agent REST API — no WebSocket needed
         serverType.value = 'hermes-rest'
+        hermesAuthToken.value = isNoAuth ? null : password
         currentServer.value = server
         status.value = 'connected'
         safeSet('lastConnectedServerId', serverId)
@@ -261,6 +264,7 @@ export const useConnectionStore = defineStore('connection', () => {
     authStore.authEnabled = true  // Reset to default
     serverType.value = null
     hermesRealModel.value = null
+    hermesAuthToken.value = null
     currentServer.value = null
     status.value = 'disconnected'
   }
@@ -336,5 +340,5 @@ export const useConnectionStore = defineStore('connection', () => {
     }
   }
 
-  return { currentServer, status, servers, serverType, hermesRealModel, loadServers, addServer, deleteServer, connect, connectLocal, disconnect, autoConnect }
+  return { currentServer, status, servers, serverType, hermesRealModel, hermesAuthToken, loadServers, addServer, deleteServer, connect, connectLocal, disconnect, autoConnect }
 })

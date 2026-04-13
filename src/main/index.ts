@@ -208,14 +208,16 @@ function registerIpcHandlers(): void {
 
   // ── Hermes REST API: streaming chat via SSE ──
   // Main-process fetch bypasses renderer CORS; SSE chunks are forwarded via IPC events.
-  ipcMain.handle('hermes:chat', async (event, url: string, body: string) => {
+  ipcMain.handle('hermes:chat', async (event, url: string, body: string, authToken?: string) => {
     if (!isSafeHttpUrl(url)) {
       return { ok: false, error: 'Blocked: only http/https URLs are allowed' }
     }
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body,
       })
       if (!res.ok) {

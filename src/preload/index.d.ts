@@ -43,7 +43,7 @@ interface HermesAPI {
   hermesConfig(): Promise<{ ok: boolean; model: string | null; fullModel: string | null; provider: string | null }>
 
   // Hermes streaming chat (SSE)
-  hermesChat(url: string, body: string): Promise<{ ok: boolean; error?: string }>
+  hermesChat(url: string, body: string, authToken?: string): Promise<{ ok: boolean; error?: string }>
   onHermesChatChunk(cb: (chunk: { done: boolean; data?: any }) => void): () => void
 
   // Backup system

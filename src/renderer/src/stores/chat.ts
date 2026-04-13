@@ -984,6 +984,7 @@ export const useChatStore = defineStore('chat', () => {
             messages: apiMessages,
             stream: true,
           }),
+          connectionStore.hermesAuthToken || undefined,
         )
 
         if (!result.ok) {
