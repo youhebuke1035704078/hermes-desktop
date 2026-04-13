@@ -7,18 +7,24 @@ export * from './remote-desktop'
 export * from './backup'
 import type { ModelConfig, ToolPolicyConfig } from './config'
 
-export interface Skill {
+export interface SkillMeta {
   name: string
-  description?: string
-  version?: string
-  source: 'bundled' | 'managed' | 'workspace' | 'extra'
-  installed: boolean
-  eligible?: boolean
-  disabled?: boolean
-  bundled?: boolean
-  skillKey?: string
-  hasUpdate?: boolean
+  description: string
+  version: string
+  author: string
+  category: string
+  platforms: string[]
+  prerequisites?: { commands?: string[]; env_vars?: string[] }
+  configVars?: { key: string; description: string; default?: any; prompt?: string }[]
+  tags?: string[]
+  license?: string
+  dirPath: string
+  relatedSkills?: string[]
+  homepage?: string
 }
+
+/** @deprecated Use SkillMeta instead. Kept as alias for backward compatibility. */
+export type Skill = SkillMeta
 
 export interface PluginPackage {
   name: string
