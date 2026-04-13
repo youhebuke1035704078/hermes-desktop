@@ -65,7 +65,13 @@ onMounted(() => {
   window.addEventListener('resize', onResize)
   if (skillStore.skills.length === 0) skillStore.fetchSkills()
 })
-onUnmounted(() => window.removeEventListener('resize', onResize))
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
+  if (configDebounceTimer) {
+    clearTimeout(configDebounceTimer)
+    configDebounceTimer = null
+  }
+})
 
 // ── Selection ──
 function selectSkill(name: string) {

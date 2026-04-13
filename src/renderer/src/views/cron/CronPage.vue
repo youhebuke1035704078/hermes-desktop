@@ -203,7 +203,7 @@ function renderExpand(row: CronJob) {
   return h(NDescriptions, { labelPlacement: 'left', column: 1, bordered: true, size: 'small', style: 'max-width: 500px;' }, {
     default: () => [
       h(NDescriptionsItem, { label: t('pages.cron.expandedRow.lastRunTime') }, {
-        default: () => new Date(row.state!.lastRunAtMs!).toLocaleString(),
+        default: () => row.state?.lastRunAtMs ? new Date(row.state.lastRunAtMs).toLocaleString() : '-',
       }),
       h(NDescriptionsItem, { label: t('pages.cron.expandedRow.duration') }, {
         default: () => row.state?.lastDurationMs != null
@@ -218,7 +218,7 @@ function renderExpand(row: CronJob) {
       }),
       row.state?.lastStatus === 'error' && row.state?.lastError
         ? h(NDescriptionsItem, { label: t('pages.cron.expandedRow.errorDetail') }, {
-            default: () => h(NAlert, { type: 'error', style: 'font-size: 12px;' }, { default: () => row.state!.lastError }),
+            default: () => h(NAlert, { type: 'error', style: 'font-size: 12px;' }, { default: () => row.state?.lastError || '' }),
           })
         : null,
       h(NDescriptionsItem, { label: t('pages.cron.expandedRow.nextRunTime') }, {

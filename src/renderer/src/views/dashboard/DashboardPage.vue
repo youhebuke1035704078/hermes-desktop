@@ -244,7 +244,7 @@ onMounted(() => {
                 <NText depth="3" style="font-size: 12px;">{{ t('pages.dashboard.kpis.errorRate.label') }}</NText>
                 <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
                   <NText :type="(messageAggregates?.errors || 0) > 0 ? 'error' : 'success'">
-                    {{ messageAggregates?.total ? ((messageAggregates.errors / messageAggregates.total) * 100).toFixed(1) : '0' }}%
+                    {{ messageAggregates?.total ? (((messageAggregates.errors || 0) / messageAggregates.total) * 100).toFixed(1) : '0' }}%
                   </NText>
                 </div>
                 <NText depth="3" style="font-size: 11px;">

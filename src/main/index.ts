@@ -241,30 +241,38 @@ function registerIpcHandlers(): void {
       const decoder = new TextDecoder()
       let buffer = ''
 
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+      try {
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // keep incomplete line in buffer
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || '' // keep incomplete line in buffer
 
-        for (const line of lines) {
-          const trimmed = line.trim()
-          if (!trimmed || trimmed.startsWith(':')) continue // skip empty lines and SSE comments
-          if (trimmed.startsWith('data: ')) {
-            const data = trimmed.slice(6)
-            if (data === '[DONE]') {
-              event.sender.send('hermes:chat:chunk', { done: true })
-            } else {
-              try {
-                const parsed = JSON.parse(data)
-                event.sender.send('hermes:chat:chunk', { done: false, data: parsed })
-              } catch { /* skip malformed JSON */ }
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed || trimmed.startsWith(':')) continue // skip empty lines and SSE comments
+            if (trimmed.startsWith('data: ')) {
+              const data = trimmed.slice(6)
+              if (data === '[DONE]') {
+                if (!event.sender.isDestroyed()) {
+                  event.sender.send('hermes:chat:chunk', { done: true })
+                }
+              } else {
+                try {
+                  const parsed = JSON.parse(data)
+                  if (!event.sender.isDestroyed()) {
+                    event.sender.send('hermes:chat:chunk', { done: false, data: parsed })
+                  }
+                } catch { /* skip malformed JSON */ }
+              }
             }
           }
         }
+      } finally {
+        reader.cancel().catch(() => {})
       }
 
       return { ok: true }
@@ -303,8 +311,9 @@ function registerIpcHandlers(): void {
       let externalDirs: string[] = []
       try {
         const raw = await readFile(configPath, 'utf-8')
-        const parsed = yaml.load(raw) as Record<string, any> | null
-        const skillsCfg = parsed?.skills
+        const parsed = yaml.load(raw)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid')
+        const skillsCfg = (parsed as Record<string, any>)?.skills
         if (skillsCfg && typeof skillsCfg === 'object') {
           disabled = Array.isArray(skillsCfg.disabled) ? skillsCfg.disabled : []
           configValues =
@@ -383,9 +392,15 @@ function registerIpcHandlers(): void {
           const { path: dirPath } = payload as { path: string }
           if (!Array.isArray(skills.external_dirs)) skills.external_dirs = []
           const resolvedDir = dirPath.replace(/^~/, homedir())
-          // Validate: must be under home and not duplicate
-          const realHome = homedir()
-          if (!resolvedDir.startsWith(realHome)) {
+          // Validate: must be under home and not duplicate (use realpath to prevent symlink bypass)
+          const realHome = await realpath(homedir())
+          let realDir: string
+          try {
+            realDir = await realpath(resolvedDir)
+          } catch {
+            return { ok: false, error: 'Directory does not exist' }
+          }
+          if (realDir !== realHome && !realDir.startsWith(realHome + '/')) {
             return { ok: false, error: 'Path must be under home directory' }
           }
           if (skills.external_dirs.includes(dirPath)) {
@@ -481,7 +496,7 @@ function registerIpcHandlers(): void {
       } catch {
         return { ok: false, error: 'File does not exist' }
       }
-      if (!realFile.startsWith(realHome + '/')) {
+      if (realFile !== realHome && !realFile.startsWith(realHome + '/')) {
         return { ok: false, error: 'Access denied: path outside home directory' }
       }
       const s = await stat(realFile)
@@ -534,7 +549,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle('hermes:restart', async () => {
     try {
       return await new Promise<{ ok: boolean; error?: string }>((resolve) => {
-        execFile('launchctl', ['kickstart', '-k', 'gui/' + process.getuid!() + '/ai.hermes.gateway'], (err, _stdout, stderr) => {
+        if (!process.getuid) return resolve({ ok: false, error: 'getuid not available on this platform' })
+        execFile('launchctl', ['kickstart', '-k', 'gui/' + process.getuid() + '/ai.hermes.gateway'], (err, _stdout, stderr) => {
           if (err) {
             resolve({ ok: false, error: stderr || err.message })
           } else {
@@ -624,11 +640,15 @@ function registerIpcHandlers(): void {
         let output = ''
         child.stdout?.on('data', (data: string) => {
           output += data
-          event.sender.send('hermes:update:progress', data.toString())
+          if (!event.sender.isDestroyed()) {
+            event.sender.send('hermes:update:progress', data.toString())
+          }
         })
         child.stderr?.on('data', (data: string) => {
           output += data
-          event.sender.send('hermes:update:progress', data.toString())
+          if (!event.sender.isDestroyed()) {
+            event.sender.send('hermes:update:progress', data.toString())
+          }
         })
         child.on('close', (code) => {
           if (code === 0) {
