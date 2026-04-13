@@ -81,6 +81,50 @@ const isLocalServer = computed(() => {
   } catch { return false }
 })
 
+// ── Remote management API ──
+/** Management API URL: same host as Hermes Agent, port 8643 */
+const mgmtUrl = computed(() => {
+  const url = connectionStore.currentServer?.url
+  if (!url) return ''
+  try {
+    const u = new URL(url)
+    u.port = '8643'
+    return u.origin
+  } catch { return '' }
+})
+/** Whether the remote management API is reachable */
+const mgmtAvailable = ref(false)
+/** True if version/config/restart features should be shown */
+const canManage = computed(() => isHermesRest.value && (isLocalServer.value || mgmtAvailable.value))
+
+/** Call remote management API with auth */
+async function mgmtFetch(path: string, options: { method?: string; body?: string } = {}): Promise<any> {
+  const url = `${mgmtUrl.value}${path}`
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (connectionStore.hermesAuthToken) headers['Authorization'] = `Bearer ${connectionStore.hermesAuthToken}`
+  if (window.api) {
+    const resp = await window.api.httpFetch(url, { method: options.method || 'GET', headers, body: options.body })
+    return typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : resp
+  }
+  const resp = await fetch(url, { method: options.method || 'GET', headers, body: options.body, signal: AbortSignal.timeout(10000) })
+  return resp.json()
+}
+
+/** Probe management API availability (silent, for remote servers) */
+async function probeMgmtApi() {
+  if (isLocalServer.value || !mgmtUrl.value) return
+  try {
+    const url = `${mgmtUrl.value}/health`
+    const resp = window.api
+      ? await window.api.httpFetch(url)
+      : await fetch(url, { signal: AbortSignal.timeout(3000) }).then(r => ({ ok: r.ok, body: '' }))
+    if (resp.ok) {
+      const data = typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}
+      mgmtAvailable.value = data?.platform === 'hermes-mgmt'
+    }
+  } catch { mgmtAvailable.value = false }
+}
+
 function handleThemeChange(mode: ThemeMode) {
   themeStore.setMode(mode)
 }
@@ -125,10 +169,11 @@ const hermesUpdating = ref(false)
 const hermesUpdateLog = ref('')
 
 async function fetchHermesVersion() {
-  if (!window.api) return
   hermesVersionLoading.value = true
   try {
-    const res = await window.api.hermesVersion()
+    const res = isLocalServer.value && window.api
+      ? await window.api.hermesVersion()
+      : await mgmtFetch('/version')
     if (res.ok) {
       hermesVersion.value = res.version || ''
       hermesDate.value = res.date || ''
@@ -138,11 +183,12 @@ async function fetchHermesVersion() {
 }
 
 async function checkHermesUpdate() {
-  if (!window.api) return
   hermesCheckingUpdate.value = true
   hermesUpdateAvailable.value = false
   try {
-    const res = await window.api.hermesCheckUpdate()
+    const res = isLocalServer.value && window.api
+      ? await window.api.hermesCheckUpdate()
+      : await mgmtFetch('/check-update')
     if (res.ok) {
       hermesCurrentTag.value = res.current || ''
       hermesLatestTag.value = res.latest || ''
@@ -161,14 +207,18 @@ async function checkHermesUpdate() {
 }
 
 async function doHermesUpdate() {
-  if (!window.api) return
   hermesUpdating.value = true
   hermesUpdateLog.value = ''
-  const unsub = window.api.onHermesUpdateProgress((data: string) => {
-    hermesUpdateLog.value += data
-  })
+  let unsub: (() => void) | null = null
+  if (isLocalServer.value && window.api) {
+    unsub = window.api.onHermesUpdateProgress((data: string) => {
+      hermesUpdateLog.value += data
+    })
+  }
   try {
-    const res = await window.api.hermesUpdate()
+    const res = isLocalServer.value && window.api
+      ? await window.api.hermesUpdate()
+      : await mgmtFetch('/update', { method: 'POST' })
     if (res.ok) {
       message.success(t('pages.settings.updateSuccess'))
       hermesUpdateAvailable.value = false
@@ -179,23 +229,30 @@ async function doHermesUpdate() {
   } catch (e: any) {
     message.error(`${t('pages.settings.updateFailed')}: ${e.message}`)
   } finally {
-    unsub()
+    unsub?.()
     hermesUpdating.value = false
   }
 }
 
 async function loadConfigFiles() {
-  if (!window.api) return
-  hermesDir.value = (await window.api.getHomedir()) + '/.hermes'
+  if (isLocalServer.value) {
+    if (!window.api) return
+    hermesDir.value = (await window.api.getHomedir()) + '/.hermes'
+  } else {
+    hermesDir.value = '~/.hermes'
+  }
 
   // Load config.yaml
   configYamlLoading.value = true
   configYamlError.value = ''
   configYamlNotFound.value = false
   try {
-    const res = await window.api.fsReadFile(`${hermesDir.value}/config.yaml`)
+    const res = isLocalServer.value && window.api
+      ? await window.api.fsReadFile(`${hermesDir.value}/config.yaml`)
+      : await mgmtFetch('/config/yaml')
     if (res.ok) {
       configYaml.value = res.content || ''
+      if (res.notFound) configYamlNotFound.value = true
     } else if (res.error?.includes('does not exist')) {
       configYamlNotFound.value = true
       configYaml.value = ''
@@ -213,9 +270,12 @@ async function loadConfigFiles() {
   envError.value = ''
   envNotFound.value = false
   try {
-    const res = await window.api.fsReadFile(`${hermesDir.value}/.env`)
+    const res = isLocalServer.value && window.api
+      ? await window.api.fsReadFile(`${hermesDir.value}/.env`)
+      : await mgmtFetch('/config/env')
     if (res.ok) {
       envContent.value = res.content || ''
+      if (res.notFound) envNotFound.value = true
     } else if (res.error?.includes('does not exist')) {
       envNotFound.value = true
       envContent.value = ''
@@ -230,10 +290,11 @@ async function loadConfigFiles() {
 }
 
 async function saveConfigYaml() {
-  if (!window.api) return
   configYamlSaving.value = true
   try {
-    const res = await window.api.fsWriteFile(`${hermesDir.value}/config.yaml`, configYaml.value)
+    const res = isLocalServer.value && window.api
+      ? await window.api.fsWriteFile(`${hermesDir.value}/config.yaml`, configYaml.value)
+      : await mgmtFetch('/config/yaml', { method: 'PUT', body: JSON.stringify({ content: configYaml.value }) })
     if (res.ok) {
       message.success(t('pages.settings.saveSuccess'))
       configYamlNotFound.value = false
@@ -248,10 +309,11 @@ async function saveConfigYaml() {
 }
 
 async function saveEnv() {
-  if (!window.api) return
   envSaving.value = true
   try {
-    const res = await window.api.fsWriteFile(`${hermesDir.value}/.env`, envContent.value)
+    const res = isLocalServer.value && window.api
+      ? await window.api.fsWriteFile(`${hermesDir.value}/.env`, envContent.value)
+      : await mgmtFetch('/config/env', { method: 'PUT', body: JSON.stringify({ content: envContent.value }) })
     if (res.ok) {
       message.success(t('pages.settings.saveSuccess'))
       envNotFound.value = false
@@ -266,10 +328,11 @@ async function saveEnv() {
 }
 
 async function restartHermes() {
-  if (!window.api) return
   restarting.value = true
   try {
-    const res = await window.api.hermesRestart()
+    const res = isLocalServer.value && window.api
+      ? await window.api.hermesRestart()
+      : await mgmtFetch('/restart', { method: 'POST' })
     if (res.ok) {
       message.success(t('pages.settings.restartSuccess'))
     } else {
@@ -284,11 +347,20 @@ async function restartHermes() {
 
 onMounted(async () => {
   if (isLocalServer.value) {
+    // Local: load config files and version directly via IPC
     loadConfigFiles()
-  }
-  if (isHermesRest.value && isLocalServer.value) {
-    await fetchHermesVersion()
-    checkHermesUpdate()  // auto-check silently on mount
+    if (isHermesRest.value) {
+      await fetchHermesVersion()
+      checkHermesUpdate()
+    }
+  } else if (isHermesRest.value) {
+    // Remote: probe management API, then load if available
+    await probeMgmtApi()
+    if (mgmtAvailable.value) {
+      loadConfigFiles()
+      await fetchHermesVersion()
+      checkHermesUpdate()
+    }
   }
 })
 </script>
@@ -339,8 +411,8 @@ onMounted(async () => {
       </NSpace>
     </NCard>
 
-    <!-- Server Info (remote Hermes REST — show what we CAN get from API) -->
-    <NCard class="app-card" v-if="isHermesRest && !isLocalServer">
+    <!-- Server Info (remote without management API — basic fallback) -->
+    <NCard class="app-card" v-if="isHermesRest && !isLocalServer && !mgmtAvailable">
       <template #header>
         <NSpace align="center" :size="8">
           <NIcon :component="InformationCircleOutline" size="18" />
@@ -365,7 +437,7 @@ onMounted(async () => {
     </NCard>
 
     <!-- Hermes Agent Version & Update (local server only — uses local git/binary) -->
-    <NCard class="app-card" v-if="isHermesRest && isLocalServer">
+    <NCard class="app-card" v-if="canManage">
       <template #header>
         <NSpace align="center" :size="8">
           <NIcon :component="RocketOutline" size="18" />
@@ -431,7 +503,7 @@ onMounted(async () => {
     </NCard>
 
     <!-- Hermes Config (config.yaml) — local only -->
-    <NCard class="app-card app-card--collapsible" v-if="isHermesRest && isLocalServer">
+    <NCard class="app-card app-card--collapsible" v-if="canManage">
       <template #header>
         <NSpace align="center" :size="8" style="cursor: pointer;" @click="configExpanded = !configExpanded">
           <NIcon :component="configExpanded ? ChevronUpOutline : ChevronDownOutline" size="18" />
@@ -475,7 +547,7 @@ onMounted(async () => {
     </NCard>
 
     <!-- Hermes .env — local only -->
-    <NCard class="app-card app-card--collapsible" v-if="isHermesRest && isLocalServer">
+    <NCard class="app-card app-card--collapsible" v-if="canManage">
       <template #header>
         <NSpace align="center" :size="8" style="cursor: pointer;" @click="envExpanded = !envExpanded">
           <NIcon :component="envExpanded ? ChevronUpOutline : ChevronDownOutline" size="18" />
@@ -519,7 +591,7 @@ onMounted(async () => {
     </NCard>
 
     <!-- Restart Hermes service — local only (macOS launchd) -->
-    <NCard class="app-card" v-if="isHermesRest && isLocalServer">
+    <NCard class="app-card" v-if="canManage">
       <template #header>
         <NSpace align="center" :size="8">
           <NIcon :component="RefreshOutline" size="18" />
