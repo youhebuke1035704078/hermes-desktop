@@ -7,6 +7,8 @@ import { homedir } from 'os'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import { getServers, saveServer, removeServer, decryptPassword, isEncryptionAvailable } from './store'
+import * as yaml from 'js-yaml'
+import { scanSkillsDirectory, setNestedValue } from './skill-parser'
 import { registerWsBridge, shutdownWsBridge } from './ws-bridge'
 import icon from '../../resources/icon.png?asset'
 
@@ -286,6 +288,129 @@ function registerIpcHandlers(): void {
       return { ok: true, model: shortModel, fullModel: rawModel, provider }
     } catch {
       return { ok: false, model: null, fullModel: null, provider: null }
+    }
+  })
+
+  // ── Skill management: read all skills + config ──
+  ipcMain.handle('hermes:skills', async () => {
+    try {
+      const configPath = join(homedir(), '.hermes/config.yaml')
+      const skillsDir = join(homedir(), '.hermes/skills')
+
+      // 1. Read config.yaml for skill settings
+      let disabled: string[] = []
+      let configValues: Record<string, any> = {}
+      let externalDirs: string[] = []
+      try {
+        const raw = await readFile(configPath, 'utf-8')
+        const parsed = yaml.load(raw) as Record<string, any> | null
+        const skillsCfg = parsed?.skills
+        if (skillsCfg && typeof skillsCfg === 'object') {
+          disabled = Array.isArray(skillsCfg.disabled) ? skillsCfg.disabled : []
+          configValues =
+            skillsCfg.config && typeof skillsCfg.config === 'object' ? skillsCfg.config : {}
+          externalDirs = Array.isArray(skillsCfg.external_dirs) ? skillsCfg.external_dirs : []
+        }
+      } catch {
+        /* config.yaml missing or unreadable — use defaults */
+      }
+
+      // 2. Scan built-in skills directory
+      let skills = await scanSkillsDirectory(skillsDir)
+
+      // 3. Scan external directories
+      for (const extDir of externalDirs) {
+        const resolved = extDir.replace(/^~/, homedir())
+        try {
+          const extSkills = await scanSkillsDirectory(resolved)
+          skills = skills.concat(extSkills)
+        } catch {
+          /* skip invalid external dirs */
+        }
+      }
+
+      // Deduplicate by name (built-in takes precedence)
+      const seen = new Set<string>()
+      skills = skills.filter((s) => {
+        if (seen.has(s.name)) return false
+        seen.add(s.name)
+        return true
+      })
+
+      return { ok: true, skills, disabled, configValues, externalDirs }
+    } catch (e: any) {
+      return { ok: false, skills: [], disabled: [], configValues: {}, externalDirs: [], error: e.message }
+    }
+  })
+
+  // ── Skill management: write config changes ──
+  ipcMain.handle('hermes:skills:config', async (_, action: string, payload: any) => {
+    try {
+      const configPath = join(homedir(), '.hermes/config.yaml')
+
+      // Read existing config (or start fresh)
+      let config: Record<string, any> = {}
+      try {
+        const raw = await readFile(configPath, 'utf-8')
+        const parsed = yaml.load(raw)
+        if (parsed && typeof parsed === 'object') config = parsed as Record<string, any>
+      } catch {
+        /* file missing — will create */
+      }
+
+      // Ensure skills section exists
+      if (!config.skills || typeof config.skills !== 'object') config.skills = {}
+      const skills = config.skills as Record<string, any>
+
+      switch (action) {
+        case 'toggle': {
+          const { name, disabled } = payload as { name: string; disabled: boolean }
+          if (!Array.isArray(skills.disabled)) skills.disabled = []
+          if (disabled) {
+            if (!skills.disabled.includes(name)) skills.disabled.push(name)
+          } else {
+            skills.disabled = skills.disabled.filter((n: string) => n !== name)
+          }
+          break
+        }
+        case 'setConfigValue': {
+          const { key, value } = payload as { key: string; value: any }
+          if (!skills.config || typeof skills.config !== 'object') skills.config = {}
+          setNestedValue(skills.config, key, value)
+          break
+        }
+        case 'addExternalDir': {
+          const { path: dirPath } = payload as { path: string }
+          if (!Array.isArray(skills.external_dirs)) skills.external_dirs = []
+          const resolvedDir = dirPath.replace(/^~/, homedir())
+          // Validate: must be under home and not duplicate
+          const realHome = homedir()
+          if (!resolvedDir.startsWith(realHome)) {
+            return { ok: false, error: 'Path must be under home directory' }
+          }
+          if (skills.external_dirs.includes(dirPath)) {
+            return { ok: false, error: 'Directory already exists' }
+          }
+          skills.external_dirs.push(dirPath)
+          break
+        }
+        case 'removeExternalDir': {
+          const { path: dirPath } = payload as { path: string }
+          if (Array.isArray(skills.external_dirs)) {
+            skills.external_dirs = skills.external_dirs.filter((d: string) => d !== dirPath)
+          }
+          break
+        }
+        default:
+          return { ok: false, error: `Unknown action: ${action}` }
+      }
+
+      // Write back
+      const output = yaml.dump(config, { lineWidth: 120, noRefs: true })
+      await writeFile(configPath, output, 'utf-8')
+      return { ok: true }
+    } catch (e: any) {
+      return { ok: false, error: e.message }
     }
   })
 
