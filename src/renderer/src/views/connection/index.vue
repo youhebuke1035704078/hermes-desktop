@@ -54,6 +54,7 @@ let probeAbortController: AbortController | null = null
 const probeResult = ref<null | {
   reachable: boolean
   authEnabled: boolean
+  isHermesRest?: boolean
   gateway?: string
 }>(null)
 
@@ -105,25 +106,43 @@ async function probeServer() {
   const timeoutId = setTimeout(() => probeAbortController?.abort(), 6000)
 
   try {
-    // Gateway is primarily a WebSocket server — plain HTTP may return non-200.
-    // Any HTTP response (even 400/426) means the server process is alive.
-    let reachable = false
+    // First, try /health to detect Hermes REST API server.
+    // Hermes Agent returns { status: 'ok' } — no auth needed.
+    let isHermesRest = false
     try {
-      await fetch(`${url}/`, { signal })
-      reachable = true
-    } catch (fetchErr) {
-      if ((fetchErr as Error).name === 'AbortError') return
-      reachable = false
+      const healthResp = await fetch(`${url}/health`, { signal })
+      if (healthResp.ok) {
+        const data = await healthResp.json()
+        if (data?.status === 'ok') isHermesRest = true
+      }
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return
     }
     if (signal.aborted) return
 
-    if (!reachable) {
-      probeResult.value = { reachable: false, authEnabled: false }
-      return
-    }
+    if (isHermesRest) {
+      probeResult.value = { reachable: true, authEnabled: false, isHermesRest: true }
+    } else {
+      // Gateway is primarily a WebSocket server — plain HTTP may return non-200.
+      // Any HTTP response (even 400/426) means the server process is alive.
+      let reachable = false
+      try {
+        await fetch(`${url}/`, { signal })
+        reachable = true
+      } catch (fetchErr) {
+        if ((fetchErr as Error).name === 'AbortError') return
+        reachable = false
+      }
+      if (signal.aborted) return
 
-    // Gateway uses token-based WS auth — always show the password/token field.
-    probeResult.value = { reachable: true, authEnabled: true }
+      if (!reachable) {
+        probeResult.value = { reachable: false, authEnabled: false }
+        return
+      }
+
+      // ACP Gateway uses token-based WS auth.
+      probeResult.value = { reachable: true, authEnabled: true }
+    }
 
     // Auto-fill name if empty
     if (!form.value.name) {
@@ -542,7 +561,11 @@ async function connectLocalHermes() {
 
         <!-- Probe feedback -->
         <div v-if="probeResult && !probing" style="margin-bottom: 16px;">
-          <NAlert v-if="probeResult.reachable && !probeResult.authEnabled" type="success" :bordered="false" style="font-size: 13px;">
+          <NAlert v-if="probeResult.isHermesRest" type="success" :bordered="false" style="font-size: 13px;">
+            <template #icon><NIcon :component="FlashOutline" /></template>
+            {{ t('pages.connection.probeHermesRest') }}
+          </NAlert>
+          <NAlert v-else-if="probeResult.reachable && !probeResult.authEnabled" type="success" :bordered="false" style="font-size: 13px;">
             <template #icon><NIcon :component="FlashOutline" /></template>
             {{ t('pages.connection.probeNoAuth') }}
           </NAlert>
