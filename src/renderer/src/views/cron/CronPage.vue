@@ -4,6 +4,7 @@ import {
   NCard, NSpace, NButton, NIcon, NTag, NDataTable, NInput,
   NModal, NForm, NFormItem, NSelect, NSwitch, NAlert,
   NGrid, NGridItem, NPopconfirm, NText, NSpin, NTooltip,
+  NDescriptions, NDescriptionsItem,
   useMessage,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
@@ -15,6 +16,7 @@ import {
 import { useI18n } from 'vue-i18n'
 import { useCronStore } from '@/stores/cron'
 import type { CronJob } from '@/api/types'
+import { formatRelativeTime } from '@/utils/format'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -89,6 +91,38 @@ const columns = computed<DataTableColumns<CronJob>>(() => [
     },
   },
   {
+    title: t('pages.cron.table.jobs.lastRun'),
+    key: 'lastRun',
+    width: 160,
+    render(row) {
+      if (!row.state?.lastRunAtMs) return h(NText, { depth: 3 }, { default: () => '-' })
+      return h(NText, { depth: 2, style: 'font-size: 13px;' }, {
+        default: () => formatRelativeTime(row.state!.lastRunAtMs!),
+      })
+    },
+  },
+  {
+    title: t('pages.cron.table.jobs.lastStatus'),
+    key: 'lastStatus',
+    width: 100,
+    render(row) {
+      const status = row.state?.lastStatus
+      if (!status) return h(NText, { depth: 3 }, { default: () => '-' })
+      const typeMap: Record<string, 'success' | 'error' | 'warning'> = {
+        ok: 'success',
+        error: 'error',
+        skipped: 'warning',
+      }
+      const labelMap: Record<string, string> = { ok: 'OK', error: 'Error', skipped: 'Skipped' }
+      return h(NTag, {
+        type: typeMap[status] || 'default',
+        size: 'small',
+        bordered: false,
+        round: true,
+      }, { default: () => labelMap[status] || status })
+    },
+  },
+  {
     title: t('pages.cron.table.jobs.status'),
     key: 'enabled',
     width: 100,
@@ -151,6 +185,41 @@ const columns = computed<DataTableColumns<CronJob>>(() => [
     },
   },
 ])
+
+// ── Expandable row ──
+function renderExpand(row: CronJob) {
+  if (!row.state?.lastRunAtMs) {
+    return h('div', { style: 'text-align: center; padding: 16px;' },
+      h(NText, { depth: 3 }, { default: () => t('pages.cron.expandedRow.noData') }),
+    )
+  }
+  return h(NDescriptions, { labelPlacement: 'left', column: 1, bordered: true, size: 'small', style: 'max-width: 500px;' }, {
+    default: () => [
+      h(NDescriptionsItem, { label: t('pages.cron.expandedRow.lastRunTime') }, {
+        default: () => new Date(row.state!.lastRunAtMs!).toLocaleString(),
+      }),
+      h(NDescriptionsItem, { label: t('pages.cron.expandedRow.duration') }, {
+        default: () => row.state?.lastDurationMs != null
+          ? `${(row.state.lastDurationMs / 1000).toFixed(1)}s`
+          : '-',
+      }),
+      h(NDescriptionsItem, { label: t('pages.cron.expandedRow.consecutiveErrors') }, {
+        default: () => h(NText, {
+          type: (row.state?.consecutiveErrors || 0) > 0 ? 'error' : undefined,
+          depth: (row.state?.consecutiveErrors || 0) > 0 ? undefined : 3,
+        }, { default: () => String(row.state?.consecutiveErrors || 0) }),
+      }),
+      row.state?.lastStatus === 'error' && row.state?.lastError
+        ? h(NDescriptionsItem, { label: t('pages.cron.expandedRow.errorDetail') }, {
+            default: () => h(NAlert, { type: 'error', style: 'font-size: 12px;' }, { default: () => row.state!.lastError }),
+          })
+        : null,
+      h(NDescriptionsItem, { label: t('pages.cron.expandedRow.nextRunTime') }, {
+        default: () => row.nextRun ? new Date(row.nextRun).toLocaleString() : '-',
+      }),
+    ].filter(Boolean),
+  })
+}
 
 // ── Handlers ──
 async function handleRefresh() {
@@ -326,10 +395,11 @@ onMounted(() => {
           :columns="columns"
           :data="filteredJobs"
           :row-key="(row: CronJob) => row.id"
+          :render-expand="renderExpand"
           :bordered="false"
           :single-line="false"
           size="small"
-          :scroll-x="700"
+          :scroll-x="900"
         />
         <NText v-if="!cronStore.loading && cronStore.jobs.length === 0" depth="3" style="display: block; text-align: center; padding: 24px 0;">
           {{ t('pages.cron.jobs.emptyHint') }}
@@ -371,7 +441,7 @@ onMounted(() => {
       </NForm>
       <template #footer>
         <NSpace justify="end" :size="8">
-          <NButton @click="showModal = false">{{ t('pages.settings.saveFile') === '保存' ? '取消' : 'Cancel' }}</NButton>
+          <NButton @click="showModal = false">{{ t('common.cancel') }}</NButton>
           <NButton type="primary" :loading="cronStore.saving" @click="handleSave">
             {{ editingJob ? t('pages.cron.actions.saveChanges') : t('pages.cron.actions.createJob') }}
           </NButton>
