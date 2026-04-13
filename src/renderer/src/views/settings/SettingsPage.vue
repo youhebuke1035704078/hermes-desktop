@@ -70,6 +70,15 @@ const connectionStatus = computed(() => {
 const currentServer = computed(() => connectionStore.currentServer)
 const isNoAuth = computed(() => currentServer.value?.username === '_noauth_')
 const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
+/** True when connected server is localhost — version/config/restart only work locally */
+const isLocalServer = computed(() => {
+  const url = connectionStore.currentServer?.url
+  if (!url) return false
+  try {
+    const host = new URL(url).hostname
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+  } catch { return false }
+})
 
 function handleThemeChange(mode: ThemeMode) {
   themeStore.setMode(mode)
@@ -273,8 +282,10 @@ async function restartHermes() {
 }
 
 onMounted(async () => {
-  loadConfigFiles()
-  if (isHermesRest.value) {
+  if (isLocalServer.value) {
+    loadConfigFiles()
+  }
+  if (isHermesRest.value && isLocalServer.value) {
     await fetchHermesVersion()
     checkHermesUpdate()  // auto-check silently on mount
   }
@@ -327,8 +338,8 @@ onMounted(async () => {
       </NSpace>
     </NCard>
 
-    <!-- Hermes Agent Version & Update -->
-    <NCard class="app-card" v-if="isHermesRest">
+    <!-- Hermes Agent Version & Update (local server only — uses local git/binary) -->
+    <NCard class="app-card" v-if="isHermesRest && isLocalServer">
       <template #header>
         <NSpace align="center" :size="8">
           <NIcon :component="RocketOutline" size="18" />
@@ -393,8 +404,8 @@ onMounted(async () => {
       </NSpace>
     </NCard>
 
-    <!-- Hermes Config (config.yaml) -->
-    <NCard class="app-card app-card--collapsible" v-if="isHermesRest">
+    <!-- Hermes Config (config.yaml) — local only -->
+    <NCard class="app-card app-card--collapsible" v-if="isHermesRest && isLocalServer">
       <template #header>
         <NSpace align="center" :size="8" style="cursor: pointer;" @click="configExpanded = !configExpanded">
           <NIcon :component="configExpanded ? ChevronUpOutline : ChevronDownOutline" size="18" />
@@ -437,8 +448,8 @@ onMounted(async () => {
       </div>
     </NCard>
 
-    <!-- Hermes .env -->
-    <NCard class="app-card app-card--collapsible" v-if="isHermesRest">
+    <!-- Hermes .env — local only -->
+    <NCard class="app-card app-card--collapsible" v-if="isHermesRest && isLocalServer">
       <template #header>
         <NSpace align="center" :size="8" style="cursor: pointer;" @click="envExpanded = !envExpanded">
           <NIcon :component="envExpanded ? ChevronUpOutline : ChevronDownOutline" size="18" />
@@ -481,8 +492,8 @@ onMounted(async () => {
       </div>
     </NCard>
 
-    <!-- Restart Hermes service -->
-    <NCard class="app-card" v-if="isHermesRest">
+    <!-- Restart Hermes service — local only (macOS launchd) -->
+    <NCard class="app-card" v-if="isHermesRest && isLocalServer">
       <template #header>
         <NSpace align="center" :size="8">
           <NIcon :component="RefreshOutline" size="18" />

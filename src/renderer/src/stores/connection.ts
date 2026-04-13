@@ -65,8 +65,9 @@ export const useConnectionStore = defineStore('connection', () => {
   /**
    * Fetch the actual underlying model name for a Hermes REST server.
    * Strategy:
-   *  1. Probe GET /hermes/info on the server (future-proof: works for remote servers
-   *     if Hermes Agent ever exposes model info via API)
+   *  1. GET /v1/models (with auth) — works for local and remote; returns
+   *     the model name advertised by Hermes Agent (API_SERVER_MODEL_NAME).
+   *     If the name differs from 'hermes-agent', use it directly.
    *  2. For local servers only: read ~/.hermes/config.yaml via IPC
    *  3. Graceful fallback: hermesRealModel stays null → UI shows proxy model name
    */
@@ -74,22 +75,25 @@ export const useConnectionStore = defineStore('connection', () => {
     const serverUrl = currentServer.value?.url
     if (!serverUrl) return
 
-    // Strategy 1: Try remote /hermes/info endpoint
+    // Strategy 1: Fetch /v1/models (works for both local and remote)
     try {
-      const infoResp = window.api
-        ? await window.api.httpFetch(`${serverUrl}/hermes/info`)
-        : await fetch(`${serverUrl}/hermes/info`, { signal: AbortSignal.timeout(3000) })
+      const headers: Record<string, string> = {}
+      if (hermesAuthToken.value) headers['Authorization'] = `Bearer ${hermesAuthToken.value}`
+      const modelsResp = window.api
+        ? await window.api.httpFetch(`${serverUrl}/v1/models`, { headers })
+        : await fetch(`${serverUrl}/v1/models`, { headers, signal: AbortSignal.timeout(3000) })
             .then(r => ({ ok: r.ok, status: r.status, body: '' }))
-      if (infoResp.ok) {
-        const body = typeof infoResp.body === 'string' && infoResp.body
-          ? infoResp.body : ''
+      if (modelsResp.ok) {
+        const body = typeof modelsResp.body === 'string' && modelsResp.body
+          ? modelsResp.body : ''
         const data = body ? JSON.parse(body) : {}
-        if (data?.model) {
-          hermesRealModel.value = data.model
+        const modelId = data?.data?.[0]?.id
+        if (modelId && modelId !== 'hermes-agent') {
+          hermesRealModel.value = modelId
           return
         }
       }
-    } catch { /* endpoint not available — fall through */ }
+    } catch { /* fall through */ }
 
     // Strategy 2: Read local config file (only for localhost)
     if (isLocalUrl(serverUrl) && window.api?.hermesConfig) {
