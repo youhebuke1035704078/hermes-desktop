@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { safeGet, safeSet } from '@/utils/safe-storage'
+import { useConnectionStore } from './connection'
 import type { ChatMessage } from '@/api/types'
 
 export interface HermesConversation {
@@ -17,17 +18,155 @@ export interface HermesConversation {
 const STORAGE_KEY = 'hermes_conversations'
 const MAX_CONVERSATIONS = 50
 
+/** Debounce timer for server sync */
+let syncTimer: ReturnType<typeof setTimeout> | null = null
+const SYNC_DEBOUNCE = 2000
+
 export const useHermesChatStore = defineStore('hermes-chat', () => {
   const conversations = ref<HermesConversation[]>([])
   const activeId = ref<string | null>(null)
   const model = ref('hermes-agent')
+  /** Whether server sync is available (management API detected) */
+  const serverSyncAvailable = ref(false)
 
   const activeConversation = computed(() =>
     conversations.value.find(c => c.id === activeId.value) || null,
   )
 
-  /** Load persisted conversations from localStorage */
+  // ── Server sync helpers ──
+
+  /** Derive management API URL from current server (port 8643) */
+  function getMgmtUrl(): string {
+    const conn = useConnectionStore()
+    const url = conn.currentServer?.url
+    if (!url) return ''
+    try {
+      const u = new URL(url)
+      u.port = '8643'
+      return u.origin
+    } catch { return '' }
+  }
+
+  function getAuthToken(): string | null {
+    const conn = useConnectionStore()
+    return conn.hermesAuthToken
+  }
+
+  async function mgmtFetch(path: string, opts: { method?: string; body?: string } = {}): Promise<any> {
+    const baseUrl = getMgmtUrl()
+    if (!baseUrl) throw new Error('No management URL')
+    const url = `${baseUrl}${path}`
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const token = getAuthToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    if (window.api?.httpFetch) {
+      const resp = await window.api.httpFetch(url, { method: opts.method || 'GET', headers, body: opts.body })
+      return typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}
+    }
+    const resp = await fetch(url, { method: opts.method || 'GET', headers, body: opts.body, signal: AbortSignal.timeout(10000) })
+    return resp.json()
+  }
+
+  /** Probe management API for conversation sync support */
+  async function probeServerSync(): Promise<void> {
+    try {
+      const resp = await mgmtFetch('/health')
+      serverSyncAvailable.value = resp?.platform === 'hermes-mgmt'
+    } catch {
+      serverSyncAvailable.value = false
+    }
+  }
+
+  /** Load conversations from server */
+  async function loadFromServer(): Promise<boolean> {
+    if (!serverSyncAvailable.value) return false
+    try {
+      const resp = await mgmtFetch('/conversations')
+      if (resp.ok && resp.data) {
+        const remote = resp.data as {
+          conversations: HermesConversation[]
+          activeId: string | null
+          model: string
+        }
+        // Merge: remote takes precedence for conversations that exist on both sides
+        // (keyed by id, newer updatedAt wins)
+        const localMap = new Map(conversations.value.map(c => [c.id, c]))
+        const remoteMap = new Map((remote.conversations || []).map(c => [c.id, c]))
+
+        const merged: HermesConversation[] = []
+        const allIds = new Set([...localMap.keys(), ...remoteMap.keys()])
+
+        for (const id of allIds) {
+          const local = localMap.get(id)
+          const remote = remoteMap.get(id)
+          if (local && remote) {
+            // Both exist — keep newer
+            merged.push(local.updatedAt >= remote.updatedAt ? local : remote)
+          } else {
+            merged.push((local || remote)!)
+          }
+        }
+
+        // Sort by updatedAt descending
+        merged.sort((a, b) => b.updatedAt - a.updatedAt)
+        conversations.value = merged.slice(0, MAX_CONVERSATIONS)
+
+        // Use remote activeId if we don't have a local one
+        if (!activeId.value && remote.activeId) {
+          activeId.value = remote.activeId
+        }
+        if (remote.model) model.value = remote.model
+
+        saveLocal()
+        return true
+      }
+    } catch { /* server sync failed, use local */ }
+    return false
+  }
+
+  /** Save conversations to server (debounced) */
+  function syncToServer() {
+    if (!serverSyncAvailable.value) return
+    if (syncTimer) clearTimeout(syncTimer)
+    syncTimer = setTimeout(async () => {
+      try {
+        await mgmtFetch('/conversations', {
+          method: 'PUT',
+          body: JSON.stringify({
+            data: {
+              conversations: conversations.value.slice(0, MAX_CONVERSATIONS),
+              activeId: activeId.value,
+              model: model.value,
+            },
+          }),
+        })
+      } catch { /* silent fail */ }
+    }, SYNC_DEBOUNCE)
+  }
+
+  // ── Local storage helpers ──
+
+  function saveLocal() {
+    try {
+      safeSet(STORAGE_KEY, JSON.stringify({
+        conversations: conversations.value.slice(0, MAX_CONVERSATIONS),
+        activeId: activeId.value,
+        model: model.value,
+      }))
+    } catch (e) {
+      console.warn('[hermes-chat] Failed to save:', e)
+    }
+  }
+
+  /** Persist to both localStorage and server */
+  function save() {
+    saveLocal()
+    syncToServer()
+  }
+
+  /** Load persisted conversations from localStorage, then try server sync */
   function load() {
+    // Load from localStorage first (instant)
     try {
       const raw = safeGet(STORAGE_KEY)
       if (raw) {
@@ -51,19 +190,13 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     if (!activeId.value || !conversations.value.find(c => c.id === activeId.value)) {
       activeId.value = conversations.value[0]?.id || null
     }
-  }
 
-  /** Persist to localStorage */
-  function save() {
-    try {
-      safeSet(STORAGE_KEY, JSON.stringify({
-        conversations: conversations.value.slice(0, MAX_CONVERSATIONS),
-        activeId: activeId.value,
-        model: model.value,
-      }))
-    } catch (e) {
-      console.warn('[hermes-chat] Failed to save:', e)
-    }
+    // Async: probe server sync and merge
+    probeServerSync().then(() => {
+      if (serverSyncAvailable.value) {
+        loadFromServer()
+      }
+    })
   }
 
   /** Create a new blank conversation and make it active */
@@ -134,6 +267,7 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     conversations,
     activeId,
     model,
+    serverSyncAvailable,
     activeConversation,
     load,
     save,

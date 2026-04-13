@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useWebSocketStore } from './websocket'
 import { useConnectionStore } from './connection'
+import { useHermesChatStore } from './hermes-chat'
 import type { ChatMessage } from '@/api/types'
 import { byLocale, getActiveLocale } from '@/i18n/text'
 
@@ -976,6 +977,7 @@ export const useChatStore = defineStore('chat', () => {
 
       try {
         const connectionStore = useConnectionStore()
+        const hermesChatStore = useHermesChatStore()
         const baseUrl = connectionStore.currentServer?.url || 'http://localhost:8642'
         const result = await window.api.hermesChat(
           `${baseUrl}/v1/chat/completions`,
@@ -985,6 +987,7 @@ export const useChatStore = defineStore('chat', () => {
             stream: true,
           }),
           connectionStore.hermesAuthToken || undefined,
+          hermesChatStore.activeId || undefined,
         )
 
         if (!result.ok) {

@@ -79,8 +79,8 @@ const api = {
     ipcRenderer.invoke('hermes:config'),
 
   // ── Hermes streaming chat (SSE via main-process) ──
-  hermesChat: (url: string, body: string, authToken?: string): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('hermes:chat', url, body, authToken),
+  hermesChat: (url: string, body: string, authToken?: string, sessionId?: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('hermes:chat', url, body, authToken, sessionId),
   onHermesChatChunk: (cb: (chunk: { done: boolean; data?: any }) => void): (() => void) => {
     const handler = (_: unknown, chunk: { done: boolean; data?: any }) => cb(chunk)
     ipcRenderer.on('hermes:chat:chunk', handler)
