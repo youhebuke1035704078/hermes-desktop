@@ -553,6 +553,7 @@ export default {
         totalJobs: '任务总数',
         enabledJobs: '启用任务',
         disabledJobs: '禁用任务',
+        nextRun: '下次执行',
         nextWake: '下次唤醒',
       },
       jobs: {
@@ -671,6 +672,8 @@ export default {
         viewDetail: '详情',
         run: '运行',
         runNow: '立即运行',
+        enable: '点击启用',
+        disable: '点击禁用',
         edit: '编辑',
         editJob: '编辑任务',
         openSession: '打开',

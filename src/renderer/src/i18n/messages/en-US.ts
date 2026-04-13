@@ -553,6 +553,7 @@ export default {
         totalJobs: 'Total jobs',
         enabledJobs: 'Enabled jobs',
         disabledJobs: 'Disabled jobs',
+        nextRun: 'Next Run',
         nextWake: 'Next wake',
       },
       jobs: {
@@ -671,6 +672,8 @@ export default {
         viewDetail: 'Details',
         run: 'Run',
         runNow: 'Run now',
+        enable: 'Enable',
+        disable: 'Disable',
         edit: 'Edit',
         editJob: 'Edit job',
         openSession: 'Open',

@@ -47,11 +47,18 @@ const filteredJobs = computed(() => {
   )
 })
 
-const statsCards = computed(() => [
-  { label: t('pages.cron.stats.totalJobs'), value: cronStore.jobs.length, type: 'info' as const },
-  { label: t('pages.cron.stats.enabledJobs'), value: cronStore.jobs.filter(j => j.enabled).length, type: 'success' as const },
-  { label: t('pages.cron.stats.disabledJobs'), value: cronStore.jobs.filter(j => !j.enabled).length, type: 'warning' as const },
-])
+const enabledCount = computed(() => cronStore.jobs.filter(j => j.enabled).length)
+const disabledCount = computed(() => cronStore.jobs.filter(j => !j.enabled).length)
+
+// Soonest next run
+const nextRunText = computed(() => {
+  const upcoming = cronStore.jobs
+    .filter(j => j.enabled && j.nextRun)
+    .map(j => ({ name: j.name, time: new Date(j.nextRun!).getTime() }))
+    .sort((a, b) => a.time - b.time)
+  if (!upcoming.length) return '-'
+  return formatRelativeTime(upcoming[0]!.time)
+})
 
 // ── Table columns ──
 const columns = computed<DataTableColumns<CronJob>>(() => [
@@ -138,7 +145,7 @@ const columns = computed<DataTableColumns<CronJob>>(() => [
   {
     title: t('pages.cron.table.jobs.actions'),
     key: 'actions',
-    width: 200,
+    width: 160,
     fixed: 'right',
     render(row) {
       return h(NSpace, { size: 4 }, {
@@ -160,7 +167,7 @@ const columns = computed<DataTableColumns<CronJob>>(() => [
               type: row.enabled ? 'warning' : 'success',
               onClick: () => handleToggle(row),
             }, { icon: () => h(NIcon, { component: row.enabled ? PauseCircleOutline : CheckmarkCircleOutline }) }),
-            default: () => row.enabled ? t('pages.cron.jobStatus.disabled') : t('pages.cron.jobStatus.enabled'),
+            default: () => row.enabled ? t('pages.cron.actions.disable') : t('pages.cron.actions.enable'),
           }),
           // Edit
           h(NTooltip, {}, {
@@ -344,12 +351,34 @@ onMounted(() => {
       </template>
 
       <!-- Stats -->
-      <NGrid :cols="3" :x-gap="12" :y-gap="12" style="margin-bottom: 16px;">
-        <NGridItem v-for="card in statsCards" :key="card.label">
-          <NCard size="small" :bordered="false" style="background: rgba(255,255,255,0.04); border-radius: 8px;">
-            <NText depth="3" style="font-size: 12px;">{{ card.label }}</NText>
-            <div style="font-size: 24px; font-weight: 600; margin-top: 4px;">
-              <NText :type="card.type">{{ card.value }}</NText>
+      <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="10" :y-gap="10" style="margin-bottom: 16px;">
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <NText depth="3" style="font-size: 12px;">{{ t('pages.cron.stats.totalJobs') }}</NText>
+            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">{{ cronStore.jobs.length }}</div>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <NText depth="3" style="font-size: 12px;">{{ t('pages.cron.stats.enabledJobs') }}</NText>
+            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+              <NText :type="enabledCount > 0 ? 'success' : undefined">{{ enabledCount }}</NText>
+            </div>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <NText depth="3" style="font-size: 12px;">{{ t('pages.cron.stats.disabledJobs') }}</NText>
+            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+              <NText :type="disabledCount > 0 ? 'warning' : undefined">{{ disabledCount }}</NText>
+            </div>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <NText depth="3" style="font-size: 12px;">{{ t('pages.cron.stats.nextRun') }}</NText>
+            <div style="font-size: 18px; font-weight: 700; margin-top: 6px;">
+              <NText type="info">{{ nextRunText }}</NText>
             </div>
           </NCard>
         </NGridItem>
@@ -399,7 +428,7 @@ onMounted(() => {
           :bordered="false"
           :single-line="false"
           size="small"
-          :scroll-x="900"
+          :scroll-x="980"
         />
         <NText v-if="!cronStore.loading && cronStore.jobs.length === 0" depth="3" style="display: block; text-align: center; padding: 24px 0;">
           {{ t('pages.cron.jobs.emptyHint') }}
