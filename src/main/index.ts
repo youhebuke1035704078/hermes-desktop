@@ -10,6 +10,12 @@ import { getServers, saveServer, removeServer, decryptPassword, isEncryptionAvai
 import { registerWsBridge, shutdownWsBridge } from './ws-bridge'
 import icon from '../../resources/icon.png?asset'
 
+// Disable GPU hardware acceleration on Windows to prevent black screen
+// (common Chromium issue with certain Intel/AMD integrated GPUs)
+if (process.platform === 'win32') {
+  app.disableHardwareAcceleration()
+}
+
 // Prevent crash dialog from uncaught WebSocket / network errors
 process.on('uncaughtException', (err) => {
   console.error('[main] uncaughtException:', err.message)
