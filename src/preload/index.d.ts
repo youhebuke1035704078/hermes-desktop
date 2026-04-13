@@ -46,6 +46,34 @@ interface HermesAPI {
   hermesChat(url: string, body: string, authToken?: string, sessionId?: string): Promise<{ ok: boolean; error?: string }>
   onHermesChatChunk(cb: (chunk: { done: boolean; data?: any }) => void): () => void
 
+  // Skill management
+  hermesSkills(): Promise<{
+    ok: boolean
+    skills: Array<{
+      name: string
+      description: string
+      version: string
+      author: string
+      category: string
+      platforms: string[]
+      prerequisites?: { commands?: string[]; env_vars?: string[] }
+      configVars?: { key: string; description: string; default?: any; prompt?: string }[]
+      tags?: string[]
+      license?: string
+      dirPath: string
+      relatedSkills?: string[]
+      homepage?: string
+    }>
+    disabled: string[]
+    configValues: Record<string, any>
+    externalDirs: string[]
+    error?: string
+  }>
+  hermesSkillsConfig(
+    action: string,
+    payload: any
+  ): Promise<{ ok: boolean; error?: string }>
+
   // Backup system
   backupList(): Promise<{ ok: boolean; backups: Array<{ filename: string; size: number; createdAt: string; date: string }>; error?: string }>
   backupCreate(): Promise<{ ok: boolean; filename?: string; size?: number; error?: string }>

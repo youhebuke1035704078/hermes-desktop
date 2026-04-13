@@ -87,6 +87,11 @@ const api = {
     return () => ipcRenderer.removeListener('hermes:chat:chunk', handler)
   },
 
+  // ── Skill management ──
+  hermesSkills: (): Promise<any> => ipcRenderer.invoke('hermes:skills'),
+  hermesSkillsConfig: (action: string, payload: any): Promise<any> =>
+    ipcRenderer.invoke('hermes:skills:config', action, payload),
+
   // ── Backup system ──
   backupList: (): Promise<{ ok: boolean; backups: Array<{ filename: string; size: number; createdAt: string; date: string }>; error?: string }> =>
     ipcRenderer.invoke('backup:list'),
