@@ -25,7 +25,8 @@ const connectionStore = useConnectionStore()
 const { activeAlertCount } = useAlertNotifier()
 
 /** Routes that require ACP WebSocket — hide in Hermes REST mode */
-const WS_ONLY_ROUTES = new Set(['Sessions'])
+const WS_ONLY_ROUTES = new Set<string>([])
+const HERMES_ONLY_ROUTES = new Set(['Dashboard'])
 const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
 const iconMap: Record<string, any> = {
@@ -47,7 +48,12 @@ const baseMenuItems = computed<MenuItem[]>(() => {
   if (!mainRoute?.children) return []
   return mainRoute.children
     .filter((child) => !child.meta?.hidden)
-    .filter((child) => !(isHermesRest.value && WS_ONLY_ROUTES.has(child.name as string)))
+    .filter((child) => {
+      const name = child.name as string
+      if (isHermesRest.value && WS_ONLY_ROUTES.has(name)) return false
+      if (!isHermesRest.value && HERMES_ONLY_ROUTES.has(name)) return false
+      return true
+    })
     .map((child) => ({
       key: child.name as string,
       titleKey: child.meta?.titleKey as string,
