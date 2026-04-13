@@ -24,6 +24,7 @@ import {
 import type { DataTableColumns, SelectOption } from 'naive-ui'
 import {
   AddOutline,
+  ChatboxEllipsesOutline,
   ChatbubblesOutline,
   DownloadOutline,
   EyeOutline,
@@ -34,6 +35,8 @@ import {
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useSessionStore } from '@/stores/session'
+import { useHermesChatStore } from '@/stores/hermes-chat'
+import { useConnectionStore } from '@/stores/connection'
 import { useCronStore } from '@/stores/cron'
 import { useAgentStore } from '@/stores/agent'
 import { useConfigStore } from '@/stores/config'
@@ -57,8 +60,12 @@ const agentStore = useAgentStore()
 const configStore = useConfigStore()
 const modelStore = useModelStore()
 const wsStore = useWebSocketStore()
+const connectionStore = useConnectionStore()
+const hermesChatStore = useHermesChatStore()
 const message = useMessage()
 const { t } = useI18n()
+
+const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
 const batchingModel = ref(false)
 const batchTargetModel = ref<string | null>(null)
@@ -353,6 +360,140 @@ const sessionColumns = computed<DataTableColumns<SessionRow>>(() => ([
   },
 ]))
 
+// ── Hermes REST data path ──
+
+const hermesSessionRows = computed(() => {
+  if (!isHermesRest.value) return []
+  return hermesChatStore.conversations.map(c => ({
+    key: c.id,
+    title: c.title || t('pages.sessions.hermesRest.untitled'),
+    messageCount: c.messages?.length || 0,
+    model: c.model || '-',
+    lastActivity: c.updatedAt,
+    createdAt: c.createdAt,
+  }))
+})
+
+const hermesFilteredRows = computed(() => {
+  if (!searchQuery.value) return hermesSessionRows.value
+  const q = searchQuery.value.toLowerCase()
+  return hermesSessionRows.value.filter(r => r.title.toLowerCase().includes(q))
+})
+
+const hermesMetrics = computed(() => {
+  const convs = hermesChatStore.conversations
+  const now = Date.now()
+  const day = 24 * 60 * 60 * 1000
+  return {
+    total: convs.length,
+    activeToday: convs.filter(c => now - c.updatedAt < day).length,
+    totalMessages: convs.reduce((sum, c) => sum + (c.messages?.length || 0), 0),
+    model: connectionStore.hermesRealModel || '-',
+  }
+})
+
+type HermesRow = (typeof hermesSessionRows.value)[number]
+
+const hermesColumns = computed<DataTableColumns<HermesRow>>(() => ([
+  {
+    title: t('pages.sessions.list.columns.session'),
+    key: 'title',
+    minWidth: 280,
+    ellipsis: { tooltip: true },
+    render(row) {
+      return h(NText, { strong: true }, { default: () => row.title })
+    },
+  },
+  {
+    title: t('pages.sessions.list.columns.messageCount'),
+    key: 'messageCount',
+    width: 120,
+    sorter: (a, b) => a.messageCount - b.messageCount,
+    render(row) {
+      return row.messageCount || 0
+    },
+  },
+  {
+    title: t('pages.sessions.list.columns.model'),
+    key: 'model',
+    minWidth: 160,
+    ellipsis: { tooltip: true },
+    render(row) {
+      return row.model || '-'
+    },
+  },
+  {
+    title: t('pages.sessions.list.columns.lastActivity'),
+    key: 'lastActivity',
+    width: 150,
+    sorter: (a, b) => a.lastActivity - b.lastActivity,
+    render(row) {
+      return row.lastActivity ? formatRelativeTime(row.lastActivity) : '-'
+    },
+  },
+  {
+    title: t('pages.sessions.list.columns.actions'),
+    key: 'actions',
+    width: 200,
+    render(row) {
+      return h(NSpace, { size: 6, wrap: false, class: 'sessions-row-actions' }, () => [
+        h(NTooltip, null, {
+          trigger: () => h(NButton, { size: 'small', quaternary: true, circle: true, onClick: () => router.push({ name: 'SessionDetail', params: { key: encodeURIComponent(row.key) } }) }, {
+            icon: () => h(NIcon, { component: EyeOutline }),
+          }),
+          default: () => t('pages.sessions.list.viewDetail'),
+        }),
+        h(NTooltip, null, {
+          trigger: () => h(NButton, { size: 'small', quaternary: true, circle: true, onClick: () => { hermesChatStore.switchTo(row.key); router.push({ name: 'Chat' }) } }, {
+            icon: () => h(NIcon, { component: ChatboxEllipsesOutline }),
+          }),
+          default: () => t('pages.sessions.hermesRest.openInChat'),
+        }),
+        h(NTooltip, null, {
+          trigger: () => h(NButton, { size: 'small', quaternary: true, circle: true, onClick: () => handleHermesExport(row.key) }, {
+            icon: () => h(NIcon, { component: DownloadOutline }),
+          }),
+          default: () => t('common.export'),
+        }),
+        h(
+          NPopconfirm,
+          { onPositiveClick: () => handleHermesDelete(row.key) },
+          {
+            trigger: () => h(NButton, { size: 'small', type: 'error', quaternary: true, circle: true }, {
+              icon: () => h(NIcon, { component: TrashOutline }),
+            }),
+            default: () => t('pages.sessions.detail.confirmDelete'),
+          }
+        ),
+      ])
+    },
+  },
+]))
+
+function handleHermesExport(id: string) {
+  const conv = hermesChatStore.conversations.find(c => c.id === id)
+  if (!conv) return
+  const json = JSON.stringify(conv, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `conversation-${id}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function handleHermesDelete(id: string) {
+  hermesChatStore.deleteConversation(id)
+}
+
+function handleHermesNew() {
+  hermesChatStore.createConversation()
+  router.push({ name: 'Chat' })
+}
+
+// ── ACP WebSocket data path ──
+
 let cleanupSSE: (() => void)[] = []
 
 onMounted(async () => {
@@ -500,7 +641,8 @@ async function handleCreateSession() {
 
 <template>
   <div class="sessions-page">
-    <NCard class="sessions-hero" :bordered="false">
+    <!-- ── ACP WebSocket mode ── -->
+    <NCard v-if="!isHermesRest" class="sessions-hero" :bordered="false">
       <template #header>
         <div class="sessions-hero-title">{{ t('pages.sessions.list.title') }}</div>
       </template>
@@ -580,7 +722,75 @@ async function handleCreateSession() {
       </div>
     </NCard>
 
-    <NCard :title="t('pages.sessions.list.listTitle')" class="sessions-card">
+    <!-- ── Hermes REST mode ── -->
+    <NCard v-else class="sessions-hero" :bordered="false">
+      <template #header>
+        <div class="sessions-hero-title">{{ t('pages.sessions.list.title') }}</div>
+      </template>
+      <template #header-extra>
+        <NButton size="small" type="primary" @click="handleHermesNew">
+          <template #icon>
+            <NIcon :component="AddOutline" />
+          </template>
+          {{ t('pages.sessions.list.createSession') }}
+        </NButton>
+      </template>
+
+      <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="10" :y-gap="10" style="margin-top: 12px;">
+        <NGridItem>
+          <NCard embedded :bordered="false" class="sessions-metric-card">
+            <NSpace justify="space-between" align="center">
+              <NText depth="3">{{ t('pages.sessions.list.metrics.totalSessions') }}</NText>
+              <NIcon :component="ChatbubblesOutline" />
+            </NSpace>
+            <div class="sessions-metric-value">{{ hermesMetrics.total }}</div>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" class="sessions-metric-card">
+            <NSpace justify="space-between" align="center">
+              <NText depth="3">{{ t('pages.sessions.list.metrics.active24h') }}</NText>
+              <NIcon :component="TimeOutline" />
+            </NSpace>
+            <div class="sessions-metric-value">{{ hermesMetrics.activeToday }}</div>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" class="sessions-metric-card">
+            <NSpace justify="space-between" align="center">
+              <NText depth="3">{{ t('pages.sessions.list.metrics.totalMessages') }}</NText>
+              <NText depth="3">{{ t('pages.sessions.list.units.messages') }}</NText>
+            </NSpace>
+            <div class="sessions-metric-value">{{ hermesMetrics.totalMessages }}</div>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" class="sessions-metric-card">
+            <NSpace justify="space-between" align="center">
+              <NText depth="3">{{ t('pages.sessions.list.columns.model') }}</NText>
+            </NSpace>
+            <div class="sessions-metric-value">{{ hermesMetrics.model }}</div>
+          </NCard>
+        </NGridItem>
+      </NGrid>
+
+      <div class="sessions-filter-bar" style="grid-template-columns: minmax(0, 1fr) auto;">
+        <NInput v-model:value="searchQuery" clearable :placeholder="t('pages.sessions.list.searchPlaceholder')">
+          <template #prefix>
+            <NIcon :component="SearchOutline" />
+          </template>
+        </NInput>
+        <NButton type="primary" @click="handleHermesNew">
+          <template #icon>
+            <NIcon :component="AddOutline" />
+          </template>
+          {{ t('pages.sessions.list.createSession') }}
+        </NButton>
+      </div>
+    </NCard>
+
+    <!-- ── ACP table ── -->
+    <NCard v-if="!isHermesRest" :title="t('pages.sessions.list.listTitle')" class="sessions-card">
       <template #header-extra>
         <NText depth="3" style="font-size: 12px;">
           {{ t('pages.sessions.list.listCount', { current: filteredSessions.length, total: stats.total }) }}
@@ -595,6 +805,25 @@ async function handleCreateSession() {
         :row-key="(row: SessionRow) => row.key"
         :pagination="{ pageSize: 12 }"
         :scroll-x="1110"
+        striped
+      />
+    </NCard>
+
+    <!-- ── Hermes REST table ── -->
+    <NCard v-else :title="t('pages.sessions.list.listTitle')" class="sessions-card">
+      <template #header-extra>
+        <NText depth="3" style="font-size: 12px;">
+          {{ t('pages.sessions.list.listCount', { current: hermesFilteredRows.length, total: hermesMetrics.total }) }}
+        </NText>
+      </template>
+
+      <NDataTable
+        :columns="hermesColumns"
+        :data="hermesFilteredRows"
+        :bordered="false"
+        :row-key="(row: any) => row.key"
+        :pagination="{ pageSize: 12 }"
+        :scroll-x="900"
         striped
       />
     </NCard>
