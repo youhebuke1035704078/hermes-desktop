@@ -19,16 +19,16 @@ All skill data comes from the local filesystem. No Hermes Agent REST API is requ
 ### 1.2 IPC Handlers (main process, `src/main/index.ts`)
 
 **`hermes:skills`** — Read all skill data in a single call:
-1. Recursively scan `~/.hermes/skills/` (one level of subdirectories → category)
-2. For each directory containing `SKILL.md`, parse YAML frontmatter
-3. Read `~/.hermes/config.yaml` for `skills.disabled`, `skills.config`, `skills.external_dirs`
+1. Recursively scan `~/.hermes/skills/` at any depth, finding all `SKILL.md` files. Category is determined by the first-level subdirectory name (e.g. `apple/apple-reminders/SKILL.md` → category `"apple"`, `mlops/evaluation/weights-and-biases/SKILL.md` → category `"mlops"`)
+2. For each `SKILL.md`, parse YAML frontmatter. If `metadata.hermes.category` exists in frontmatter, it overrides the filesystem-derived category
+3. Read `~/.hermes/config.yaml` for `skills.disabled`, `skills.config`, `skills.external_dirs` (all confirmed fields in Hermes Agent `skill_utils.py`)
 4. Also scan any directories listed in `skills.external_dirs`
 5. Return `{ ok, skills: SkillMeta[], disabled: string[], configValues: Record<string,any>, externalDirs: string[] }`
 
 **`hermes:skills:config`** — Write config changes:
 - Accepts `{ action, payload }` where action is one of:
   - `toggle` — `{ name: string, disabled: boolean }` → add/remove from `skills.disabled[]`
-  - `setConfigValue` — `{ key: string, value: any }` → set `skills.config.<key>`
+  - `setConfigValue` — `{ key: string, value: any }` → set `skills.config.<key>`. Dot-delimited keys (e.g. `wiki.path`) expand to nested YAML: `skills: { config: { wiki: { path: value } } }`. Use a `setNestedValue(obj, dotPath, value)` utility
   - `addExternalDir` — `{ path: string }` → push to `skills.external_dirs[]`
   - `removeExternalDir` — `{ path: string }` → filter from `skills.external_dirs[]`
 - Implementation: `js-yaml.load()` → modify → `js-yaml.dump()` → `writeFile()`
@@ -44,21 +44,23 @@ interface SkillMeta {
   description: string
   version: string
   author: string
-  category: string          // parent directory name, e.g. "apple", "development"
-  platforms: string[]        // e.g. ["macos"], empty array means all platforms
+  category: string          // first-level subdir name, or metadata.hermes.category override
+  platforms: string[]        // from frontmatter `platforms`, defaults to [] (= all platforms)
   prerequisites?: {
     commands?: string[]
     env_vars?: string[]
   }
-  configVars?: {
+  configVars?: {             // from frontmatter `metadata.hermes.config` (NOT top-level)
     key: string
     description: string
     default?: any
     prompt?: string
   }[]
-  tags?: string[]
+  tags?: string[]            // from frontmatter `metadata.hermes.tags` (NOT top-level)
   license?: string
   dirPath: string            // absolute path to skill directory
+  relatedSkills?: string[]   // from frontmatter `metadata.hermes.related_skills`
+  homepage?: string          // from frontmatter `metadata.hermes.homepage`
 }
 
 interface SkillsState {
@@ -68,6 +70,23 @@ interface SkillsState {
   externalDirs: string[]
 }
 ```
+
+**Frontmatter field mapping** (actual SKILL.md structure → SkillMeta):
+| SKILL.md path | SkillMeta field |
+|---------------|----------------|
+| `name` | `name` |
+| `description` | `description` |
+| `version` | `version` |
+| `author` | `author` |
+| `license` | `license` |
+| `platforms` | `platforms` (default `[]`) |
+| `prerequisites.commands` | `prerequisites.commands` |
+| `prerequisites.env_vars` | `prerequisites.env_vars` |
+| `metadata.hermes.tags` | `tags` |
+| `metadata.hermes.config` | `configVars` |
+| `metadata.hermes.category` | `category` (overrides filesystem) |
+| `metadata.hermes.related_skills` | `relatedSkills` |
+| `metadata.hermes.homepage` | `homepage` |
 
 ### 1.4 Preload Bridge (`src/preload/index.ts`, `src/preload/index.d.ts`)
 
@@ -87,7 +106,11 @@ hermesSkillsConfig: (action: string, payload: any) => Promise<{ ok: boolean; err
 
 ### 1.5 Pinia Store (`src/renderer/src/stores/skill.ts`)
 
-Rewrite the existing stub store:
+Rewrite the existing stub store. **Backward compatibility:** The existing store exports `skills: Skill[]`, `fetchSkills()`, and `isSkillVisibleInChat()`, consumed by `ChatPage.vue` and `AgentChatPanel.vue`. The rewritten store must preserve these:
+- Keep exporting a `skills` array (now `SkillMeta[]` — the old `Skill` type is replaced)
+- Keep `isSkillVisibleInChat(name)` → returns `!isDisabled(name)`
+- Keep `fetchSkills()` as async action
+- `ChatPage.vue` filters by `skill.disabled` and `skill.eligible` — after rewrite, use `isDisabled(skill.name)` check instead since `SkillMeta` has no `disabled` / `eligible` fields (disabled state lives in the `disabled[]` array)
 
 **State:**
 - `skills: SkillMeta[]`
@@ -118,8 +141,10 @@ Simple parser in `src/main/skill-parser.ts`:
 1. Read file content
 2. Extract text between first `---` and second `---`
 3. Parse with `js-yaml.load()`
-4. Extract category from parent directory name
-5. Return `SkillMeta` or `null` on failure (skip malformed files)
+4. Extract fields from correct paths: top-level (`name`, `description`, `version`, `author`, `license`, `platforms`, `prerequisites`) and nested (`metadata.hermes.tags`, `metadata.hermes.config`, `metadata.hermes.category`, `metadata.hermes.related_skills`, `metadata.hermes.homepage`)
+5. Determine category: use `metadata.hermes.category` if present, otherwise derive from first-level parent directory name relative to skills root
+6. Default `platforms` to `[]` when field is absent (not `undefined`)
+7. Return `SkillMeta` or `null` on failure (skip malformed files, `console.warn`)
 
 ---
 
@@ -136,7 +161,10 @@ Simple parser in `src/main/skill-parser.ts`:
 }
 ```
 
-Position: after Cron, before Settings. Add `'Skills'` to `HERMES_ONLY_ROUTES` in `AppSidebar.vue`.
+Position: after Cron, before Settings. In `AppSidebar.vue`:
+- Add `'Skills'` to `HERMES_ONLY_ROUTES`
+- Import `ExtensionPuzzleOutline` from `@vicons/ionicons5`
+- Add `ExtensionPuzzleOutline` to the `iconMap` object
 
 ### 2.2 Layout — Three Zones
 
@@ -188,6 +216,7 @@ When skill selected:
 
 - `>= 900px`: Side-by-side layout (table + panel)
 - `< 900px`: Full-width table only. Click row → open NDrawer from right with detail panel content
+- Implementation: track `window.innerWidth` via a `resize` event listener → `isNarrow` ref controls layout mode and NDrawer visibility
 
 ### 2.4 External Directories Section
 
@@ -225,12 +254,12 @@ Separate `NCard` below the main layout, wrapped in `NCollapse`:
 | `config.yaml` has no `skills` field | Auto-create `skills: {}` node on write |
 | `SKILL.md` frontmatter parse failure | Skip that skill, `console.warn`, load others normally |
 | File write failure | Return `{ ok: false, error }`, renderer shows NMessage.error |
-| External dir path invalid | Show error, don't add to list |
+| External dir path invalid | Show error, don't add to list. Valid = absolute path or starts with `~`, resolves under `$HOME`, not a duplicate |
 
 ### 3.4 UI Feedback
 
 - **Toggle:** NSwitch changes optimistically. On IPC failure → rollback switch state + NMessage.error
-- **Config var edit:** NInput blur/Enter → save with 500ms debounce. Success → NMessage.success. Failure → NMessage.error, value reverts
+- **Config var edit:** NInput blur/Enter → save with 500ms debounce. Success → NMessage.success. Failure → NMessage.error, value reverts. Debounce timer must be canceled when `selectedSkillName` changes to prevent stale saves
 - **External dir add/remove:** After successful IPC → re-fetch full skill list (new directory may bring new skills)
 
 ---
@@ -287,8 +316,11 @@ pages.skills.externalDirs.added — "目录已添加" / "Directory added"
 pages.skills.externalDirs.removed — "目录已移除" / "Directory removed"
 pages.skills.externalDirs.failed — "操作失败" / "Operation failed"
 pages.skills.empty — "未发现任何 skill。请检查 ~/.hermes/skills/ 目录。" / "No skills found. Check ~/.hermes/skills/ directory."
-routes.skills — "Skills" / "Skills"
+pages.skills.detail.relatedSkills — "关联 Skill" / "Related Skills"
+pages.skills.detail.homepage — "主页" / "Homepage"
 ```
+
+Note: `routes.skills` already exists in both i18n files (zh-CN: `'技能管理'`, en-US: `'Skills'`). No need to add it again.
 
 ---
 
@@ -312,7 +344,16 @@ routes.skills — "Skills" / "Skills"
 | `src/renderer/src/stores/skill.ts` | **Rewrite** | Full skill store with fetch, toggle, config, external dirs |
 | `src/renderer/src/views/skills/SkillsPage.vue` | **Create** | Main skill management page |
 | `src/renderer/src/router/routes.ts` | Modify | Add Skills route |
-| `src/renderer/src/components/layout/AppSidebar.vue` | Modify | Add 'Skills' to HERMES_ONLY_ROUTES |
+| `src/renderer/src/components/layout/AppSidebar.vue` | Modify | Add 'Skills' to HERMES_ONLY_ROUTES, import + add ExtensionPuzzleOutline to iconMap |
+| `src/renderer/src/views/chat/ChatPage.vue` | Modify | Update `availableSkills` computed to use new store shape (replace `skill.disabled` / `skill.eligible` with `skillStore.isDisabled()`) |
 | `src/renderer/src/i18n/messages/zh-CN.ts` | Modify | Add `pages.skills` and `routes.skills` keys |
 | `src/renderer/src/i18n/messages/en-US.ts` | Modify | Add `pages.skills` and `routes.skills` keys |
 | `package.json` | Modify | Add js-yaml + @types/js-yaml dependencies |
+
+---
+
+## 7. Known Limitations
+
+- **No live file watching:** Changes to `~/.hermes/skills/` outside the app require manual Refresh. Consistent with Cron module behavior. A `fs.watch` based auto-refresh can be added as a follow-up.
+- **js-yaml strips comments:** First config.yaml write will remove user comments. Matches Hermes Agent's own behavior.
+- **No skill content preview:** The detail panel shows metadata only, not the full Markdown body of SKILL.md. Showing full content is a possible future enhancement.
