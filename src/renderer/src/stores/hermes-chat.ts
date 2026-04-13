@@ -270,6 +270,7 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     serverSyncAvailable,
     activeConversation,
     load,
+    loadFromServer,
     save,
     createConversation,
     switchTo,
