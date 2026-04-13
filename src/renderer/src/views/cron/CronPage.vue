@@ -1,0 +1,382 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, h } from 'vue'
+import {
+  NCard, NSpace, NButton, NIcon, NTag, NDataTable, NInput,
+  NModal, NForm, NFormItem, NSelect, NSwitch, NAlert,
+  NGrid, NGridItem, NPopconfirm, NText, NSpin, NTooltip,
+  useMessage,
+} from 'naive-ui'
+import type { DataTableColumns } from 'naive-ui'
+import {
+  AddOutline, RefreshOutline, PlayOutline, CreateOutline,
+  TrashOutline, PauseCircleOutline, CalendarOutline,
+  CheckmarkCircleOutline,
+} from '@vicons/ionicons5'
+import { useI18n } from 'vue-i18n'
+import { useCronStore } from '@/stores/cron'
+import type { CronJob } from '@/api/types'
+
+const { t } = useI18n()
+const message = useMessage()
+const cronStore = useCronStore()
+
+// ── State ──
+const search = ref('')
+const showModal = ref(false)
+const editingJob = ref<CronJob | null>(null)
+
+// Form
+const formRef = ref()
+const form = ref({
+  name: '',
+  schedule: '',
+  prompt: '',
+  enabled: true,
+})
+
+// ── Computed ──
+const filteredJobs = computed(() => {
+  const q = search.value.toLowerCase()
+  if (!q) return cronStore.jobs
+  return cronStore.jobs.filter(j =>
+    j.name.toLowerCase().includes(q) ||
+    (j.description || '').toLowerCase().includes(q) ||
+    (j.command || '').toLowerCase().includes(q)
+  )
+})
+
+const statsCards = computed(() => [
+  { label: t('pages.cron.stats.totalJobs'), value: cronStore.jobs.length, type: 'info' as const },
+  { label: t('pages.cron.stats.enabledJobs'), value: cronStore.jobs.filter(j => j.enabled).length, type: 'success' as const },
+  { label: t('pages.cron.stats.disabledJobs'), value: cronStore.jobs.filter(j => !j.enabled).length, type: 'warning' as const },
+])
+
+// ── Table columns ──
+const columns = computed<DataTableColumns<CronJob>>(() => [
+  {
+    title: t('pages.cron.table.jobs.task'),
+    key: 'name',
+    minWidth: 180,
+    render(row) {
+      return h('div', [
+        h(NText, { strong: true }, { default: () => row.name }),
+        row.description
+          ? h(NText, { depth: 3, style: 'display: block; font-size: 12px; margin-top: 2px;' }, { default: () => row.description.length > 60 ? row.description.slice(0, 60) + '...' : row.description })
+          : null,
+      ])
+    },
+  },
+  {
+    title: t('pages.cron.table.jobs.schedule'),
+    key: 'schedule',
+    width: 160,
+    render(row) {
+      return h(NTag, { size: 'small', bordered: false, round: true }, { default: () => row.schedule || '-' })
+    },
+  },
+  {
+    title: t('pages.cron.table.jobs.nextRun'),
+    key: 'nextRun',
+    width: 180,
+    render(row) {
+      if (!row.nextRun) return h(NText, { depth: 3 }, { default: () => '-' })
+      try {
+        const d = new Date(row.nextRun)
+        return h(NText, { depth: 2, style: 'font-size: 13px;' }, { default: () => d.toLocaleString('zh-CN') })
+      } catch {
+        return h(NText, { depth: 3 }, { default: () => row.nextRun })
+      }
+    },
+  },
+  {
+    title: t('pages.cron.table.jobs.status'),
+    key: 'enabled',
+    width: 100,
+    render(row) {
+      return h(NTag, {
+        type: row.enabled ? 'success' : 'default',
+        size: 'small',
+        bordered: false,
+        round: true,
+      }, { default: () => row.enabled ? t('pages.cron.jobStatus.enabled') : t('pages.cron.jobStatus.disabled') })
+    },
+  },
+  {
+    title: t('pages.cron.table.jobs.actions'),
+    key: 'actions',
+    width: 200,
+    fixed: 'right',
+    render(row) {
+      return h(NSpace, { size: 4 }, {
+        default: () => [
+          // Run now
+          h(NTooltip, {}, {
+            trigger: () => h(NButton, {
+              size: 'tiny',
+              quaternary: true,
+              onClick: () => handleRun(row),
+            }, { icon: () => h(NIcon, { component: PlayOutline }) }),
+            default: () => t('pages.cron.actions.runNow'),
+          }),
+          // Toggle
+          h(NTooltip, {}, {
+            trigger: () => h(NButton, {
+              size: 'tiny',
+              quaternary: true,
+              type: row.enabled ? 'warning' : 'success',
+              onClick: () => handleToggle(row),
+            }, { icon: () => h(NIcon, { component: row.enabled ? PauseCircleOutline : CheckmarkCircleOutline }) }),
+            default: () => row.enabled ? t('pages.cron.jobStatus.disabled') : t('pages.cron.jobStatus.enabled'),
+          }),
+          // Edit
+          h(NTooltip, {}, {
+            trigger: () => h(NButton, {
+              size: 'tiny',
+              quaternary: true,
+              onClick: () => handleEdit(row),
+            }, { icon: () => h(NIcon, { component: CreateOutline }) }),
+            default: () => t('pages.cron.actions.edit'),
+          }),
+          // Delete
+          h(NPopconfirm, {
+            onPositiveClick: () => handleDelete(row),
+          }, {
+            trigger: () => h(NButton, { size: 'tiny', quaternary: true, type: 'error' }, {
+              icon: () => h(NIcon, { component: TrashOutline }),
+            }),
+            default: () => t('pages.cron.confirmDeleteJob'),
+          }),
+        ],
+      })
+    },
+  },
+])
+
+// ── Handlers ──
+async function handleRefresh() {
+  await cronStore.fetchJobs()
+}
+
+function handleCreate() {
+  editingJob.value = null
+  form.value = { name: '', schedule: '0 9 * * *', prompt: '', enabled: true }
+  showModal.value = true
+}
+
+function handleEdit(job: CronJob) {
+  editingJob.value = job
+  form.value = {
+    name: job.name,
+    schedule: job.schedule || '',
+    prompt: job.description || job.command || '',
+    enabled: job.enabled,
+  }
+  showModal.value = true
+}
+
+async function handleSave() {
+  if (!form.value.name.trim()) {
+    message.warning(t('pages.cron.validation.nameRequired'))
+    return
+  }
+  if (!form.value.prompt.trim()) {
+    message.warning(t('pages.cron.validation.payloadRequired'))
+    return
+  }
+
+  if (editingJob.value) {
+    const ok = await cronStore.updateJob(editingJob.value.id, {
+      name: form.value.name,
+      schedule: form.value.schedule,
+      prompt: form.value.prompt,
+      enabled: form.value.enabled,
+    })
+    if (ok) {
+      message.success(t('pages.cron.messages.jobUpdated'))
+      showModal.value = false
+    } else {
+      message.error(`${t('pages.cron.messages.updateFailed')}: ${cronStore.lastError}`)
+    }
+  } else {
+    const job = await cronStore.createJob({
+      name: form.value.name,
+      schedule: form.value.schedule,
+      prompt: form.value.prompt,
+      enabled: form.value.enabled,
+    })
+    if (job) {
+      message.success(t('pages.cron.messages.jobCreated'))
+      showModal.value = false
+    } else {
+      message.error(`${t('pages.cron.messages.updateFailed')}: ${cronStore.lastError}`)
+    }
+  }
+}
+
+async function handleToggle(job: CronJob) {
+  const ok = await cronStore.toggleJob(job.id, !job.enabled)
+  if (ok) {
+    message.success(job.enabled ? t('pages.cron.messages.jobDisabled') : t('pages.cron.messages.jobEnabled'))
+  } else {
+    message.error(`${t('pages.cron.messages.updateFailed')}: ${cronStore.lastError}`)
+  }
+}
+
+async function handleRun(job: CronJob) {
+  const ok = await cronStore.runJob(job.id)
+  if (ok) {
+    message.success(t('pages.cron.messages.jobTriggered'))
+  } else {
+    message.error(`${t('pages.cron.messages.triggerFailed')}: ${cronStore.lastError}`)
+  }
+}
+
+async function handleDelete(job: CronJob) {
+  const ok = await cronStore.deleteJob(job.id)
+  if (ok) {
+    message.success(t('pages.cron.messages.jobDeleted'))
+  } else {
+    message.error(`${t('pages.cron.messages.deleteFailed')}: ${cronStore.lastError}`)
+  }
+}
+
+function handleTemplate(template: { name: string; schedule: string; prompt: string }) {
+  editingJob.value = null
+  form.value = { ...template, enabled: true }
+  showModal.value = true
+}
+
+// ── Lifecycle ──
+onMounted(() => {
+  cronStore.fetchJobs()
+})
+</script>
+
+<template>
+  <NSpace vertical :size="16">
+    <!-- Header -->
+    <NCard class="app-card">
+      <template #header>
+        <NSpace align="center" :size="8">
+          <NIcon :component="CalendarOutline" size="18" />
+          <span>{{ t('pages.cron.title') }}</span>
+        </NSpace>
+      </template>
+      <template #header-extra>
+        <NSpace :size="8">
+          <NButton size="small" :loading="cronStore.loading" @click="handleRefresh">
+            <template #icon><NIcon :component="RefreshOutline" /></template>
+          </NButton>
+          <NButton size="small" type="primary" @click="handleCreate">
+            <template #icon><NIcon :component="AddOutline" /></template>
+            {{ t('pages.cron.actions.createJob') }}
+          </NButton>
+        </NSpace>
+      </template>
+
+      <!-- Stats -->
+      <NGrid :cols="3" :x-gap="12" :y-gap="12" style="margin-bottom: 16px;">
+        <NGridItem v-for="card in statsCards" :key="card.label">
+          <NCard size="small" :bordered="false" style="background: rgba(255,255,255,0.04); border-radius: 8px;">
+            <NText depth="3" style="font-size: 12px;">{{ card.label }}</NText>
+            <div style="font-size: 24px; font-weight: 600; margin-top: 4px;">
+              <NText :type="card.type">{{ card.value }}</NText>
+            </div>
+          </NCard>
+        </NGridItem>
+      </NGrid>
+
+      <!-- Quick templates -->
+      <NAlert :closable="false" type="default" style="margin-bottom: 16px;">
+        <template #header>{{ t('pages.cron.quickTemplates') }}</template>
+        <NSpace :size="8">
+          <NButton
+            size="small"
+            @click="handleTemplate({ name: t('pages.cron.templates.morningReport.label'), schedule: '0 7 * * *', prompt: t('pages.cron.templates.morningReport.payloadText') })"
+          >
+            {{ t('pages.cron.templates.morningReport.label') }}
+          </NButton>
+          <NButton
+            size="small"
+            @click="handleTemplate({ name: t('pages.cron.templates.heartbeatCheck.label'), schedule: '*/30 * * * *', prompt: t('pages.cron.templates.heartbeatCheck.payloadText') })"
+          >
+            {{ t('pages.cron.templates.heartbeatCheck.label') }}
+          </NButton>
+          <NButton
+            size="small"
+            @click="handleTemplate({ name: t('pages.cron.templates.mainReminder.label'), schedule: '0 9,14,18 * * 1-5', prompt: t('pages.cron.templates.mainReminder.payloadText') })"
+          >
+            {{ t('pages.cron.templates.mainReminder.label') }}
+          </NButton>
+        </NSpace>
+      </NAlert>
+
+      <!-- Search -->
+      <NInput
+        v-model:value="search"
+        :placeholder="t('pages.cron.jobs.searchPlaceholder')"
+        clearable
+        size="small"
+        style="margin-bottom: 12px;"
+      />
+
+      <!-- Jobs table -->
+      <NSpin :show="cronStore.loading">
+        <NDataTable
+          :columns="columns"
+          :data="filteredJobs"
+          :row-key="(row: CronJob) => row.id"
+          :bordered="false"
+          :single-line="false"
+          size="small"
+          :scroll-x="700"
+        />
+        <NText v-if="!cronStore.loading && cronStore.jobs.length === 0" depth="3" style="display: block; text-align: center; padding: 24px 0;">
+          {{ t('pages.cron.jobs.emptyHint') }}
+        </NText>
+      </NSpin>
+
+      <!-- Error -->
+      <NAlert v-if="cronStore.lastError" type="error" :closable="true" style="margin-top: 12px;">
+        {{ t('pages.cron.requestFailed', { error: cronStore.lastError }) }}
+      </NAlert>
+    </NCard>
+
+    <!-- Create / Edit Modal -->
+    <NModal
+      v-model:show="showModal"
+      preset="card"
+      :title="editingJob ? t('pages.cron.modal.editTitle') : t('pages.cron.modal.createTitle')"
+      style="max-width: 520px;"
+      :mask-closable="false"
+    >
+      <NForm ref="formRef" :model="form" label-placement="left" label-width="100">
+        <NFormItem :label="t('pages.cron.form.name')" path="name">
+          <NInput v-model:value="form.name" :placeholder="t('pages.cron.form.namePlaceholder')" />
+        </NFormItem>
+        <NFormItem :label="t('pages.cron.form.cronExpr')" path="schedule">
+          <NInput v-model:value="form.schedule" :placeholder="t('pages.cron.form.cronExprPlaceholder')" />
+        </NFormItem>
+        <NFormItem :label="t('pages.cron.detail.payload')" path="prompt">
+          <NInput
+            v-model:value="form.prompt"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 8 }"
+            :placeholder="t('pages.cron.form.payloadTextPlaceholders.agentTurn')"
+          />
+        </NFormItem>
+        <NFormItem :label="t('pages.cron.form.enabled')" path="enabled">
+          <NSwitch v-model:value="form.enabled" />
+        </NFormItem>
+      </NForm>
+      <template #footer>
+        <NSpace justify="end" :size="8">
+          <NButton @click="showModal = false">{{ t('pages.settings.saveFile') === '保存' ? '取消' : 'Cancel' }}</NButton>
+          <NButton type="primary" :loading="cronStore.saving" @click="handleSave">
+            {{ editingJob ? t('pages.cron.actions.saveChanges') : t('pages.cron.actions.createJob') }}
+          </NButton>
+        </NSpace>
+      </template>
+    </NModal>
+  </NSpace>
+</template>

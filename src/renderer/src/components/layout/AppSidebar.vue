@@ -10,6 +10,7 @@ import {
   ChatboxEllipsesOutline,
   ChatbubblesOutline,
   CogOutline,
+  CalendarOutline,
 } from '@vicons/ionicons5'
 import { routes } from '@/router/routes'
 import { useConnectionStore } from '@/stores/connection'
@@ -32,6 +33,7 @@ const iconMap: Record<string, any> = {
   ChatboxEllipsesOutline,
   ChatbubblesOutline,
   CogOutline,
+  CalendarOutline,
 }
 
 interface MenuItem {

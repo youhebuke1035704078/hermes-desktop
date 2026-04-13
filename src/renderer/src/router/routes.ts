@@ -35,6 +35,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { titleKey: 'routes.sessionDetail', hidden: true },
       },
       {
+        path: 'cron',
+        name: 'Cron',
+        component: () => import('@/views/cron/CronPage.vue'),
+        meta: { titleKey: 'routes.cron', icon: 'CalendarOutline' },
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/settings/SettingsPage.vue'),
