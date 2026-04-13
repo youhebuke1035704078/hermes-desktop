@@ -774,18 +774,12 @@ async function handleCreateSession() {
         </NGridItem>
       </NGrid>
 
-      <div class="sessions-filter-bar" style="grid-template-columns: minmax(0, 1fr) auto;">
+      <div class="sessions-filter-bar" style="grid-template-columns: minmax(0, 1fr);">
         <NInput v-model:value="searchQuery" clearable :placeholder="t('pages.sessions.list.searchPlaceholder')">
           <template #prefix>
             <NIcon :component="SearchOutline" />
           </template>
         </NInput>
-        <NButton type="primary" @click="handleHermesNew">
-          <template #icon>
-            <NIcon :component="AddOutline" />
-          </template>
-          {{ t('pages.sessions.list.createSession') }}
-        </NButton>
       </div>
     </NCard>
 
