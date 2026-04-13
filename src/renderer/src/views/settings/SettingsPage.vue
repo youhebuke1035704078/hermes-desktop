@@ -28,6 +28,7 @@ import {
   ChevronUpOutline,
   RocketOutline,
   CloudDownloadOutline,
+  InformationCircleOutline,
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore, type ThemeMode } from '@/stores/theme'
@@ -336,6 +337,31 @@ onMounted(async () => {
           {{ t('pages.settings.disconnect') }}
         </NButton>
       </NSpace>
+    </NCard>
+
+    <!-- Server Info (remote Hermes REST — show what we CAN get from API) -->
+    <NCard class="app-card" v-if="isHermesRest && !isLocalServer">
+      <template #header>
+        <NSpace align="center" :size="8">
+          <NIcon :component="InformationCircleOutline" size="18" />
+          <span>{{ t('pages.settings.serverInfo') }}</span>
+        </NSpace>
+      </template>
+
+      <NDescriptions label-placement="left" :column="1" bordered size="small">
+        <NDescriptionsItem :label="t('pages.settings.serverPlatform')">
+          <NTag size="small" :bordered="false" round type="info">Hermes Agent</NTag>
+        </NDescriptionsItem>
+        <NDescriptionsItem :label="t('pages.settings.serverModel')" v-if="connectionStore.hermesRealModel">
+          <NTag size="small" :bordered="false" round type="success">
+            {{ connectionStore.hermesRealModel }}
+          </NTag>
+        </NDescriptionsItem>
+      </NDescriptions>
+
+      <NAlert type="info" :closable="false" style="margin-top: 12px;">
+        {{ t('pages.settings.serverLocalOnly') }}
+      </NAlert>
     </NCard>
 
     <!-- Hermes Agent Version & Update (local server only — uses local git/binary) -->
