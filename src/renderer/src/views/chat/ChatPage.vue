@@ -1026,8 +1026,7 @@ function skillSourceLabel(source: Skill['source']): string {
 const availableSkills = computed(() =>
   skillStore.skills
     .filter((skill) => {
-      if (skill.disabled) return false
-      if (skill.eligible === false) return false
+      if (skillStore.isDisabled(skill.name)) return false
       if (!skillStore.isSkillVisibleInChat(skill.name)) return false
       return true
     })
