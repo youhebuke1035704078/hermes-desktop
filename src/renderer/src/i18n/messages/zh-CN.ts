@@ -132,6 +132,7 @@ export default {
       tokenHint: '令牌在服务器的 hermes.json 中配置（gateway.auth.token），可通过 hermes config get gateway.auth.token 查看',
       probeButton: '检测服务器',
       probeHermesRest: '检测到 Hermes Agent REST API，无需认证，可直接连接',
+      probeHermesRestAuth: '检测到 Hermes Agent REST API，需要填写 API 访问令牌（API_SERVER_KEY）',
       probeNoAuth: '服务器已连通，该服务器未开启认证，无需输入账号密码',
       probeAuth: '服务器已连通，请输入 Gateway 访问令牌',
       probeUnreachable: '无法连接到该地址，请检查：1) 服务是否已启动 2) 端口是否正确 3) 防火墙设置',

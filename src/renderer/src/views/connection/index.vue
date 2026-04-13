@@ -121,7 +121,15 @@ async function probeServer() {
     if (signal.aborted) return
 
     if (isHermesRest) {
-      probeResult.value = { reachable: true, authEnabled: false, isHermesRest: true }
+      // Health is public, but API might require auth (API_SERVER_KEY).
+      // Probe /v1/models without token to check.
+      let needsAuth = false
+      try {
+        const modelsResp = await fetch(`${url}/v1/models`, { signal })
+        if (modelsResp.status === 401 || modelsResp.status === 403) needsAuth = true
+      } catch { /* network error — assume no auth needed */ }
+      if (signal.aborted) return
+      probeResult.value = { reachable: true, authEnabled: needsAuth, isHermesRest: true }
     } else {
       // Gateway is primarily a WebSocket server — plain HTTP may return non-200.
       // Any HTTP response (even 400/426) means the server process is alive.
@@ -561,9 +569,13 @@ async function connectLocalHermes() {
 
         <!-- Probe feedback -->
         <div v-if="probeResult && !probing" style="margin-bottom: 16px;">
-          <NAlert v-if="probeResult.isHermesRest" type="success" :bordered="false" style="font-size: 13px;">
+          <NAlert v-if="probeResult.isHermesRest && !probeResult.authEnabled" type="success" :bordered="false" style="font-size: 13px;">
             <template #icon><NIcon :component="FlashOutline" /></template>
             {{ t('pages.connection.probeHermesRest') }}
+          </NAlert>
+          <NAlert v-else-if="probeResult.isHermesRest && probeResult.authEnabled" type="info" :bordered="false" style="font-size: 13px;">
+            <template #icon><NIcon :component="FlashOutline" /></template>
+            {{ t('pages.connection.probeHermesRestAuth') }}
           </NAlert>
           <NAlert v-else-if="probeResult.reachable && !probeResult.authEnabled" type="success" :bordered="false" style="font-size: 13px;">
             <template #icon><NIcon :component="FlashOutline" /></template>

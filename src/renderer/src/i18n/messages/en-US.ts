@@ -132,6 +132,7 @@ export default {
       tokenHint: 'The token is configured in hermes.json (gateway.auth.token). Run: hermes config get gateway.auth.token',
       probeButton: 'Probe Server',
       probeHermesRest: 'Hermes Agent REST API detected — no authentication needed, ready to connect.',
+      probeHermesRestAuth: 'Hermes Agent REST API detected — please enter the API access token (API_SERVER_KEY).',
       probeNoAuth: 'Server is reachable. Authentication is disabled — no credentials needed.',
       probeAuth: 'Server is reachable. Please enter the Gateway access token.',
       probeUnreachable: 'Cannot reach this address. Check: 1) Service is running 2) Port is correct 3) Firewall settings',
