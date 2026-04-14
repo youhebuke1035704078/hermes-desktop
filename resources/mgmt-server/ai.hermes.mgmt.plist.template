@@ -19,5 +19,19 @@
 	<string>__HOME__/.hermes/logs/mgmt-server.err</string>
 	<key>WorkingDirectory</key>
 	<string>__HOME__/.hermes</string>
+	<!--
+		launchd's default PATH is just /usr/bin:/bin:/usr/sbin:/sbin, which means
+		`#!/usr/bin/env python3` in the `hermes` wrapper script resolves to macOS's
+		stock Python 3.9. That fails on hermes-agent code using PEP 604 unions
+		(`Path | None`) and breaks `/version`. Put the venv's python first so
+		`env python3` resolves to the same interpreter the gateway uses (3.11+),
+		and include Homebrew + /usr/local/bin as fallbacks so `git`, `launchctl`,
+		etc. all resolve regardless of whether we're on Intel or Apple Silicon.
+	-->
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>__HOME__/.hermes/hermes-agent/venv/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
 </dict>
 </plist>
