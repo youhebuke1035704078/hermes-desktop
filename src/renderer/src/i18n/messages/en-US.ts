@@ -1648,6 +1648,8 @@ export default {
       updating: 'Updating...',
       updateSuccess: 'Hermes Agent updated, please restart service',
       updateFailed: 'Update failed',
+      checkUpdateFailed: 'Update check failed',
+      updateRetryHint: 'The network may be intermittent — you can retry later.',
       versionTag: 'Version tag',
     },
     tools: {

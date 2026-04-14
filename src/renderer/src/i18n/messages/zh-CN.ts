@@ -1648,6 +1648,8 @@ export default {
       updating: '更新中...',
       updateSuccess: 'Hermes Agent 已更新，请重启服务',
       updateFailed: '更新失败',
+      checkUpdateFailed: '检查更新失败',
+      updateRetryHint: '网络偶有不稳定，失败时可稍后重试',
       versionTag: '版本标签',
     },
     tools: {

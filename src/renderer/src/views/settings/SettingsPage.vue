@@ -167,6 +167,10 @@ const hermesUpdateChecked = ref(false)   // true after first check completes
 const hermesCheckingUpdate = ref(false)
 const hermesUpdating = ref(false)
 const hermesUpdateLog = ref('')
+// Persistent error state so users don't lose context when the auto-dismiss
+// toast fades. Cleared at the start of each check/update attempt.
+const hermesCheckError = ref('')
+const hermesUpdateError = ref('')
 
 async function fetchHermesVersion() {
   hermesVersionLoading.value = true
@@ -185,6 +189,9 @@ async function fetchHermesVersion() {
 async function checkHermesUpdate() {
   hermesCheckingUpdate.value = true
   hermesUpdateAvailable.value = false
+  // Clear stale error state on every attempt so the user isn't confused
+  // by a leftover message from a previous failure.
+  hermesCheckError.value = ''
   try {
     const res = isLocalServer.value && window.api
       ? await window.api.hermesCheckUpdate()
@@ -196,10 +203,15 @@ async function checkHermesUpdate() {
     } else if (!hermesUpdateChecked.value) {
       // Silent fail on auto-check; only show error on manual click
     } else {
-      message.error(res.error || 'Check failed')
+      const err = res.error || 'Check failed'
+      hermesCheckError.value = err
+      message.error(err)
     }
   } catch (e: any) {
-    if (hermesUpdateChecked.value) message.error(e.message)
+    if (hermesUpdateChecked.value) {
+      hermesCheckError.value = e.message
+      message.error(e.message)
+    }
   } finally {
     hermesCheckingUpdate.value = false
     hermesUpdateChecked.value = true
@@ -209,6 +221,9 @@ async function checkHermesUpdate() {
 async function doHermesUpdate() {
   hermesUpdating.value = true
   hermesUpdateLog.value = ''
+  // Clear stale error so a retry starts from a clean slate.
+  hermesUpdateError.value = ''
+  hermesCheckError.value = ''
   let unsub: (() => void) | null = null
   if (isLocalServer.value && window.api) {
     unsub = window.api.onHermesUpdateProgress((data: string) => {
@@ -222,11 +237,15 @@ async function doHermesUpdate() {
     if (res.ok) {
       message.success(t('pages.settings.updateSuccess'))
       hermesUpdateAvailable.value = false
+      hermesUpdateError.value = ''
       await fetchHermesVersion()
     } else {
-      message.error(`${t('pages.settings.updateFailed')}: ${res.error}`)
+      const err = res.error || 'Unknown error'
+      hermesUpdateError.value = err
+      message.error(`${t('pages.settings.updateFailed')}: ${err}`)
     }
   } catch (e: any) {
+    hermesUpdateError.value = e.message
     message.error(`${t('pages.settings.updateFailed')}: ${e.message}`)
   } finally {
     unsub?.()
@@ -466,6 +485,28 @@ onMounted(async () => {
         <NAlert v-if="hermesCheckingUpdate" type="default" :closable="false">
           <template #icon><NSpin :size="14" /></template>
           {{ t('pages.settings.checking') }}
+        </NAlert>
+        <!-- Update failure (persistent, user can retry) -->
+        <NAlert
+          v-else-if="hermesUpdateError"
+          type="error"
+          :closable="true"
+          :title="t('pages.settings.updateFailed')"
+          @close="hermesUpdateError = ''"
+        >
+          <div style="word-break: break-word; font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 12px;">{{ hermesUpdateError }}</div>
+          <div style="margin-top: 6px; font-size: 12px; opacity: 0.8;">{{ t('pages.settings.updateRetryHint') }}</div>
+        </NAlert>
+        <!-- Check failure (persistent, user can retry) -->
+        <NAlert
+          v-else-if="hermesCheckError"
+          type="error"
+          :closable="true"
+          :title="t('pages.settings.checkUpdateFailed')"
+          @close="hermesCheckError = ''"
+        >
+          <div style="word-break: break-word; font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 12px;">{{ hermesCheckError }}</div>
+          <div style="margin-top: 6px; font-size: 12px; opacity: 0.8;">{{ t('pages.settings.updateRetryHint') }}</div>
         </NAlert>
         <!-- Update available -->
         <NAlert v-else-if="hermesUpdateAvailable" type="warning" :closable="false">

@@ -567,6 +567,60 @@ function registerIpcHandlers(): void {
   const HERMES_BIN = join(homedir(), '.hermes/hermes-agent/hermes')
   const HERMES_REPO = join(homedir(), '.hermes/hermes-agent')
 
+  // Helper: run a git (or any) command with clear error reporting — distinguishes
+  // timeout from other failures and never returns a bare "Command failed: ..." string.
+  function runGit(args: string[], timeoutMs = 15000): Promise<{ ok: boolean; stdout: string; stderr: string; error?: string; timedOut?: boolean }> {
+    return new Promise((resolve) => {
+      const started = Date.now()
+      execFile('git', args, { timeout: timeoutMs }, (err, stdout, stderr) => {
+        if (err) {
+          const elapsed = Date.now() - started
+          const anyErr = err as NodeJS.ErrnoException & { killed?: boolean; signal?: string; code?: number | string }
+          const timedOut = anyErr.killed === true && (anyErr.signal === 'SIGTERM' || elapsed >= timeoutMs - 100)
+          const parts: string[] = []
+          if (timedOut) parts.push(`timed out after ${timeoutMs}ms`)
+          else if (typeof anyErr.code === 'number') parts.push(`exit ${anyErr.code}`)
+          else if (anyErr.code) parts.push(`error ${anyErr.code}`)
+          const stderrTrim = (stderr || '').trim()
+          if (stderrTrim) parts.push(stderrTrim)
+          if (!stderrTrim && err.message && !err.message.startsWith('Command failed:')) parts.push(err.message)
+          if (parts.length === 0) parts.push(`git ${args.join(' ')} failed`)
+          resolve({ ok: false, stdout: '', stderr: stderrTrim, error: parts.join(': '), timedOut })
+          return
+        }
+        resolve({ ok: true, stdout: stdout.trim(), stderr: (stderr || '').trim() })
+      })
+    })
+  }
+
+  // Retry git fetch once on transient/timeout failure
+  async function gitFetchWithRetry(
+    timeoutMs = 60000,
+  ): Promise<{ ok: boolean; stdout: string; stderr: string; error?: string; timedOut?: boolean }> {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const r = await runGit(['-C', HERMES_REPO, 'fetch', '--tags'], timeoutMs)
+      if (r.ok) return r
+      if (attempt === 2) return r
+      const retryable = r.timedOut || /could not resolve host|connection reset|ssl|tls|timeout|operation timed out/i.test(r.error || '')
+      if (!retryable) return r
+      console.error(`[hermes:fetch retry] attempt ${attempt} failed (${r.error}); retrying in 800ms`)
+      await new Promise((res) => setTimeout(res, 800))
+    }
+    return { ok: false, stdout: '', stderr: '', error: 'unreachable', timedOut: false }
+  }
+
+  // Serialize git operations so checkUpdate and update can't race
+  let gitBusy = false
+  async function withGitLock<T>(fn: () => Promise<T>): Promise<T | { ok: false; error: string }> {
+    const waitStart = Date.now()
+    while (gitBusy) {
+      if (Date.now() - waitStart > 90000) return { ok: false, error: 'git lock wait timeout' }
+      await new Promise((r) => setTimeout(r, 100))
+    }
+    gitBusy = true
+    try { return await fn() } finally { gitBusy = false }
+  }
+
   ipcMain.handle('hermes:version', async () => {
     try {
       return await new Promise<{ ok: boolean; version?: string; date?: string; error?: string }>((resolve) => {
@@ -590,92 +644,73 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('hermes:checkUpdate', async () => {
-    try {
-      // Fetch remote tags, then compare with latest local tag
-      return await new Promise<{ ok: boolean; current?: string; latest?: string; updateAvailable?: boolean; error?: string }>((resolve) => {
-        execFile('git', ['-C', HERMES_REPO, 'fetch', '--tags'], { timeout: 15000 }, (fetchErr) => {
-          if (fetchErr) {
-            resolve({ ok: false, error: 'Failed to fetch: ' + fetchErr.message })
-            return
-          }
-          // Get all tags sorted by date (newest first)
-          execFile('git', ['-C', HERMES_REPO, 'tag', '--sort=-creatordate'], { timeout: 5000 }, (tagErr, tagOut) => {
-            if (tagErr) {
-              resolve({ ok: false, error: tagErr.message })
-              return
-            }
-            const tags = tagOut.trim().split('\n').filter(Boolean)
-            const latest = tags[0] || ''
-            // Compare commit dates: if HEAD is newer than (or equal to) the latest tag, no update needed
-            // This handles repos where tags are on a separate release branch
-            execFile('git', ['-C', HERMES_REPO, 'log', '-1', '--format=%ct', 'HEAD'], { timeout: 5000 }, (_headErr, headTs) => {
-              const headTime = parseInt(headTs?.trim() || '0', 10)
-              if (!latest) {
-                resolve({ ok: true, current: 'dev', latest: '', updateAvailable: false })
-                return
-              }
-              execFile('git', ['-C', HERMES_REPO, 'log', '-1', '--format=%ct', latest], { timeout: 5000 }, (_tagErr, tagTs) => {
-                const tagTime = parseInt(tagTs?.trim() || '0', 10)
-                // HEAD is up-to-date if its commit is same age or newer than latest tag
-                const updateAvailable = tagTime > headTime
-                // Show current as a readable description
-                execFile('git', ['-C', HERMES_REPO, 'describe', '--tags', '--always', 'HEAD'], { timeout: 5000 }, (_dErr, dOut) => {
-                  const current = dOut?.trim() || 'dev'
-                  resolve({ ok: true, current, latest, updateAvailable })
-                })
-              })
-            })
-          })
-        })
-      })
-    } catch (e: any) {
-      return { ok: false, error: e.message }
-    }
+    return await withGitLock(async () => {
+      try {
+        const fetchResult = await gitFetchWithRetry(45000)
+        if (!fetchResult.ok) return { ok: false, error: 'git fetch failed: ' + fetchResult.error }
+
+        const tagsResult = await runGit(['-C', HERMES_REPO, 'tag', '--sort=-creatordate'], 5000)
+        if (!tagsResult.ok) return { ok: false, error: tagsResult.error }
+
+        const tags = tagsResult.stdout.split('\n').filter(Boolean)
+        const latest = tags[0] || ''
+        if (!latest) return { ok: true, current: 'dev', latest: '', updateAvailable: false }
+
+        const headTs = await runGit(['-C', HERMES_REPO, 'log', '-1', '--format=%ct', 'HEAD'], 5000)
+        const tagTs = await runGit(['-C', HERMES_REPO, 'log', '-1', '--format=%ct', latest], 5000)
+        const headTime = parseInt(headTs.stdout || '0', 10)
+        const tagTime = parseInt(tagTs.stdout || '0', 10)
+        const updateAvailable = tagTime > headTime
+
+        const desc = await runGit(['-C', HERMES_REPO, 'describe', '--tags', '--always', 'HEAD'], 5000)
+        const current = desc.stdout || 'dev'
+        return { ok: true, current, latest, updateAvailable }
+      } catch (e: any) {
+        return { ok: false, error: e.message }
+      }
+    })
   })
 
   ipcMain.handle('hermes:update', async (event) => {
-    try {
-      // Auto-stash any local changes (e.g. package-lock.json, __pycache__)
-      // that would block `git checkout` during `hermes update`. We silently
-      // ignore stash errors — if there's nothing to stash, that's fine.
-      await new Promise<void>((resolveStash) => {
-        execFile(
-          'git',
-          ['-C', HERMES_REPO, 'stash', 'push', '--include-untracked', '-m', `hermes-desktop-auto-stash-${Date.now()}`],
-          { timeout: 10000 },
-          () => resolveStash(),
-        )
-      })
+    return await withGitLock(async () => {
+      try {
+        // Auto-stash any local changes (e.g. package-lock.json, __pycache__)
+        // that would block `git checkout` during `hermes update`. Silent fail OK.
+        await runGit([
+          '-C', HERMES_REPO, 'stash', 'push', '--include-untracked',
+          '-m', `hermes-desktop-auto-stash-${Date.now()}`,
+        ], 10000)
 
-      return await new Promise<{ ok: boolean; error?: string }>((resolve) => {
-        const child = execFile(HERMES_BIN, ['update'], { timeout: 120000 })
-        let output = ''
-        child.stdout?.on('data', (data: string) => {
-          output += data
-          if (!event.sender.isDestroyed()) {
-            event.sender.send('hermes:update:progress', data.toString())
-          }
+        // Pre-fetch with retry so a transient blip doesn't abort the whole update.
+        const preFetch = await gitFetchWithRetry(60000)
+        if (!preFetch.ok) return { ok: false, error: 'fetch failed: ' + preFetch.error }
+
+        // Run the CLI update (streams progress to renderer)
+        return await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+          const child = execFile(HERMES_BIN, ['update'], { timeout: 180000 })
+          let output = ''
+          child.stdout?.on('data', (data: string) => {
+            output += data
+            if (!event.sender.isDestroyed()) {
+              event.sender.send('hermes:update:progress', data.toString())
+            }
+          })
+          child.stderr?.on('data', (data: string) => {
+            output += data
+            if (!event.sender.isDestroyed()) {
+              event.sender.send('hermes:update:progress', data.toString())
+            }
+          })
+          child.on('close', (code) => {
+            if (code === 0) resolve({ ok: true })
+            else resolve({ ok: false, error: output || `Exit code ${code}` })
+          })
+          child.on('error', (err) => resolve({ ok: false, error: err.message }))
         })
-        child.stderr?.on('data', (data: string) => {
-          output += data
-          if (!event.sender.isDestroyed()) {
-            event.sender.send('hermes:update:progress', data.toString())
-          }
-        })
-        child.on('close', (code) => {
-          if (code === 0) {
-            resolve({ ok: true })
-          } else {
-            resolve({ ok: false, error: output || `Exit code ${code}` })
-          }
-        })
-        child.on('error', (err) => {
-          resolve({ ok: false, error: err.message })
-        })
-      })
-    } catch (e: any) {
-      return { ok: false, error: e.message }
-    }
+      } catch (e: any) {
+        return { ok: false, error: e.message }
+      }
+    })
   })
 
   // ── Backup system ──
