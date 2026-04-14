@@ -10,6 +10,7 @@ import { getServers, saveServer, removeServer, decryptPassword, isEncryptionAvai
 import * as yaml from 'js-yaml'
 import { scanSkillsDirectory, setNestedValue } from './skill-parser'
 import { registerWsBridge, shutdownWsBridge } from './ws-bridge'
+import { runGit, gitFetchWithRetry, createGitLock } from './hermes-git'
 import icon from '../../resources/icon.png?asset'
 
 // Disable GPU hardware acceleration on Windows to prevent black screen
@@ -567,59 +568,9 @@ function registerIpcHandlers(): void {
   const HERMES_BIN = join(homedir(), '.hermes/hermes-agent/hermes')
   const HERMES_REPO = join(homedir(), '.hermes/hermes-agent')
 
-  // Helper: run a git (or any) command with clear error reporting — distinguishes
-  // timeout from other failures and never returns a bare "Command failed: ..." string.
-  function runGit(args: string[], timeoutMs = 15000): Promise<{ ok: boolean; stdout: string; stderr: string; error?: string; timedOut?: boolean }> {
-    return new Promise((resolve) => {
-      const started = Date.now()
-      execFile('git', args, { timeout: timeoutMs }, (err, stdout, stderr) => {
-        if (err) {
-          const elapsed = Date.now() - started
-          const anyErr = err as NodeJS.ErrnoException & { killed?: boolean; signal?: string; code?: number | string }
-          const timedOut = anyErr.killed === true && (anyErr.signal === 'SIGTERM' || elapsed >= timeoutMs - 100)
-          const parts: string[] = []
-          if (timedOut) parts.push(`timed out after ${timeoutMs}ms`)
-          else if (typeof anyErr.code === 'number') parts.push(`exit ${anyErr.code}`)
-          else if (anyErr.code) parts.push(`error ${anyErr.code}`)
-          const stderrTrim = (stderr || '').trim()
-          if (stderrTrim) parts.push(stderrTrim)
-          if (!stderrTrim && err.message && !err.message.startsWith('Command failed:')) parts.push(err.message)
-          if (parts.length === 0) parts.push(`git ${args.join(' ')} failed`)
-          resolve({ ok: false, stdout: '', stderr: stderrTrim, error: parts.join(': '), timedOut })
-          return
-        }
-        resolve({ ok: true, stdout: stdout.trim(), stderr: (stderr || '').trim() })
-      })
-    })
-  }
-
-  // Retry git fetch once on transient/timeout failure
-  async function gitFetchWithRetry(
-    timeoutMs = 60000,
-  ): Promise<{ ok: boolean; stdout: string; stderr: string; error?: string; timedOut?: boolean }> {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      const r = await runGit(['-C', HERMES_REPO, 'fetch', '--tags'], timeoutMs)
-      if (r.ok) return r
-      if (attempt === 2) return r
-      const retryable = r.timedOut || /could not resolve host|connection reset|ssl|tls|timeout|operation timed out/i.test(r.error || '')
-      if (!retryable) return r
-      console.error(`[hermes:fetch retry] attempt ${attempt} failed (${r.error}); retrying in 800ms`)
-      await new Promise((res) => setTimeout(res, 800))
-    }
-    return { ok: false, stdout: '', stderr: '', error: 'unreachable', timedOut: false }
-  }
-
-  // Serialize git operations so checkUpdate and update can't race
-  let gitBusy = false
-  async function withGitLock<T>(fn: () => Promise<T>): Promise<T | { ok: false; error: string }> {
-    const waitStart = Date.now()
-    while (gitBusy) {
-      if (Date.now() - waitStart > 90000) return { ok: false, error: 'git lock wait timeout' }
-      await new Promise((r) => setTimeout(r, 100))
-    }
-    gitBusy = true
-    try { return await fn() } finally { gitBusy = false }
-  }
+  // Serialize git operations so checkUpdate and update can't race.
+  // The factory returns an independent mutex; helpers themselves live in ./hermes-git.
+  const withGitLock = createGitLock()
 
   ipcMain.handle('hermes:version', async () => {
     try {
@@ -646,7 +597,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('hermes:checkUpdate', async () => {
     return await withGitLock(async () => {
       try {
-        const fetchResult = await gitFetchWithRetry(45000)
+        const fetchResult = await gitFetchWithRetry(HERMES_REPO, 45000)
         if (!fetchResult.ok) return { ok: false, error: 'git fetch failed: ' + fetchResult.error }
 
         const tagsResult = await runGit(['-C', HERMES_REPO, 'tag', '--sort=-creatordate'], 5000)
@@ -682,7 +633,7 @@ function registerIpcHandlers(): void {
         ], 10000)
 
         // Pre-fetch with retry so a transient blip doesn't abort the whole update.
-        const preFetch = await gitFetchWithRetry(60000)
+        const preFetch = await gitFetchWithRetry(HERMES_REPO, 60000)
         if (!preFetch.ok) return { ok: false, error: 'fetch failed: ' + preFetch.error }
 
         // Run the CLI update (streams progress to renderer)
