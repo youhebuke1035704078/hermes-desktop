@@ -1038,6 +1038,7 @@ export default {
         totalTokens: '总 Token',
         totalCost: '总 Cost',
         missingCostEntries: '缺失成本条目：{count}',
+        unavailableHermesRest: 'Hermes REST 模式下不支持 Token 使用统计，请连接 ACP Gateway 查看',
         segments: {
           input: '输入',
           output: '输出',

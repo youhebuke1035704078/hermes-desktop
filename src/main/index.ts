@@ -635,6 +635,18 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('hermes:update', async (event) => {
     try {
+      // Auto-stash any local changes (e.g. package-lock.json, __pycache__)
+      // that would block `git checkout` during `hermes update`. We silently
+      // ignore stash errors — if there's nothing to stash, that's fine.
+      await new Promise<void>((resolveStash) => {
+        execFile(
+          'git',
+          ['-C', HERMES_REPO, 'stash', 'push', '--include-untracked', '-m', `hermes-desktop-auto-stash-${Date.now()}`],
+          { timeout: 10000 },
+          () => resolveStash(),
+        )
+      })
+
       return await new Promise<{ ok: boolean; error?: string }>((resolve) => {
         const child = execFile(HERMES_BIN, ['update'], { timeout: 120000 })
         let output = ''

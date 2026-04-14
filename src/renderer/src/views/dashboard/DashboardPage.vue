@@ -29,7 +29,8 @@ const totalMessages = computed(() =>
 const enabledJobs = computed(() => cronStore.jobs.filter(j => j.enabled).length)
 const totalJobs = computed(() => cronStore.jobs.length)
 const isOnline = computed(() => connectionStore.status === 'connected')
-const modelName = computed(() => connectionStore.hermesRealModel || '-')
+const serverName = computed(() => connectionStore.currentServer?.name || '-')
+const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
 // ── Usage Data ──
 const usageData = ref<SessionsUsageResult | null>(null)
@@ -116,6 +117,12 @@ function goCron() {
 }
 
 async function fetchUsageData() {
+  // Skip: hermes-rest servers don't expose usage RPC (only /health, /v1/models, /v1/chat/completions)
+  if (isHermesRest.value) {
+    usageData.value = null
+    usageError.value = null
+    return
+  }
   usageLoading.value = true
   usageError.value = null
   try {
@@ -190,7 +197,7 @@ onMounted(() => {
             <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
               <NText :type="isOnline ? 'success' : 'error'">{{ isOnline ? t('pages.dashboard.metrics.online') : t('pages.dashboard.metrics.offline') }}</NText>
             </div>
-            <NText depth="3" style="font-size: 11px;">{{ modelName }}</NText>
+            <NText depth="3" style="font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">{{ serverName }}</NText>
           </NCard>
         </NGridItem>
       </NGrid>
@@ -205,7 +212,10 @@ onMounted(() => {
       </template>
 
       <NSpin :show="usageLoading" size="small">
-        <div v-if="usageError" style="text-align: center; padding: 16px;">
+        <div v-if="isHermesRest" style="text-align: center; padding: 24px 16px;">
+          <NText depth="3" style="font-size: 13px;">{{ t('pages.dashboard.usage.unavailableHermesRest') }}</NText>
+        </div>
+        <div v-else-if="usageError" style="text-align: center; padding: 16px;">
           <NText type="error" style="font-size: 13px;">{{ usageError }}</NText>
         </div>
         <div v-else>
@@ -296,8 +306,8 @@ onMounted(() => {
       </NSpin>
     </NCard>
 
-    <!-- Two-column: Daily Trend + Top Models -->
-    <NGrid cols="1 m:2" responsive="screen" :x-gap="12" :y-gap="12">
+    <!-- Two-column: Daily Trend + Top Models (hidden in hermes-rest mode) -->
+    <NGrid v-if="!isHermesRest" cols="1 m:2" responsive="screen" :x-gap="12" :y-gap="12">
       <!-- Left: Daily Trend -->
       <NGridItem>
         <NCard :title="t('pages.dashboard.cards.trend')" size="small">

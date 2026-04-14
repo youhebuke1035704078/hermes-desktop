@@ -1038,6 +1038,7 @@ export default {
         totalTokens: 'Total tokens',
         totalCost: 'Total cost',
         missingCostEntries: 'Missing cost entries: {count}',
+        unavailableHermesRest: 'Token usage statistics are not supported in Hermes REST mode. Connect to an ACP Gateway to view usage.',
         segments: {
           input: 'Input',
           output: 'Output',
