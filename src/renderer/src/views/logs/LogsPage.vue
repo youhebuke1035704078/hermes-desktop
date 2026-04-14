@@ -1,0 +1,379 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import {
+  NButton, NCard, NGrid, NGridItem, NIcon, NInput, NSelect,
+  NSpace, NSwitch, NTag, NText, useMessage,
+} from 'naive-ui'
+import {
+  DocumentTextOutline, RefreshOutline, TrashBinOutline,
+  PlayCircleOutline, PauseCircleOutline, ArrowDownOutline,
+} from '@vicons/ionicons5'
+import { useLogsStore } from '@/stores/logs'
+import { useConnectionStore } from '@/stores/connection'
+import type { LogEntry, LogLevel } from '@/api/types'
+
+const { t } = useI18n()
+const message = useMessage()
+const logsStore = useLogsStore()
+const connectionStore = useConnectionStore()
+
+const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
+
+// ── Auto-scroll ──
+const autoScroll = ref(true)
+const logContainer = ref<HTMLDivElement | null>(null)
+
+async function scrollToBottom() {
+  if (!autoScroll.value || !logContainer.value) return
+  await nextTick()
+  logContainer.value.scrollTop = logContainer.value.scrollHeight
+}
+
+watch(() => logsStore.filteredEntries.length, () => {
+  scrollToBottom()
+})
+
+// ── Filter options ──
+const levelOptions = computed(() => [
+  { label: t('pages.logs.levelAll'), value: null as any },
+  { label: 'TRACE', value: 'trace' },
+  { label: 'DEBUG', value: 'debug' },
+  { label: 'INFO', value: 'info' },
+  { label: 'WARN', value: 'warn' },
+  { label: 'ERROR', value: 'error' },
+  { label: 'FATAL', value: 'fatal' },
+])
+
+const subsystemOptions = computed(() => [
+  { label: t('pages.logs.subsystemAll'), value: null as any },
+  ...logsStore.availableSubsystems.map((s) => ({ label: s, value: s })),
+])
+
+const refreshIntervalOptions = [
+  { label: '1s', value: 1000 },
+  { label: '3s', value: 3000 },
+  { label: '5s', value: 5000 },
+  { label: '10s', value: 10000 },
+]
+
+// ── Level tag style ──
+function levelType(level: LogLevel | null | undefined): 'default' | 'success' | 'info' | 'warning' | 'error' {
+  switch (level) {
+    case 'trace': return 'default'
+    case 'debug': return 'default'
+    case 'info': return 'info'
+    case 'warn': return 'warning'
+    case 'error': return 'error'
+    case 'fatal': return 'error'
+    default: return 'default'
+  }
+}
+
+function levelLabel(level: LogLevel | null | undefined): string {
+  return (level || 'LOG').toUpperCase()
+}
+
+// ── Time formatting ──
+function formatEntryTime(entry: LogEntry): string {
+  if (!entry.time) return ''
+  try {
+    const d = new Date(entry.time)
+    if (Number.isNaN(d.getTime())) return entry.time
+    return d.toLocaleTimeString()
+  } catch {
+    return entry.time
+  }
+}
+
+// ── File size formatting ──
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// ── Actions ──
+async function handleRefresh(): Promise<void> {
+  await logsStore.fetchOnce()
+  scrollToBottom()
+}
+
+async function handleReset(): Promise<void> {
+  logsStore.clearBuffer()
+  await logsStore.fetchOnce(true)
+  scrollToBottom()
+}
+
+function handleClear(): void {
+  logsStore.clearBuffer()
+  message.success(t('pages.logs.cleared'))
+}
+
+function handleToggleAutoRefresh(): void {
+  logsStore.toggleAutoRefresh()
+  if (logsStore.autoRefresh) {
+    message.success(t('pages.logs.autoRefreshOn'))
+  }
+}
+
+function handleIntervalChange(val: number): void {
+  logsStore.refreshIntervalMs = val
+  if (logsStore.autoRefresh) {
+    logsStore.stopAutoRefresh()
+    logsStore.startAutoRefresh()
+  }
+}
+
+// ── Lifecycle ──
+onMounted(() => {
+  if (isHermesRest.value) return
+  logsStore.fetchOnce(true).then(() => scrollToBottom())
+})
+
+onUnmounted(() => {
+  logsStore.stopAutoRefresh()
+})
+</script>
+
+<template>
+  <NSpace vertical :size="16">
+    <!-- Hermes REST not supported notice -->
+    <NCard v-if="isHermesRest">
+      <div style="text-align: center; padding: 40px 16px;">
+        <NIcon :component="DocumentTextOutline" :size="48" depth="3" />
+        <div style="margin-top: 12px;">
+          <NText depth="3">{{ t('pages.logs.unavailableHermesRest') }}</NText>
+        </div>
+      </div>
+    </NCard>
+
+    <template v-else>
+      <!-- Header + Metrics + Actions -->
+      <NCard>
+        <template #header>
+          <NSpace align="center" :size="8">
+            <NIcon :component="DocumentTextOutline" :size="20" />
+            <span>{{ t('pages.logs.title') }}</span>
+          </NSpace>
+        </template>
+        <template #header-extra>
+          <NSpace :size="8">
+            <NButton secondary size="small" @click="handleRefresh" :loading="logsStore.loading">
+              <template #icon><NIcon :component="RefreshOutline" /></template>
+              {{ t('pages.logs.refresh') }}
+            </NButton>
+            <NButton
+              :type="logsStore.autoRefresh ? 'warning' : 'primary'"
+              secondary
+              size="small"
+              @click="handleToggleAutoRefresh"
+            >
+              <template #icon>
+                <NIcon :component="logsStore.autoRefresh ? PauseCircleOutline : PlayCircleOutline" />
+              </template>
+              {{ logsStore.autoRefresh ? t('pages.logs.pause') : t('pages.logs.autoRefresh') }}
+            </NButton>
+          </NSpace>
+        </template>
+
+        <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="10" :y-gap="10">
+          <NGridItem>
+            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+              <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.metrics.total') }}</NText>
+              <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">{{ logsStore.counts.total }}</div>
+            </NCard>
+          </NGridItem>
+          <NGridItem>
+            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+              <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.metrics.errors') }}</NText>
+              <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+                <NText type="error">{{ logsStore.counts.error }}</NText>
+              </div>
+            </NCard>
+          </NGridItem>
+          <NGridItem>
+            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+              <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.metrics.warns') }}</NText>
+              <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+                <NText type="warning">{{ logsStore.counts.warn }}</NText>
+              </div>
+            </NCard>
+          </NGridItem>
+          <NGridItem>
+            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+              <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.metrics.fileSize') }}</NText>
+              <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+                <NText type="info">{{ formatBytes(logsStore.fileSize) }}</NText>
+              </div>
+            </NCard>
+          </NGridItem>
+        </NGrid>
+
+        <!-- Filter bar -->
+        <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center;">
+          <NInput
+            v-model:value="logsStore.searchQuery"
+            clearable
+            :placeholder="t('pages.logs.searchPlaceholder')"
+            style="flex: 1; min-width: 200px;"
+          />
+          <NSelect
+            v-model:value="logsStore.levelFilter"
+            :options="levelOptions"
+            :placeholder="t('pages.logs.levelFilter')"
+            clearable
+            style="width: 140px;"
+          />
+          <NSelect
+            v-model:value="logsStore.subsystemFilter"
+            :options="subsystemOptions"
+            :placeholder="t('pages.logs.subsystemFilter')"
+            clearable
+            style="width: 160px;"
+          />
+          <NSelect
+            :value="logsStore.refreshIntervalMs"
+            :options="refreshIntervalOptions"
+            style="width: 90px;"
+            @update:value="handleIntervalChange"
+          />
+          <NSpace :size="6" align="center">
+            <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.autoScroll') }}</NText>
+            <NSwitch v-model:value="autoScroll" size="small" />
+          </NSpace>
+        </div>
+
+        <!-- File info line -->
+        <div v-if="logsStore.fileName" style="margin-top: 8px;">
+          <NText depth="3" code style="font-size: 11px;">{{ logsStore.fileName }}</NText>
+          <NText v-if="logsStore.error" type="error" style="font-size: 12px; margin-left: 8px;">
+            {{ logsStore.error }}
+          </NText>
+        </div>
+      </NCard>
+
+      <!-- Log viewer -->
+      <NCard content-style="padding: 0;">
+        <div
+          ref="logContainer"
+          class="log-viewer"
+        >
+          <div
+            v-if="logsStore.filteredEntries.length === 0"
+            style="text-align: center; padding: 60px 16px;"
+          >
+            <NText depth="3">{{ logsStore.loading ? t('pages.logs.loading') : t('pages.logs.empty') }}</NText>
+          </div>
+          <div
+            v-for="(entry, idx) in logsStore.filteredEntries"
+            :key="idx"
+            class="log-line"
+            :class="{
+              'log-line--error': entry.level === 'error' || entry.level === 'fatal',
+              'log-line--warn': entry.level === 'warn',
+            }"
+          >
+            <span class="log-time">{{ formatEntryTime(entry) }}</span>
+            <NTag
+              v-if="entry.level"
+              size="tiny"
+              :type="levelType(entry.level)"
+              :bordered="false"
+              style="margin-right: 6px; min-width: 46px; text-align: center;"
+            >
+              {{ levelLabel(entry.level) }}
+            </NTag>
+            <span v-if="entry.subsystem" class="log-subsystem">[{{ entry.subsystem }}]</span>
+            <span class="log-message">{{ entry.message || entry.raw }}</span>
+          </div>
+        </div>
+
+        <!-- Footer controls -->
+        <div class="log-footer">
+          <NText depth="3" style="font-size: 11px;">
+            {{ t('pages.logs.showing', { filtered: logsStore.filteredEntries.length, total: logsStore.counts.total }) }}
+          </NText>
+          <NSpace :size="6">
+            <NButton size="tiny" quaternary @click="handleClear">
+              <template #icon><NIcon :component="TrashBinOutline" /></template>
+              {{ t('pages.logs.clear') }}
+            </NButton>
+            <NButton size="tiny" quaternary @click="handleReset">
+              <template #icon><NIcon :component="RefreshOutline" /></template>
+              {{ t('pages.logs.reload') }}
+            </NButton>
+            <NButton size="tiny" quaternary @click="scrollToBottom">
+              <template #icon><NIcon :component="ArrowDownOutline" /></template>
+              {{ t('pages.logs.scrollBottom') }}
+            </NButton>
+          </NSpace>
+        </div>
+      </NCard>
+    </template>
+  </NSpace>
+</template>
+
+<style scoped>
+.log-viewer {
+  max-height: calc(100vh - 420px);
+  min-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Cascadia Code', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 8px 12px;
+  background: var(--n-color-embedded);
+}
+
+.log-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--n-border-color);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.log-line:last-child {
+  border-bottom: none;
+}
+
+.log-line--error {
+  background: rgba(208, 48, 80, 0.06);
+}
+
+.log-line--warn {
+  background: rgba(255, 193, 7, 0.05);
+}
+
+.log-time {
+  color: var(--n-text-color-3);
+  flex-shrink: 0;
+  min-width: 72px;
+  font-size: 11px;
+}
+
+.log-subsystem {
+  color: var(--n-text-color-2);
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.log-message {
+  flex: 1;
+  min-width: 0;
+  color: var(--n-text-color-1);
+}
+
+.log-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-top: 1px solid var(--n-border-color);
+  background: var(--n-color);
+}
+</style>

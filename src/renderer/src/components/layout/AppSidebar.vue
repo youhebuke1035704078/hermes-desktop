@@ -12,6 +12,10 @@ import {
   CogOutline,
   CalendarOutline,
   ExtensionPuzzleOutline,
+  AnalyticsOutline,
+  PaperPlaneOutline,
+  DocumentTextOutline,
+  SaveOutline,
 } from '@vicons/ionicons5'
 import { routes } from '@/router/routes'
 import { useConnectionStore } from '@/stores/connection'
@@ -37,6 +41,10 @@ const iconMap: Record<string, any> = {
   CogOutline,
   CalendarOutline,
   ExtensionPuzzleOutline,
+  AnalyticsOutline,
+  PaperPlaneOutline,
+  DocumentTextOutline,
+  SaveOutline,
 }
 
 interface MenuItem {

@@ -47,10 +47,34 @@ export const routes: RouteRecordRaw[] = [
         meta: { titleKey: 'routes.cron', icon: 'CalendarOutline' },
       },
       {
+        path: 'insights',
+        name: 'Insights',
+        component: () => import('@/views/insights/InsightsPage.vue'),
+        meta: { titleKey: 'routes.insights', icon: 'AnalyticsOutline' },
+      },
+      {
+        path: 'channels',
+        name: 'Channels',
+        component: () => import('@/views/channels/ChannelsPage.vue'),
+        meta: { titleKey: 'routes.channels', icon: 'PaperPlaneOutline' },
+      },
+      {
         path: 'skills',
         name: 'Skills',
         component: () => import('@/views/skills/SkillsPage.vue'),
         meta: { titleKey: 'routes.skills', icon: 'ExtensionPuzzleOutline' },
+      },
+      {
+        path: 'logs',
+        name: 'Logs',
+        component: () => import('@/views/logs/LogsPage.vue'),
+        meta: { titleKey: 'routes.logs', icon: 'DocumentTextOutline' },
+      },
+      {
+        path: 'backup',
+        name: 'Backup',
+        component: () => import('@/views/backup/BackupPage.vue'),
+        meta: { titleKey: 'routes.backup', icon: 'SaveOutline' },
       },
       {
         path: 'settings',
