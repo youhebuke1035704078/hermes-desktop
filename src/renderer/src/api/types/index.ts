@@ -7,6 +7,8 @@ export * from './remote-desktop'
 export * from './backup'
 import type { ModelConfig, ToolPolicyConfig } from './config'
 
+export type SkillSource = 'bundled' | 'workspace' | 'managed' | 'extra'
+
 export interface SkillMeta {
   name: string
   description: string
@@ -21,6 +23,19 @@ export interface SkillMeta {
   dirPath: string
   relatedSkills?: string[]
   homepage?: string
+
+  // Runtime fields populated by rpc-client.ts:normalizeSkillItem() from the
+  // hermes-agent list response. They describe the install state of a skill
+  // on the connected server, not its static manifest metadata, which is why
+  // they're all optional — not every caller constructs SkillMeta from the
+  // wire format.
+  source?: SkillSource
+  installed?: boolean
+  eligible?: boolean
+  disabled?: boolean
+  bundled?: boolean
+  skillKey?: string
+  hasUpdate?: boolean
 }
 
 /** @deprecated Use SkillMeta instead. Kept as alias for backward compatibility. */

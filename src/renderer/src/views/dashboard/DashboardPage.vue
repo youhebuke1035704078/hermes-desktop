@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -12,7 +12,7 @@ import { useCronStore } from '@/stores/cron'
 import { useConnectionStore } from '@/stores/connection'
 import { useWebSocketStore } from '@/stores/websocket'
 import { formatRelativeTime } from '@/utils/format'
-import type { SessionsUsageResult, CostUsageSummary } from '@/api/types'
+import type { SessionsUsageResult } from '@/api/types'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -34,7 +34,6 @@ const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest'
 
 // ── Usage Data ──
 const usageData = ref<SessionsUsageResult | null>(null)
-const costData = ref<CostUsageSummary | null>(null)
 const usageLoading = ref(false)
 const usageError = ref<string | null>(null)
 
@@ -446,7 +445,7 @@ onMounted(() => {
             <NSpace vertical :size="8">
               <div style="display: flex; justify-content: space-between;">
                 <NText depth="3">{{ t('pages.dashboard.model') }}</NText>
-                <NText>{{ modelName }}</NText>
+                <NText>{{ hermesChatStore.model }}</NText>
               </div>
               <div style="display: flex; justify-content: space-between;">
                 <NText depth="3">{{ t('pages.dashboard.syncStatus') }}</NText>

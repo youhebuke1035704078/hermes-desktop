@@ -710,10 +710,13 @@ export class RPCClient {
   private normalizeSkillItem(value: unknown): Skill {
     const row = this.asRecord(value)
     const source = this.normalizeSkillSource(row)
+    // SkillMeta declares description/version as required strings. asString
+    // already returns "" for missing/empty input, so drop the `|| undefined`
+    // that was flipping them to undefined and breaking the type contract.
     return {
       name: this.asString(row.name || row.id),
-      description: this.asString(row.description) || undefined,
-      version: this.asString(row.version) || undefined,
+      description: this.asString(row.description),
+      version: this.asString(row.version),
       source,
       installed: this.asBoolean(row.installed, source !== 'bundled'),
       eligible: this.asBoolean(row.eligible, true),
@@ -721,7 +724,7 @@ export class RPCClient {
       bundled: this.asBoolean(row.bundled, source === 'bundled'),
       skillKey: this.asString(row.skillKey) || undefined,
       hasUpdate: this.asBoolean(row.hasUpdate, false) || undefined,
-    }
+    } as Skill
   }
 
   private normalizePluginItem(value: unknown): PluginPackage {

@@ -90,7 +90,7 @@ async function hermesFetch<T = any>(
       const errBody = typeof resp.body === 'string' ? resp.body : ''
       throw new Error(errBody || `HTTP ${resp.status}`)
     }
-    return typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}
+    return (typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}) as T
   }
 
   const resp = await fetch(url, {

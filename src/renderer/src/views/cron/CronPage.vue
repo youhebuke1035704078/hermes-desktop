@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, h } from 'vue'
 import {
   NCard, NSpace, NButton, NIcon, NTag, NDataTable, NInput,
-  NModal, NForm, NFormItem, NSelect, NSwitch, NAlert,
+  NModal, NForm, NFormItem, NSwitch, NAlert,
   NGrid, NGridItem, NPopconfirm, NText, NSpin, NTooltip,
   NDescriptions, NDescriptionsItem,
   useMessage,
@@ -28,7 +28,6 @@ const showModal = ref(false)
 const editingJob = ref<CronJob | null>(null)
 
 // Form
-const formRef = ref()
 const form = ref({
   name: '',
   schedule: '',
@@ -67,10 +66,11 @@ const columns = computed<DataTableColumns<CronJob>>(() => [
     key: 'name',
     minWidth: 180,
     render(row) {
+      const desc = row.description
       return h('div', [
         h(NText, { strong: true }, { default: () => row.name }),
-        row.description
-          ? h(NText, { depth: 3, style: 'display: block; font-size: 12px; margin-top: 2px;' }, { default: () => row.description.length > 60 ? row.description.slice(0, 60) + '...' : row.description })
+        desc
+          ? h(NText, { depth: 3, style: 'display: block; font-size: 12px; margin-top: 2px;' }, { default: () => desc.length > 60 ? desc.slice(0, 60) + '...' : desc })
           : null,
       ])
     },
