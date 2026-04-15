@@ -12,11 +12,13 @@ import { useNotificationStore } from '@/stores/notification'
 import {
   makeFallbackActivatedPayload,
   makePrimaryRestoredPayload,
-  makeChainExhaustedPayload,
+  makeChainExhaustedPayload
 } from '@/test-utils/sse-fixtures'
 import {
   __routeLifecycleForTest as routeLifecycle,
   __resetDebounceForTest as resetDebounce,
+  resolveBootstrap,
+  bootstrapFromRealModelIfUnknown
 } from './useModelStoreBootstrap'
 
 describe('useModelStoreBootstrap', () => {
@@ -78,11 +80,11 @@ describe('useModelStoreBootstrap', () => {
 
     routeLifecycle(
       'hermes.model.fallback_activated',
-      makeFallbackActivatedPayload({ from_model: 'a', to_model: 'b' }),
+      makeFallbackActivatedPayload({ from_model: 'a', to_model: 'b' })
     )
     routeLifecycle(
       'hermes.model.fallback_activated',
-      makeFallbackActivatedPayload({ from_model: 'b', to_model: 'c' }),
+      makeFallbackActivatedPayload({ from_model: 'b', to_model: 'c' })
     )
 
     // Different keys — both should land
@@ -133,5 +135,119 @@ describe('useModelStoreBootstrap', () => {
     expect(notif.items.length).toBe(1)
     vi.advanceTimersByTime(1)
     expect(notif.items.length).toBe(0)
+  })
+
+  // Bug 7 (post-v0.4.0): remote hermes-rest bootstrap path.
+  //
+  // v0.4.0 only knew two paths: localhost hermes-rest (read ~/.hermes/
+  // config.yaml via IPC) and acp-ws (wait for live events). Remote
+  // hermes-rest over Tailscale read the *client* machine's config.yaml,
+  // which usually doesn't exist on a Windows laptop — so the badge
+  // stayed 'unknown' forever. resolveBootstrap + the fallthrough to
+  // hermesRealModel fix this.
+  describe('resolveBootstrap', () => {
+    it('uses remote REST result when it returns a primary', async () => {
+      const result = await resolveBootstrap({
+        fetchRemote: async () => ({
+          primary: 'gemini-2.5-flash',
+          fallback_chain: ['gemini-2.5-flash', 'gemini-2.5-pro']
+        }),
+        fetchLocal: async () => {
+          throw new Error('local should not be called when remote succeeds')
+        },
+        getRealModel: () => {
+          throw new Error('realModel should not be called when remote succeeds')
+        }
+      })
+      expect(result.primary).toBe('gemini-2.5-flash')
+      expect(result.fallback_chain).toEqual(['gemini-2.5-flash', 'gemini-2.5-pro'])
+    })
+
+    it('falls through to local IPC when remote returns null', async () => {
+      const result = await resolveBootstrap({
+        fetchRemote: async () => null,
+        fetchLocal: async () => ({
+          primary: 'gemini-2.5-flash',
+          fallback_chain: ['gemini-2.5-flash']
+        }),
+        getRealModel: () => {
+          throw new Error('realModel should not be called when local succeeds')
+        }
+      })
+      expect(result.primary).toBe('gemini-2.5-flash')
+      expect(result.fallback_chain).toEqual(['gemini-2.5-flash'])
+    })
+
+    it('falls through to realModel when remote and local both return null', async () => {
+      const result = await resolveBootstrap({
+        fetchRemote: async () => null,
+        fetchLocal: async () => null,
+        getRealModel: () => 'gpt-5.4'
+      })
+      expect(result.primary).toBe('gpt-5.4')
+      expect(result.fallback_chain).toEqual([])
+    })
+
+    it('returns null primary with empty chain when every source fails', async () => {
+      const result = await resolveBootstrap({
+        fetchRemote: async () => null,
+        fetchLocal: async () => null,
+        getRealModel: () => null
+      })
+      expect(result.primary).toBe(null)
+      expect(result.fallback_chain).toEqual([])
+    })
+  })
+
+  describe('bootstrapFromRealModelIfUnknown', () => {
+    it('promotes store from unknown to normal when realModel is non-null', () => {
+      const store = useModelStore()
+      expect(store.state.kind).toBe('unknown')
+      bootstrapFromRealModelIfUnknown('gpt-5.4')
+      expect(store.state.kind).toBe('normal')
+      expect(store.state.primaryModel).toBe('gpt-5.4')
+      expect(store.state.currentModel).toBe('gpt-5.4')
+      expect(store.state.fallbackChain).toEqual([])
+    })
+
+    it('is a no-op when realModel is null', () => {
+      const store = useModelStore()
+      bootstrapFromRealModelIfUnknown(null)
+      expect(store.state.kind).toBe('unknown')
+      expect(store.state.primaryModel).toBe(null)
+    })
+
+    it('does not overwrite an already-bootstrapped normal store', () => {
+      const store = useModelStore()
+      store.bootstrap({
+        primary: 'gemini-2.5-flash',
+        fallbackChain: ['gemini-2.5-flash', 'gemini-2.5-pro']
+      })
+      bootstrapFromRealModelIfUnknown('gpt-5.4')
+      expect(store.state.primaryModel).toBe('gemini-2.5-flash')
+      expect(store.state.fallbackChain).toEqual(['gemini-2.5-flash', 'gemini-2.5-pro'])
+    })
+
+    it('does not overwrite a store in fallback state', () => {
+      const store = useModelStore()
+      store.bootstrap({
+        primary: 'gemini-2.5-flash',
+        fallbackChain: ['gemini-2.5-flash', 'gemini-2.5-pro']
+      })
+      store.applyFallbackActivated(makeFallbackActivatedPayload())
+      expect(store.state.kind).toBe('fallback')
+      bootstrapFromRealModelIfUnknown('gpt-5.4')
+      expect(store.state.kind).toBe('fallback')
+    })
+
+    it('does not overwrite a stale store', () => {
+      const store = useModelStore()
+      store.bootstrap({ primary: 'gemini-2.5-flash', fallbackChain: [] })
+      store.markStale()
+      expect(store.state.kind).toBe('stale')
+      bootstrapFromRealModelIfUnknown('gpt-5.4')
+      expect(store.state.kind).toBe('stale')
+      expect(store.state.primaryModel).toBe('gemini-2.5-flash')
+    })
   })
 })
