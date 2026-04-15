@@ -1,8 +1,9 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { useWebSocketStore } from './websocket'
 import { useConnectionStore } from './connection'
 import { useHermesChatStore } from './hermes-chat'
+import { useModelStore } from '@/stores/model'
 import type { ChatMessage } from '@/api/types'
 import { byLocale, getActiveLocale } from '@/i18n/text'
 
@@ -948,14 +949,45 @@ export const useChatStore = defineStore('chat', () => {
     // ── Hermes REST API path (POST /v1/chat/completions with SSE streaming) ──
     if (isHermesRestMode() && window.api?.hermesChat) {
       const assistantMsgId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      // Stamp the placeholder with current fallback state so the
+      // FallbackChip renders immediately on first-turn fallback (where
+      // the store already knows we're in fallback before sendMessage).
+      const modelStore = useModelStore()
       const assistantMessage: ChatMessage = {
         id: assistantMsgId,
         role: 'assistant',
         content: '',
         timestamp: new Date().toISOString(),
+        model: modelStore.state.currentModel ?? undefined,
+        fromFallback: modelStore.state.kind === 'fallback',
+        fallbackFrom: modelStore.state.fallbackFrom ?? undefined,
+        fallbackReasonText: modelStore.state.reasonText ?? undefined,
       }
       messages.value = capMessages([...messages.value, assistantMessage])
       setAgentStatusPhase(agentId, 'replying', { runId: idempotencyKey, detail: null })
+
+      // Watch for mid-stream fallback activation and retro-stamp the
+      // in-flight assistant message. flush: 'sync' guarantees the mark
+      // lands before the next SSE chunk handler observes the message.
+      const stopFallbackWatch = watch(
+        () => modelStore.state.kind,
+        (kind) => {
+          if (kind !== 'fallback') return
+          const idx = messages.value.findIndex(m => m.id === assistantMsgId)
+          if (idx < 0) return
+          const existing = messages.value[idx]
+          if (existing.fromFallback) return
+          messages.value[idx] = {
+            ...existing,
+            fromFallback: true,
+            model: modelStore.state.currentModel ?? existing.model,
+            fallbackFrom: modelStore.state.fallbackFrom ?? undefined,
+            fallbackReasonText: modelStore.state.reasonText ?? undefined,
+          }
+          messages.value = [...messages.value] // trigger Vue reactivity
+        },
+        { flush: 'sync' },
+      )
 
       // Build OpenAI-format messages from local history (exclude the empty assistant placeholder)
       const apiMessages = messages.value
@@ -1004,6 +1036,7 @@ export const useChatStore = defineStore('chat', () => {
         setAgentStatusPhase(agentId, 'error', { runId: null, detail: lastError.value })
         throw error
       } finally {
+        stopFallbackWatch()
         cleanupChunkListener()
         sending.value = false
       }
