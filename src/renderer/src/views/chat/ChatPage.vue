@@ -33,6 +33,7 @@ import { useHermesChatStore } from '@/stores/hermes-chat'
 import { formatDate, formatRelativeTime, parseSessionKey } from '@/utils/format'
 import { renderSimpleMarkdown } from '@/utils/markdown'
 import type { AgentInstance, ChatMessage, ChatMessageContent, SessionsUsageSession, Skill } from '@/api/types'
+import FallbackChip from '@/components/chat/FallbackChip.vue'
 
 const message = useMessage()
 const route = useRoute()
@@ -2754,6 +2755,12 @@ async function handleSend() {
                             <NTag size="small" :type="roleType(entry.item.role)" :bordered="false" round>
                               {{ roleLabel(entry.item.role) }}
                             </NTag>
+                            <FallbackChip
+                              v-if="entry.item.role === 'assistant' && entry.item.fromFallback"
+                              :model="entry.item.model"
+                              :from="entry.item.fallbackFrom"
+                              :reason-text="entry.item.fallbackReasonText"
+                            />
                             <NText v-if="entry.item.name" depth="3" style="font-size: 12px;">
                               {{ entry.item.name }}
                             </NText>
