@@ -10,6 +10,7 @@ import { getServers, saveServer, removeServer, decryptPassword, isEncryptionAvai
 import * as yaml from 'js-yaml'
 import { scanSkillsDirectory, setNestedValue } from './skill-parser'
 import { parseHermesConfig } from './config-parser'
+import { extractApiServerKey } from './dotenv-parser'
 import { parseSseLine, makeInitialSseParserState } from './sse-parser'
 import { registerWsBridge, shutdownWsBridge } from './ws-bridge'
 import { runGit, gitFetchWithRetry, createGitLock } from './hermes-git'
@@ -305,20 +306,12 @@ function registerIpcHandlers(): void {
   // ── Read Hermes Agent config (to extract actual underlying model name
   //     and the fallback chain for the renderer's model-state badge) ──
   ipcMain.handle('hermes:config', async () => {
+    // Read config.yaml (required for primary / fallback_chain)
+    let summary: ReturnType<typeof parseHermesConfig>
     try {
       const configPath = join(homedir(), '.hermes/config.yaml')
       const content = await readFile(configPath, 'utf-8')
-      const summary = parseHermesConfig(content)
-      return {
-        // Preserve legacy fields consumed by connection.ts:fetchHermesModel
-        ok: summary.primary !== null,
-        model: summary.primary,
-        fullModel: summary.fullModel,
-        provider: summary.provider,
-        // New fields added in Task E2 for fallback-visibility bootstrap
-        primary: summary.primary,
-        fallback_chain: summary.fallback_chain,
-      }
+      summary = parseHermesConfig(content)
     } catch {
       return {
         ok: false,
@@ -327,7 +320,33 @@ function registerIpcHandlers(): void {
         provider: null,
         primary: null,
         fallback_chain: [] as string[],
+        apiServerKey: null as string | null,
       }
+    }
+
+    // Read .env (optional — only present when the user configured one)
+    // Bug 5: connectLocal() needs API_SERVER_KEY for /v1/chat and SSE,
+    // otherwise hermes-agent returns 401 and the UI silently stalls.
+    let apiServerKey: string | null = null
+    try {
+      const envPath = join(homedir(), '.hermes/.env')
+      const envContent = await readFile(envPath, 'utf-8')
+      apiServerKey = extractApiServerKey(envContent)
+    } catch {
+      // No .env file — local server is unauthenticated. Leave null.
+    }
+
+    return {
+      // Preserve legacy fields consumed by connection.ts:fetchHermesModel
+      ok: summary.primary !== null,
+      model: summary.primary,
+      fullModel: summary.fullModel,
+      provider: summary.provider,
+      // New fields added in Task E2 for fallback-visibility bootstrap
+      primary: summary.primary,
+      fallback_chain: summary.fallback_chain,
+      // Bug 5 (post-merge): API_SERVER_KEY for connectLocal auth
+      apiServerKey,
     }
   })
 

@@ -48,6 +48,7 @@ interface HermesAPI {
     provider: string | null
     primary: string | null
     fallback_chain: string[]
+    apiServerKey: string | null
   }>
 
   // Hermes streaming chat (SSE)

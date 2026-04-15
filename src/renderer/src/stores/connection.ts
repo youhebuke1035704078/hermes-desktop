@@ -288,6 +288,16 @@ export const useConnectionStore = defineStore('connection', () => {
    * Connect directly to the local Hermes server (localhost:8642).
    * Hermes exposes an OpenAI-compatible REST API — NOT ACP WebSocket.
    * We confirm the server is alive via GET /health, then mark connected.
+   *
+   * Bug 5 (fallback-visibility post-merge): previously this assumed
+   * the local server had no API_SERVER_KEY and hard-coded
+   * `authEnabled = false`. When the user started hermes-agent with a
+   * key in ~/.hermes/.env, every downstream /v1/chat, /v1/models,
+   * and /v1/chat/stream (SSE) call went without an Authorization
+   * header and returned 401 — the UI silently failed to bootstrap
+   * the model store. We now read the key via the hermes:config IPC
+   * and, if present, enable auth and set hermesAuthToken before
+   * probing /health.
    */
   async function connectLocal(): Promise<void> {
     // If already connected to another server, clean up first
@@ -300,13 +310,41 @@ export const useConnectionStore = defineStore('connection', () => {
 
     setBaseURL(LOCAL_SERVER.url)
     const authStore = useAuthStore()
-    authStore.authEnabled = false // local server without API_SERVER_KEY
+
+    // Read the local Hermes config (model + fallback chain + API key)
+    // BEFORE any HTTP probe so we can authenticate from the very first
+    // request. hermesConfig is a local file read — fast, no network.
+    let configApiKey: string | null = null
+    if (window.api?.hermesConfig) {
+      try {
+        const cfg = await window.api.hermesConfig()
+        if (cfg.apiServerKey) configApiKey = cfg.apiServerKey
+        if (cfg.model) hermesRealModel.value = cfg.model
+      } catch { /* fall through — treat as unauthenticated local */ }
+    }
+
+    if (configApiKey) {
+      authStore.authEnabled = true
+      authStore.setToken(configApiKey)
+      hermesAuthToken.value = configApiKey
+    } else {
+      authStore.authEnabled = false
+      hermesAuthToken.value = null
+    }
 
     try {
-      // Use Electron main-process fetch to bypass CORS restrictions
+      // Use Electron main-process fetch to bypass CORS restrictions.
+      // /health itself doesn't require auth, but we send the header
+      // anyway — if the user rotated their key we'd rather fail here
+      // than silently stream 401s later.
+      const headers: Record<string, string> = {}
+      if (configApiKey) headers['Authorization'] = `Bearer ${configApiKey}`
       const resp = window.api
-        ? await window.api.httpFetch(`${LOCAL_SERVER.url}/health`)
-        : await fetch(`${LOCAL_SERVER.url}/health`, { signal: AbortSignal.timeout(LOCAL_CONNECT_TIMEOUT) }).then(r => ({ ok: r.ok, status: r.status, body: '' }))
+        ? await window.api.httpFetch(`${LOCAL_SERVER.url}/health`, { headers })
+        : await fetch(`${LOCAL_SERVER.url}/health`, {
+            headers,
+            signal: AbortSignal.timeout(LOCAL_CONNECT_TIMEOUT),
+          }).then(r => ({ ok: r.ok, status: r.status, body: '' }))
 
       if (!resp.ok) throw new Error(`health check returned ${resp.status}`)
 
@@ -317,9 +355,12 @@ export const useConnectionStore = defineStore('connection', () => {
       currentServer.value = { ...LOCAL_SERVER }
       status.value = 'connected'
       safeSet('lastConnectedServerId', LOCAL_SERVER.id)
-      fetchHermesModel() // non-blocking: read actual model name from config
+      fetchHermesModel() // non-blocking: resolve the final display name
     } catch (e) {
       status.value = 'error'
+      // Roll back auth state so a retry doesn't reuse a bad token.
+      hermesAuthToken.value = null
+      authStore.setToken(null)
       if (e instanceof ConnectionError) throw e
       throw new ConnectionError('network', '无法连接到本地 Hermes 服务器')
     }
