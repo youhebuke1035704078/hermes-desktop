@@ -9,6 +9,8 @@ import { autoUpdater } from 'electron-updater'
 import { getServers, saveServer, removeServer, decryptPassword, isEncryptionAvailable } from './store'
 import * as yaml from 'js-yaml'
 import { scanSkillsDirectory, setNestedValue } from './skill-parser'
+import { parseHermesConfig } from './config-parser'
+import { parseSseLine, makeInitialSseParserState } from './sse-parser'
 import { registerWsBridge, shutdownWsBridge } from './ws-bridge'
 import { runGit, gitFetchWithRetry, createGitLock } from './hermes-git'
 import icon from '../../resources/icon.png?asset'
@@ -240,6 +242,7 @@ function registerIpcHandlers(): void {
       if (!reader) return { ok: false, error: 'No readable stream' }
 
       const decoder = new TextDecoder()
+      const parserState = makeInitialSseParserState()
       let buffer = ''
 
       try {
@@ -253,22 +256,39 @@ function registerIpcHandlers(): void {
           buffer = lines.pop() || '' // keep incomplete line in buffer
 
           for (const line of lines) {
-            const trimmed = line.trim()
-            if (!trimmed || trimmed.startsWith(':')) continue // skip empty lines and SSE comments
-            if (trimmed.startsWith('data: ')) {
-              const data = trimmed.slice(6)
-              if (data === '[DONE]') {
+            const parsed = parseSseLine(line, parserState)
+            if (parsed.kind !== 'data') continue
+
+            // Route hermes.model.* lifecycle events to a dedicated channel so
+            // the renderer can update the model-state badge without polluting
+            // the chat-chunk stream.
+            if (parsed.event && parsed.event.startsWith('hermes.model.')) {
+              try {
+                const payload = JSON.parse(parsed.data)
                 if (!event.sender.isDestroyed()) {
-                  event.sender.send('hermes:chat:chunk', { done: true })
+                  event.sender.send('hermes:lifecycle', {
+                    name: parsed.event,
+                    payload,
+                  })
                 }
-              } else {
-                try {
-                  const parsed = JSON.parse(data)
-                  if (!event.sender.isDestroyed()) {
-                    event.sender.send('hermes:chat:chunk', { done: false, data: parsed })
-                  }
-                } catch { /* skip malformed JSON */ }
+              } catch (err) {
+                console.warn('[hermes:lifecycle] JSON parse failed', err)
               }
+              continue
+            }
+
+            // Default path: OpenAI-compatible chat completion delta.
+            if (parsed.data === '[DONE]') {
+              if (!event.sender.isDestroyed()) {
+                event.sender.send('hermes:chat:chunk', { done: true })
+              }
+            } else {
+              try {
+                const parsedJson = JSON.parse(parsed.data)
+                if (!event.sender.isDestroyed()) {
+                  event.sender.send('hermes:chat:chunk', { done: false, data: parsedJson })
+                }
+              } catch { /* skip malformed JSON */ }
             }
           }
         }
@@ -282,21 +302,32 @@ function registerIpcHandlers(): void {
     }
   })
 
-  // ── Read Hermes Agent config (to extract actual underlying model name) ──
+  // ── Read Hermes Agent config (to extract actual underlying model name
+  //     and the fallback chain for the renderer's model-state badge) ──
   ipcMain.handle('hermes:config', async () => {
     try {
       const configPath = join(homedir(), '.hermes/config.yaml')
       const content = await readFile(configPath, 'utf-8')
-      // Extract model.default (e.g. "openai-codex/gpt-5.4")
-      const modelMatch = content.match(/model:\s*\n\s+default:\s*(.+)/)
-      const providerMatch = content.match(/provider:\s*(.+)/)
-      const rawModel = modelMatch?.[1]?.trim() || null
-      const provider = providerMatch?.[1]?.trim() || null
-      // Extract the short model name (e.g. "gpt-5.4" from "openai-codex/gpt-5.4")
-      const shortModel = rawModel?.includes('/') ? rawModel.split('/').pop() || rawModel : rawModel
-      return { ok: true, model: shortModel, fullModel: rawModel, provider }
+      const summary = parseHermesConfig(content)
+      return {
+        // Preserve legacy fields consumed by connection.ts:fetchHermesModel
+        ok: summary.primary !== null,
+        model: summary.primary,
+        fullModel: summary.fullModel,
+        provider: summary.provider,
+        // New fields added in Task E2 for fallback-visibility bootstrap
+        primary: summary.primary,
+        fallback_chain: summary.fallback_chain,
+      }
     } catch {
-      return { ok: false, model: null, fullModel: null, provider: null }
+      return {
+        ok: false,
+        model: null,
+        fullModel: null,
+        provider: null,
+        primary: null,
+        fallback_chain: [] as string[],
+      }
     }
   })
 

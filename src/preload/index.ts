@@ -75,8 +75,14 @@ const api = {
     ipcRenderer.invoke('http:fetch', url, init),
 
   // ── Hermes config (read ~/.hermes/config.yaml for actual model name) ──
-  hermesConfig: (): Promise<{ ok: boolean; model: string | null; fullModel: string | null; provider: string | null }> =>
-    ipcRenderer.invoke('hermes:config'),
+  hermesConfig: (): Promise<{
+    ok: boolean
+    model: string | null
+    fullModel: string | null
+    provider: string | null
+    primary: string | null
+    fallback_chain: string[]
+  }> => ipcRenderer.invoke('hermes:config'),
 
   // ── Hermes streaming chat (SSE via main-process) ──
   hermesChat: (url: string, body: string, authToken?: string, sessionId?: string): Promise<{ ok: boolean; error?: string }> =>
@@ -85,6 +91,18 @@ const api = {
     const handler = (_: unknown, chunk: { done: boolean; data?: any }) => cb(chunk)
     ipcRenderer.on('hermes:chat:chunk', handler)
     return () => ipcRenderer.removeListener('hermes:chat:chunk', handler)
+  },
+  /**
+   * Subscribe to hermes.model.* lifecycle events streamed from the main
+   * process. The callback receives `{ name, payload }` frames exactly as
+   * emitted by hermes-agent's B1 SSE relay.
+   */
+  onHermesLifecycle: (
+    cb: (event: { name: string; payload: unknown }) => void
+  ): (() => void) => {
+    const handler = (_: unknown, event: { name: string; payload: unknown }) => cb(event)
+    ipcRenderer.on('hermes:lifecycle', handler)
+    return () => ipcRenderer.removeListener('hermes:lifecycle', handler)
   },
 
   // ── Skill management ──

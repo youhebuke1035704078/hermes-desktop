@@ -39,12 +39,25 @@ interface HermesAPI {
   // HTTP proxy
   httpFetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; body: string }>
 
-  // Hermes config (read ~/.hermes/config.yaml for actual model name)
-  hermesConfig(): Promise<{ ok: boolean; model: string | null; fullModel: string | null; provider: string | null }>
+  // Hermes config (read ~/.hermes/config.yaml for actual model name +
+  // fallback chain surfaced to the model-state badge)
+  hermesConfig(): Promise<{
+    ok: boolean
+    model: string | null
+    fullModel: string | null
+    provider: string | null
+    primary: string | null
+    fallback_chain: string[]
+  }>
 
   // Hermes streaming chat (SSE)
   hermesChat(url: string, body: string, authToken?: string, sessionId?: string): Promise<{ ok: boolean; error?: string }>
   onHermesChatChunk(cb: (chunk: { done: boolean; data?: any }) => void): () => void
+  /**
+   * Subscribe to hermes.model.* lifecycle events (fallback_activated,
+   * primary_restored, chain_exhausted) streamed from the main process.
+   */
+  onHermesLifecycle(cb: (event: { name: string; payload: unknown }) => void): () => void
 
   // Skill management
   hermesSkills(): Promise<{
