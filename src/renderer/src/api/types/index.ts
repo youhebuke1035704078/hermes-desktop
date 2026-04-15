@@ -174,6 +174,13 @@ export interface ChatMessage {
   toolName?: string
   isError?: boolean
   rawContent?: ChatMessageContent[]
+  // --- Fallback stamping (spec §2.3 / Task D1) ---
+  // When the hermes-agent fallback chain activates mid-stream, the gateway
+  // marks subsequent assistant messages with these fields so the UI can
+  // render a FallbackChip and tooltip without re-querying the backend.
+  fromFallback?: boolean
+  fallbackFrom?: string // the displaced primary model
+  fallbackReasonText?: string // verbatim reason_text for chip tooltip
 }
 
 export interface ChatSendParams {
@@ -750,4 +757,53 @@ export interface AgentSetModelParams {
 
 export interface AgentDeleteParams {
   agentId: string
+}
+
+// ---------------------------------------------------------------------
+// Model lifecycle events (spec §2.3 / Task D1)
+//
+// These mirror the JSON payloads emitted by hermes-agent's
+// ``_emit_lifecycle_event`` on the three ``hermes.model.*`` event
+// types.  The gateway relays them unchanged to the desktop client via
+// SSE frames (stream path) and /v1/runs event stream.
+// ---------------------------------------------------------------------
+
+export interface FallbackActivatedPayload {
+  schema_version: number
+  timestamp: string
+  from_model: string
+  to_model: string
+  from_provider: string
+  to_provider: string
+  reason_code: string
+  reason_text: string
+  fallback_chain: string[]
+  fallback_index: number
+}
+
+export interface PrimaryRestoredPayload {
+  schema_version: number
+  timestamp: string
+  restored_to: string
+  restored_from: string
+  primary_model: string
+}
+
+export interface ChainExhaustedPayload {
+  schema_version: number
+  timestamp: string
+  attempted_models: string[]
+  last_error_code: string
+  last_error_text: string
+  fallback_chain: string[]
+}
+
+export type LifecycleEventName =
+  | 'hermes.model.fallback_activated'
+  | 'hermes.model.primary_restored'
+  | 'hermes.model.chain_exhausted'
+
+export interface LifecycleEvent {
+  name: LifecycleEventName
+  payload: FallbackActivatedPayload | PrimaryRestoredPayload | ChainExhaustedPayload
 }
