@@ -14,6 +14,13 @@ import {
 import { useI18n } from "vue-i18n";
 import { useTheme } from "@/composables/useTheme";
 import { useLocaleStore } from "@/stores/locale";
+import { useModelStoreBootstrap } from "@/composables/useModelStoreBootstrap";
+import NotificationLayer from "@/components/layout/NotificationLayer.vue";
+
+// Wire up lifecycle event routing + connection-aware bootstrap/stale
+// marking for the model store.  Must be called at the root so the
+// composable's `watch` stays alive for the whole app lifetime.
+useModelStoreBootstrap();
 
 const { theme } = useTheme();
 const route = useRoute();
@@ -53,6 +60,7 @@ watch(
       <NMessageProvider>
         <NDialogProvider>
           <RouterView />
+          <NotificationLayer />
         </NDialogProvider>
       </NMessageProvider>
     </NNotificationProvider>
