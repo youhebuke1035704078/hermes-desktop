@@ -7,17 +7,27 @@ import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/composables/useTheme'
 import { useConnectionStore } from '@/stores/connection'
 import { useLocaleStore } from '@/stores/locale'
+import { useModelStore } from '@/stores/model'
 import { useWideModeStore } from '@/stores/wideMode'
 import ConnectionStatus from '@/components/common/ConnectionStatus.vue'
 import ModelStateBadge from './ModelStateBadge.vue'
+import { shouldShowModelBadge } from './modelBadgeVisibility'
 
 const route = useRoute()
 const router = useRouter()
 const { isDark, toggle } = useTheme()
 const connectionStore = useConnectionStore()
+const modelStore = useModelStore()
 const localeStore = useLocaleStore()
 const wideModeStore = useWideModeStore()
 const { t } = useI18n()
+
+// Bug 4 fix: keep the badge mounted during disconnect so the stale
+// model name + reason stay visible. Hide only when no data has ever
+// been bootstrapped (kind === 'unknown').
+const showModelBadge = computed(() =>
+  shouldShowModelBadge(connectionStore.status, modelStore.state),
+)
 
 const breadcrumbs = computed(() => {
   const items: { label: string; name?: string }[] = [{ label: t('common.home'), name: 'Dashboard' }]
@@ -50,7 +60,7 @@ async function handleLogout() {
     </NBreadcrumb>
 
     <NSpace :size="8" align="center">
-      <ModelStateBadge v-if="connectionStore.status === 'connected'" />
+      <ModelStateBadge v-if="showModelBadge" />
       <ConnectionStatus />
 
       <NTooltip>
