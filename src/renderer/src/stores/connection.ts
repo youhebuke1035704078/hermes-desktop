@@ -4,6 +4,7 @@ import { setBaseURL, clearAuthToken } from '@/api/desktop-http-client'
 import { ConnectionState } from '@/api/types'
 import { useAuthStore } from './auth'
 import { useWebSocketStore } from './websocket'
+import { useModelStore } from '@/stores/model'
 import { safeGet, safeSet } from '@/utils/safe-storage'
 
 export interface ServerConfig {
@@ -271,6 +272,16 @@ export const useConnectionStore = defineStore('connection', () => {
     hermesAuthToken.value = null
     currentServer.value = null
     status.value = 'disconnected'
+    // Mark model state as stale so the badge shows last-known data with
+    // the stale flag. Note: useModelStoreBootstrap also watches
+    // connection.status and calls markStale on 'disconnected' — this is
+    // a belt-and-suspenders call for code paths that disconnect without
+    // going through the status watcher synchronously.
+    try {
+      useModelStore().markStale()
+    } catch {
+      // Pinia store may not be available in every call context; ignore.
+    }
   }
 
   /**
