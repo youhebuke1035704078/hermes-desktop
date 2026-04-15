@@ -155,6 +155,77 @@ describe('useModelStore', () => {
     expect(store.state.reasonCode).toBe('server_error')
   })
 
+  it('applyChainExhausted strips provider prefixes from attempted_models (Bug 3)', () => {
+    // hermes-agent emits attempted_models with the provider prefix
+    // intact (e.g. "openrouter/anthropic/claude-3.5-sonnet") while the
+    // bootstrapped fallbackChain uses short names from config-parser
+    // ("claude-3.5-sonnet"). ModelDropdown.vue compares them with
+    // `chain.includes(attempted)`, which never matched and left the
+    // is-failed line-through styling un-applied in acceptance scenario
+    // 3. Normalize on ingest so downstream consumers can do plain
+    // string equality.
+    const store = useModelStore()
+    store.bootstrap({
+      primary: 'claude-3.5-sonnet',
+      fallbackChain: ['claude-3.5-sonnet', 'claude-3-opus'],
+    })
+    store.applyChainExhausted({
+      schema_version: 1,
+      timestamp: '2026-04-15T06:00:00Z',
+      attempted_models: [
+        'openrouter/anthropic/claude-3.5-sonnet',
+        'anthropic/claude-3-opus',
+      ],
+      last_error_code: 'auth_failed',
+      last_error_text: 'HTTP 401: No cookie auth credentials found',
+      fallback_chain: [
+        'openrouter/anthropic/claude-3.5-sonnet',
+        'anthropic/claude-3-opus',
+      ],
+    })
+    expect(store.state.kind).toBe('exhausted')
+    expect(store.state.attemptedModels).toEqual([
+      'claude-3.5-sonnet',
+      'claude-3-opus',
+    ])
+    // The invariant the dropdown needs: every attempted model appears
+    // in the chain after normalization so `chain.includes(attempted)`
+    // finds every failed entry.
+    for (const attempted of store.state.attemptedModels) {
+      expect(store.state.fallbackChain).toContain(attempted)
+    }
+  })
+
+  it('applyFallbackActivated preserves short-name fallbackFrom for display (Bug 3 sibling)', () => {
+    // The dropdown/badge display fallbackFrom as-is; this test pins
+    // that normalization happens on attempted_models ONLY, and
+    // fallbackFrom is left as-emitted so existing tooltip copy stays
+    // stable. (Does NOT normalize fallbackFrom — that's intentional,
+    // humans recognize "openrouter/anthropic/claude-3.5-sonnet" and
+    // the full path carries provider info the short name lacks.)
+    const store = useModelStore()
+    store.bootstrap({
+      primary: 'claude-3.5-sonnet',
+      fallbackChain: ['claude-3.5-sonnet', 'gemini-2.5-pro'],
+    })
+    store.applyFallbackActivated({
+      schema_version: 1,
+      timestamp: '2026-04-15T06:00:00Z',
+      from_model: 'openrouter/anthropic/claude-3.5-sonnet',
+      to_model: 'gemini-2.5-pro',
+      from_provider: 'openrouter',
+      to_provider: 'google',
+      reason_code: 'auth_failed',
+      reason_text: 'HTTP 401',
+      fallback_chain: ['claude-3.5-sonnet', 'gemini-2.5-pro'],
+      fallback_index: 1,
+    })
+    // fallbackFrom stays full (not normalized)
+    expect(store.state.fallbackFrom).toBe('openrouter/anthropic/claude-3.5-sonnet')
+    // currentModel is already a short name in our tests
+    expect(store.state.currentModel).toBe('gemini-2.5-pro')
+  })
+
   it('markStale from normal keeps data, changes kind to stale', () => {
     const store = useModelStore()
     store.bootstrap({ primary: 'gpt-5.4', fallbackChain: ['gpt-5.4'] })

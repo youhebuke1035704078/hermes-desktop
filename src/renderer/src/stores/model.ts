@@ -55,6 +55,28 @@ const INITIAL_STATE: ModelState = {
 }
 
 // ---------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------
+
+/**
+ * Normalize a model identifier that may include a provider prefix
+ * (e.g. "openrouter/anthropic/claude-3.5-sonnet") down to the short
+ * name config-parser emits for the fallback chain ("claude-3.5-sonnet").
+ *
+ * Bug 3 fix: hermes-agent's chain_exhausted event emits attempted_models
+ * with the full provider path intact while the bootstrapped fallbackChain
+ * uses short names. ModelDropdown.vue compares them via
+ * `attemptedModels.includes(model)`, which never matched and left the
+ * is-failed line-through styling un-applied in acceptance scenario 3.
+ * Normalizing on ingest keeps downstream consumers doing plain equality.
+ */
+function toShortName(full: string): string {
+  if (!full.includes('/')) return full
+  const last = full.split('/').pop()
+  return last && last.length > 0 ? last : full
+}
+
+// ---------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------
 
@@ -144,7 +166,10 @@ export const useModelStore = defineStore('model', () => {
       ...state.value,
       kind: 'exhausted',
       currentModel: null,
-      attemptedModels: p.attempted_models,
+      // Bug 3: normalize provider-prefixed names to the short form the
+      // fallbackChain uses, so ModelDropdown's `includes()` check marks
+      // every attempted model as failed.
+      attemptedModels: p.attempted_models.map(toShortName),
       reasonCode: p.last_error_code,
       reasonText: p.last_error_text,
       switchedAt: p.timestamp,
