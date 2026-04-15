@@ -9,6 +9,7 @@ import { useConnectionStore } from '@/stores/connection'
 import { useLocaleStore } from '@/stores/locale'
 import { useWideModeStore } from '@/stores/wideMode'
 import ConnectionStatus from '@/components/common/ConnectionStatus.vue'
+import ModelStateBadge from './ModelStateBadge.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -49,6 +50,7 @@ async function handleLogout() {
     </NBreadcrumb>
 
     <NSpace :size="8" align="center">
+      <ModelStateBadge v-if="connectionStore.status === 'connected'" />
       <ConnectionStatus />
 
       <NTooltip>
