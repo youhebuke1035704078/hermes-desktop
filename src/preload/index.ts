@@ -100,7 +100,7 @@ const api = {
   onHermesLifecycle: (
     cb: (event: { name: string; payload: unknown }) => void
   ): (() => void) => {
-    const handler = (_: unknown, event: { name: string; payload: unknown }) => cb(event)
+    const handler = (_: unknown, event: { name: string; payload: unknown }): void => cb(event)
     ipcRenderer.on('hermes:lifecycle', handler)
     return () => ipcRenderer.removeListener('hermes:lifecycle', handler)
   },
