@@ -36,7 +36,16 @@ import type {
 
 const DEBOUNCE_MS = 60_000
 const FALLBACK_TOAST_MS = 3_000
-const EXHAUSTED_TOAST_MS = 5_000
+/**
+ * Bug 6 (post-merge): the original spec set this to 5_000 ms, but real
+ * acceptance testing showed that 5 s is not enough to read the
+ * attempted-models list and the last error before a terminal error
+ * toast vanishes.  chain_exhausted is a hard failure mode — the user
+ * has to open config.yaml or their .env to fix it — so we now emit the
+ * toast as persistent (durationMs = 0 means "no auto-dismiss"). The
+ * toast still has a × close button so the user can clear it at will.
+ */
+const EXHAUSTED_TOAST_MS = 0
 
 /**
  * Module-level debounce map. Keyed by a stable event signature (see

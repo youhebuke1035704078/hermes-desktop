@@ -97,4 +97,41 @@ describe('useModelStoreBootstrap', () => {
     expect(store.state.kind).toBe('unknown') // unchanged
     spy.mockRestore()
   })
+
+  // Bug 6 (post-merge): terminal error state must not auto-dismiss.
+  // The acceptance-test observation was that the 5 s exhausted toast
+  // disappeared before users could read the attempted-models list and
+  // the last error. triggerExhaustedToast now pushes with durationMs=0
+  // (persistent) so the toast stays until the user dismisses it.
+  it('chain_exhausted toast is persistent (durationMs = 0)', () => {
+    const store = useModelStore()
+    const notif = useNotificationStore()
+    store.bootstrap({ primary: 'a', fallbackChain: ['a', 'b', 'c'] })
+
+    routeLifecycle('hermes.model.chain_exhausted', makeChainExhaustedPayload())
+    expect(notif.items.length).toBe(1)
+    expect(notif.items[0].durationMs).toBe(0)
+
+    // Fast-forward far beyond any sane auto-dismiss window
+    vi.advanceTimersByTime(60_000)
+    expect(notif.items.length).toBe(1) // still there
+    expect(notif.items[0].kind).toBe('exhausted')
+  })
+
+  it('fallback toast still auto-dismisses after 3 s', () => {
+    // Regression guard: the fix for Bug 6 must not change fallback toast
+    // timing.  Informational toasts stay informational.
+    const store = useModelStore()
+    const notif = useNotificationStore()
+    store.bootstrap({ primary: 'gpt-5.4', fallbackChain: ['gpt-5.4', 'gemini-2.5-pro'] })
+
+    routeLifecycle('hermes.model.fallback_activated', makeFallbackActivatedPayload())
+    expect(notif.items.length).toBe(1)
+    expect(notif.items[0].durationMs).toBe(3000)
+
+    vi.advanceTimersByTime(2999)
+    expect(notif.items.length).toBe(1)
+    vi.advanceTimersByTime(1)
+    expect(notif.items.length).toBe(0)
+  })
 })

@@ -154,4 +154,67 @@ describe('useNotificationStore', () => {
     expect(() => vi.advanceTimersByTime(2000)).not.toThrow()
     expect(store.items).toHaveLength(0)
   })
+
+  // Bug 6 (post-merge): chain_exhausted is a terminal state. During
+  // acceptance testing the 5 s auto-dismiss felt too short — users
+  // missed seeing which models failed before the toast vanished.  We
+  // use durationMs = 0 as a sentinel meaning "persistent, user must
+  // click the × to dismiss".  This matches NaiveUI n-notification and
+  // the HTML Notification API's requireInteraction flag.
+  describe('persistent toasts (durationMs = 0)', () => {
+    it('durationMs = 0 skips auto-dismiss so the item stays forever', () => {
+      const store = useNotificationStore()
+      store.push({
+        kind: 'exhausted',
+        payload: EXHAUSTED_PAYLOAD,
+        durationMs: 0,
+      })
+      expect(store.items).toHaveLength(1)
+      // Even after a day — no auto-dismiss
+      vi.advanceTimersByTime(86_400_000)
+      expect(store.items).toHaveLength(1)
+    })
+
+    it('negative durationMs is also treated as persistent', () => {
+      const store = useNotificationStore()
+      store.push({
+        kind: 'exhausted',
+        payload: EXHAUSTED_PAYLOAD,
+        durationMs: -1,
+      })
+      vi.advanceTimersByTime(60_000)
+      expect(store.items).toHaveLength(1)
+    })
+
+    it('a persistent toast can still be dismissed manually', () => {
+      const store = useNotificationStore()
+      const id = store.push({
+        kind: 'exhausted',
+        payload: EXHAUSTED_PAYLOAD,
+        durationMs: 0,
+      })
+      expect(store.items).toHaveLength(1)
+      store.dismiss(id)
+      expect(store.items).toHaveLength(0)
+    })
+
+    it('persistent and timed toasts coexist without interference', () => {
+      const store = useNotificationStore()
+      store.push({
+        kind: 'exhausted',
+        payload: EXHAUSTED_PAYLOAD,
+        durationMs: 0, // persistent
+      })
+      store.push({
+        kind: 'fallback',
+        payload: FALLBACK_PAYLOAD,
+        durationMs: 3000, // auto-dismiss
+      })
+      expect(store.items).toHaveLength(2)
+      // Fallback auto-dismisses, exhausted stays
+      vi.advanceTimersByTime(3000)
+      expect(store.items).toHaveLength(1)
+      expect(store.items[0].kind).toBe('exhausted')
+    })
+  })
 })

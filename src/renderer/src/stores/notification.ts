@@ -28,6 +28,13 @@ export const useNotificationStore = defineStore('notification', () => {
   /**
    * Push a new notification onto the queue and schedule its auto-dismiss.
    * Returns the generated id so the caller can dismiss manually if needed.
+   *
+   * Bug 6 (post-merge): `durationMs <= 0` is treated as "persistent" —
+   * no auto-dismiss timer is scheduled, so the toast stays until the
+   * user clicks the × button (or the store is manually cleared).  Used
+   * for chain_exhausted notifications, where the 5 s auto-dismiss in
+   * the original spec turned out to be too short during acceptance
+   * testing for a terminal error state.
    */
   function push(input: {
     kind: NotificationKind
@@ -44,8 +51,11 @@ export const useNotificationStore = defineStore('notification', () => {
     })
     // Auto-dismiss — filter tolerates the id already being gone
     // (manual dismiss before the timer fires), so no extra bookkeeping
-    // is required.
-    setTimeout(() => dismiss(id), input.durationMs)
+    // is required.  `durationMs <= 0` opts out entirely: the toast is
+    // persistent and only goes away on manual dismiss / clear.
+    if (input.durationMs > 0) {
+      setTimeout(() => dismiss(id), input.durationMs)
+    }
     return id
   }
 
