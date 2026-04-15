@@ -4,6 +4,7 @@ import { useWebSocketStore } from './websocket'
 import { useConnectionStore } from './connection'
 import { useHermesChatStore } from './hermes-chat'
 import { useModelStore } from '@/stores/model'
+import { initialFallbackStamp, applyFallbackStamp } from './chat-fallback-stamp'
 import type { ChatMessage } from '@/api/types'
 import { byLocale, getActiveLocale } from '@/i18n/text'
 
@@ -952,16 +953,14 @@ export const useChatStore = defineStore('chat', () => {
       // Stamp the placeholder with current fallback state so the
       // FallbackChip renders immediately on first-turn fallback (where
       // the store already knows we're in fallback before sendMessage).
+      // See chat-fallback-stamp.ts for the pure stamping logic.
       const modelStore = useModelStore()
       const assistantMessage: ChatMessage = {
         id: assistantMsgId,
         role: 'assistant',
         content: '',
         timestamp: new Date().toISOString(),
-        model: modelStore.state.currentModel ?? undefined,
-        fromFallback: modelStore.state.kind === 'fallback',
-        fallbackFrom: modelStore.state.fallbackFrom ?? undefined,
-        fallbackReasonText: modelStore.state.reasonText ?? undefined,
+        ...initialFallbackStamp(modelStore.state),
       }
       messages.value = capMessages([...messages.value, assistantMessage])
       setAgentStatusPhase(agentId, 'replying', { runId: idempotencyKey, detail: null })
@@ -971,19 +970,12 @@ export const useChatStore = defineStore('chat', () => {
       // lands before the next SSE chunk handler observes the message.
       const stopFallbackWatch = watch(
         () => modelStore.state.kind,
-        (kind) => {
-          if (kind !== 'fallback') return
+        () => {
           const idx = messages.value.findIndex(m => m.id === assistantMsgId)
           if (idx < 0) return
-          const existing = messages.value[idx]
-          if (existing.fromFallback) return
-          messages.value[idx] = {
-            ...existing,
-            fromFallback: true,
-            model: modelStore.state.currentModel ?? existing.model,
-            fallbackFrom: modelStore.state.fallbackFrom ?? undefined,
-            fallbackReasonText: modelStore.state.reasonText ?? undefined,
-          }
+          const stamped = applyFallbackStamp(messages.value[idx], modelStore.state)
+          if (!stamped) return
+          messages.value[idx] = stamped
           messages.value = [...messages.value] // trigger Vue reactivity
         },
         { flush: 'sync' },
@@ -994,14 +986,23 @@ export const useChatStore = defineStore('chat', () => {
         .filter(m => (m.role === 'user' || m.role === 'assistant') && m.id !== assistantMsgId && m.content)
         .map(m => ({ role: m.role, content: m.content }))
 
-      // Listen for SSE chunks
+      // Listen for SSE chunks. Bug 2 safety net: if a fallback_activated
+      // lifecycle event raced the chunk through a different IPC channel
+      // and the sync watcher didn't retro-stamp in time (e.g. the
+      // sendMessage scope had already torn down), stamp inline from the
+      // current modelStore state on every content chunk. The
+      // applyFallbackStamp helper is a no-op when the state isn't in
+      // fallback or the message is already stamped.
       const cleanupChunkListener = window.api.onHermesChatChunk((chunk) => {
         if (chunk.done) return
         const delta = chunk.data?.choices?.[0]?.delta
         if (delta?.content) {
           const idx = messages.value.findIndex(m => m.id === assistantMsgId)
           if (idx >= 0) {
-            messages.value[idx] = { ...messages.value[idx], content: messages.value[idx].content + delta.content }
+            const existing = messages.value[idx]
+            const stamped = applyFallbackStamp(existing, modelStore.state)
+            const base = stamped ?? existing
+            messages.value[idx] = { ...base, content: base.content + delta.content }
             messages.value = [...messages.value] // trigger Vue reactivity
           }
         }
