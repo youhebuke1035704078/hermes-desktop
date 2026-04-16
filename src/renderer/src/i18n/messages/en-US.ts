@@ -1046,6 +1046,7 @@ export default {
         models: 'Models configured',
         skills: 'Skills installed',
         totalTokens: 'Total tokens',
+        modelsSeen: 'Models Seen',
       },
       cards: {
         kpis: 'Usage KPIs',
@@ -1080,7 +1081,16 @@ export default {
         },
         activeDays: {
           label: 'Active days',
-          hint: '{days} days selected',
+          hint: '{days} days with activity in range',
+        },
+        totalTokens: {
+          label: 'Total Tokens',
+          hint: 'Cumulative tokens in range',
+        },
+        lastUsed: {
+          label: 'Last Used',
+          hint: 'Most recent token-consuming turn',
+          never: 'Never',
         },
       },
       trend: {
