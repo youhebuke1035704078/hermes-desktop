@@ -84,6 +84,51 @@ describe('buildHermesRestUsageData', () => {
     expect(result.aggregates.messages.assistant).toBe(1)
   })
 
+  it('"all" preset (no filter) falls back to tokenUsageHistory when tokenUsage is missing', () => {
+    // Scenario: conversation only has per-turn history (e.g. from a buggy
+    // state where cumulative tokenUsage was never written). In "all" mode we
+    // still want it to contribute to totals and byModel, otherwise Top Models
+    // looks empty for the user.
+    const convs = [
+      mkConv({
+        id: 'c1',
+        model: 'hermes-agent',
+        // Deliberately no tokenUsage field
+        tokenUsageHistory: [
+          { ts: 1_700_000_000_000, input: 100, output: 200, model: 'gemini-2.5-flash' },
+          { ts: 1_700_000_100_000, input: 50, output: 80, model: 'gemini-2.5-flash' },
+        ],
+      }),
+    ]
+    const result = buildHermesRestUsageData(convs) // no filter → "all"
+    expect(result.totals.input).toBe(150)
+    expect(result.totals.output).toBe(280)
+    expect(result.totals.totalTokens).toBe(430)
+    expect(result.sessions.length).toBe(1)
+    expect(result.aggregates.byModel.length).toBe(1)
+    expect(result.aggregates.byModel[0]!.model).toBe('gemini-2.5-flash')
+    expect(result.aggregates.byModel[0]!.totals.totalTokens).toBe(430)
+  })
+
+  it('"all" preset uses per-turn entry.model for byModel when history is the fallback source', () => {
+    const convs = [
+      mkConv({
+        id: 'c1',
+        model: 'hermes-agent',
+        tokenUsageHistory: [
+          { ts: 1_700_000_000_000, input: 100, output: 200, model: 'gpt-5.4' },
+          { ts: 1_700_000_100_000, input: 50, output: 80, model: 'claude-sonnet-4.5' },
+        ],
+      }),
+    ]
+    const result = buildHermesRestUsageData(convs)
+    expect(result.aggregates.byModel.length).toBe(2)
+    const gpt = result.aggregates.byModel.find(m => m.model === 'gpt-5.4')!
+    expect(gpt.totals.totalTokens).toBe(300)
+    const claude = result.aggregates.byModel.find(m => m.model === 'claude-sonnet-4.5')!
+    expect(claude.totals.totalTokens).toBe(130)
+  })
+
   it('byModel groups by resolvedModel with fallback to model', () => {
     const convs = [
       mkConv({

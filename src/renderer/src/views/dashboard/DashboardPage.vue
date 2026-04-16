@@ -621,8 +621,13 @@ onMounted(() => {
 
 .dashboard-hero {
   border-radius: 10px;
-  background: var(--n-card-color, #ffffff);
-  border: 1px solid var(--n-border-color, rgba(0, 0, 0, 0.09));
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.dashboard-hero :deep(.n-card__content) {
+  color: #ffffff;
 }
 
 .dashboard-hero-top {
@@ -638,12 +643,13 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 700;
   line-height: 1.3;
+  color: #ffffff;
 }
 
 .dashboard-hero-subtitle {
   margin-top: 4px;
   font-size: 13px;
-  color: var(--n-text-color-3, #999);
+  color: rgba(255, 255, 255, 0.68);
   line-height: 1.55;
 }
 
