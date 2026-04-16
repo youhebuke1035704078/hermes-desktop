@@ -621,10 +621,8 @@ onMounted(() => {
 
 .dashboard-hero {
   border-radius: 10px;
-  background:
-    radial-gradient(circle at 84% 16%, rgba(24, 160, 88, 0.22), transparent 36%),
-    linear-gradient(120deg, var(--n-card-color, #ffffff), rgba(42, 127, 255, 0.08));
-  border: 1px solid rgba(42, 127, 255, 0.18);
+  background: var(--n-card-color, #ffffff);
+  border: 1px solid var(--n-border-color, rgba(0, 0, 0, 0.09));
 }
 
 .dashboard-hero-top {
