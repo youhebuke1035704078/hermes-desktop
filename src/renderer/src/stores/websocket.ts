@@ -152,6 +152,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
     gatewayMethods.value = []
     gatewayVersion.value = null
     updateAvailable.value = null
+    // Reset counters so a fresh connection starts clean and the UI doesn't
+    // carry over stale "reconnecting (3 attempts)" text from a prior session.
+    reconnectAttempts.value = 0
+    lastError.value = null
   }
 
   function subscribe(event: string, handler: (...args: unknown[]) => void): () => void {

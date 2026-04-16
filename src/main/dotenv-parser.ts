@@ -32,12 +32,19 @@ export function extractApiServerKey(envContent: string): string | null {
     if (!match) continue
     let value = match[1].trim()
     // Strip matching surrounding quotes.
+    let quoted = false
     if (value.length >= 2) {
       const first = value[0]
       const last = value[value.length - 1]
       if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
         value = value.slice(1, -1)
+        quoted = true
       }
+    }
+    // For unquoted values, strip inline comments (e.g. `mykey # note`).
+    // Quoted values preserve their content verbatim.
+    if (!quoted) {
+      value = value.replace(/\s+#.*$/, '').trim()
     }
     return value.length > 0 ? value : null
   }

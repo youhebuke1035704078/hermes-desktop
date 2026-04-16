@@ -296,29 +296,33 @@ export const useSessionStore = defineStore('session', () => {
     }
 
     // Batch delete orphaned sessions
+    let deletedCount = 0
     for (const key of toDelete) {
       try {
         await wsStore.rpc.deleteSession(key)
+        deletedCount++
       } catch {
-        // skip failures
+        // skip failures — count only actual successes
       }
     }
 
     // Batch update stale labels
+    let relabeledCount = 0
     for (const { key, label } of toRelabel) {
       try {
         await wsStore.rpc.patchSession({ sessionKey: key, label })
+        relabeledCount++
       } catch {
-        // skip failures
+        // skip failures — count only actual successes
       }
     }
 
     // Refresh session list if any changes were made
-    if (toDelete.length > 0 || toRelabel.length > 0) {
+    if (deletedCount > 0 || relabeledCount > 0) {
       await fetchSessions()
     }
 
-    return { deleted: toDelete.length, relabeled: toRelabel.length }
+    return { deleted: deletedCount, relabeled: relabeledCount }
   }
 
   return {

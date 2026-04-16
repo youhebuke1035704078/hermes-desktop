@@ -26,6 +26,16 @@ export const useNotificationStore = defineStore('notification', () => {
   const items = ref<NotificationItem[]>([])
 
   /**
+   * Track auto-dismiss timer IDs so we can cancel them when a notification
+   * is dismissed manually or the store is cleared.  Without this, a clear()
+   * call would not stop already-scheduled timers — they would fire later
+   * and try to dismiss ids that no longer exist (harmless) but keep the
+   * closure alive until they fire (memory leak proportional to durationMs).
+   */
+  let seq = 0
+  const timers = new Map<string, ReturnType<typeof setTimeout>>()
+
+  /**
    * Push a new notification onto the queue and schedule its auto-dismiss.
    * Returns the generated id so the caller can dismiss manually if needed.
    *
@@ -41,7 +51,7 @@ export const useNotificationStore = defineStore('notification', () => {
     payload: FallbackActivatedPayload | ChainExhaustedPayload
     durationMs: number
   }): string {
-    const id = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const id = `notif-${++seq}`
     items.value.push({
       id,
       kind: input.kind,
@@ -49,12 +59,10 @@ export const useNotificationStore = defineStore('notification', () => {
       durationMs: input.durationMs,
       createdAt: Date.now(),
     })
-    // Auto-dismiss — filter tolerates the id already being gone
-    // (manual dismiss before the timer fires), so no extra bookkeeping
-    // is required.  `durationMs <= 0` opts out entirely: the toast is
-    // persistent and only goes away on manual dismiss / clear.
+    // `durationMs <= 0` opts out entirely: the toast is persistent and
+    // only goes away on manual dismiss / clear.
     if (input.durationMs > 0) {
-      setTimeout(() => dismiss(id), input.durationMs)
+      timers.set(id, setTimeout(() => dismiss(id), input.durationMs))
     }
     return id
   }
@@ -64,13 +72,18 @@ export const useNotificationStore = defineStore('notification', () => {
    * dismiss racing with auto-dismiss, unknown handle, etc.).
    */
   function dismiss(id: string): void {
+    const tid = timers.get(id)
+    if (tid !== undefined) { clearTimeout(tid); timers.delete(id) }
     items.value = items.value.filter((item) => item.id !== id)
   }
 
   /**
-   * Drop every queued notification.  Used on logout / server swap.
+   * Drop every queued notification and cancel all pending auto-dismiss
+   * timers.  Used on logout / server swap.
    */
   function clear(): void {
+    timers.forEach((tid) => clearTimeout(tid))
+    timers.clear()
     items.value = []
   }
 

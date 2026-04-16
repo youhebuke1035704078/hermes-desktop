@@ -209,11 +209,15 @@ export function useModelStoreBootstrap(): void {
   const stopWatch = watch(
     () => connectionStore.status,
     async (status, prev) => {
-      if (status === 'connected' && prev !== 'connected') {
-        lastToastKey.clear()
-        await runBootstrap()
-      } else if (status === 'disconnected') {
-        modelStore.markStale()
+      try {
+        if (status === 'connected' && prev !== 'connected') {
+          lastToastKey.clear()
+          await runBootstrap()
+        } else if (status === 'disconnected') {
+          modelStore.markStale()
+        }
+      } catch (err) {
+        console.error('[useModelStoreBootstrap] watcher error', err)
       }
     },
     { flush: 'sync' }
@@ -302,7 +306,12 @@ export function useModelStoreBootstrap(): void {
     try {
       const config = await window.api.hermesConfig()
       if (!config.primary) return null
-      return { primary: config.primary, fallback_chain: config.fallback_chain }
+      return {
+        primary: config.primary,
+        // Validate fallback_chain: the IPC result is untyped at runtime,
+        // so guard against undefined / non-array values.
+        fallback_chain: Array.isArray(config.fallback_chain) ? config.fallback_chain : [],
+      }
     } catch (err) {
       console.warn('[lifecycle] hermesConfig bootstrap failed', err)
       return null

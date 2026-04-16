@@ -87,9 +87,16 @@ async function checkAppUpdate() {
   appUpdateError.value = ''
   const api = (window as any).api
   if (api?.updaterCheck) {
-    const result = await api.updaterCheck()
-    if (!result.ok && result.error) {
-      appUpdateError.value = result.error
+    try {
+      const result = await api.updaterCheck()
+      if (!result.ok && result.error) {
+        appUpdateError.value = result.error
+      }
+    } finally {
+      // Safety net: if the updater IPC fires 'checking' but a final
+      // 'available'/'not-available'/'error' event never arrives (network error,
+      // stale listener), appChecking would stay true and disable the button.
+      appChecking.value = false
     }
   }
 }

@@ -137,6 +137,9 @@ export const useModelStore = defineStore('model', () => {
       reasonCode: p.reason_code,
       reasonText: p.reason_text,
       switchedAt: p.timestamp,
+      // Clear any attemptedModels carried over from a prior 'exhausted' state
+      // so the dropdown doesn't mark models as failed in a new fallback run.
+      attemptedModels: [],
     }
   }
 

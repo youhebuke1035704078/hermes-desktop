@@ -64,18 +64,25 @@ async function handleDownload(filename: string): Promise<void> {
   }
 }
 
-async function handleRestore(filename: string): Promise<void> {
+function handleRestore(filename: string): void {
   dialog.warning({
     title: t('pages.backup.restoreConfirmTitle'),
     content: t('pages.backup.restoreConfirmContent', { filename }),
     positiveText: t('pages.backup.restoreConfirmOk'),
     negativeText: t('pages.backup.restoreConfirmCancel'),
     onPositiveClick: async () => {
-      const result = await backupStore.restoreBackup(filename)
-      if (result.ok) {
-        message.success(t('pages.backup.restoreSuccess'))
-      } else {
-        message.error(t('pages.backup.restoreFailed', { error: result.error || '' }))
+      // Wrap in try/catch: Naive UI does not await the returned Promise so any
+      // rejection would become an unhandled rejection and potentially crash the
+      // renderer process.
+      try {
+        const result = await backupStore.restoreBackup(filename)
+        if (result.ok) {
+          message.success(t('pages.backup.restoreSuccess'))
+        } else {
+          message.error(t('pages.backup.restoreFailed', { error: result.error || '' }))
+        }
+      } catch (e: any) {
+        message.error(t('pages.backup.restoreFailed', { error: e?.message || String(e) }))
       }
     },
   })

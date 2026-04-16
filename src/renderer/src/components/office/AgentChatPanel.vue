@@ -534,17 +534,17 @@ const configuredModelOptions = computed<ConfiguredModelOption[]>(() => {
 
   const finalRefs = new Set<string>()
   if (allowlistedRefs.size > 0) {
-    for (const ref of refs) {
-      if (allowlistedRefs.has(ref)) {
-        finalRefs.add(ref)
+    for (const modelRef of refs) {
+      if (allowlistedRefs.has(modelRef)) {
+        finalRefs.add(modelRef)
       }
     }
-    for (const ref of allowlistedRefs) {
-      finalRefs.add(ref)
+    for (const modelRef of allowlistedRefs) {
+      finalRefs.add(modelRef)
     }
   } else {
-    for (const ref of refs) {
-      finalRefs.add(ref)
+    for (const modelRef of refs) {
+      finalRefs.add(modelRef)
     }
   }
 
@@ -1261,9 +1261,12 @@ function stripCodeFence(text: string): string {
 function decodeEscapedJsonText(text: string): string | null {
   const normalized = text.trim()
   if (!normalized.includes('\\"')) return null
+  // The input is already JSON-escaped content (e.g. `\"foo\"` from a tool
+  // output that was JSON-serialized twice).  Simply wrap it in quotes and
+  // parse — do NOT re-escape the backslashes first, because that produces
+  // double-escaping and `JSON.parse` returns `\"foo\"` instead of `foo`.
   try {
-    const wrapped = `"${normalized.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
-    const decoded = JSON.parse(wrapped)
+    const decoded = JSON.parse(`"${normalized}"`)
     if (typeof decoded === 'string' && decoded.trim()) {
       return decoded.trim()
     }

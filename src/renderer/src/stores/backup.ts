@@ -136,7 +136,13 @@ export const useBackupStore = defineStore('backup', () => {
   function bindProgressListener(): void {
     if (offProgress) return
     offProgress = window.api.onBackupProgress((data) => {
-      progress.value = data
+      // Only update progress while a task is actually in flight.
+      // IPC events arrive asynchronously and can land after the task's
+      // `finally` block has already cleared `busy` and set `progress = null`.
+      // Without this guard the completed-task progress bar would reappear.
+      if (busy.value) {
+        progress.value = data
+      }
     })
   }
 

@@ -5,13 +5,22 @@ import type { SessionsUsageResult, CostUsageSummary } from '@/api/types'
 
 export type DateRange = '7d' | '14d' | '30d' | '90d' | 'all'
 
+function toLocalDateString(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function rangeToDates(range: DateRange): { startDate?: string; endDate?: string; days?: number } {
   if (range === 'all') return {}
   const daysMap: Record<string, number> = { '7d': 7, '14d': 14, '30d': 30, '90d': 90 }
   const days = daysMap[range] || 7
   const now = new Date()
-  const end = now.toISOString().slice(0, 10)
-  const start = new Date(now.getTime() - (days - 1) * 86400000).toISOString().slice(0, 10)
+  // Use local calendar dates so the date range matches what the user sees in
+  // their timezone, not UTC (which would shift the boundary by the TZ offset).
+  const end = toLocalDateString(now)
+  const start = toLocalDateString(new Date(now.getTime() - (days - 1) * 86400000))
   return { startDate: start, endDate: end, days }
 }
 

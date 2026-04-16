@@ -43,7 +43,8 @@ const body2 = computed(() => {
     return `now using ${p.to_model}`
   }
   const p = props.item.payload as ChainExhaustedPayload
-  return p.last_error_text
+  // last_error_text is optional — guard against rendering the literal "undefined"
+  return p.last_error_text || ''
 })
 
 function close(): void {

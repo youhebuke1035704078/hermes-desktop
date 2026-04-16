@@ -32,8 +32,13 @@ export function useAlertNotifier(options: { interval?: number } = {}) {
     }
   }
 
+  let isChecking = false
+  let checkDestroyed = false
+
   async function check() {
-    if (!enabled.value) return
+    if (!enabled.value || isChecking || checkDestroyed) return
+    isChecking = true
+    try {
     const wsStore = useWebSocketStore()
     const cronStore = useCronStore()
 
@@ -96,6 +101,9 @@ export function useAlertNotifier(options: { interval?: number } = {}) {
       isFirstFetch.value = false
       knownAlertIds.value = new Set(alertIds.map(a => a.id))
     } catch { /* ignore */ }
+    } finally {
+      isChecking = false
+    }
   }
 
   function start() {
@@ -105,6 +113,7 @@ export function useAlertNotifier(options: { interval?: number } = {}) {
   }
 
   function stop() {
+    checkDestroyed = true
     if (timer) { clearInterval(timer); timer = null }
   }
 
