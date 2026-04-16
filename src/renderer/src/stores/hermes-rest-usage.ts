@@ -85,7 +85,49 @@ export function buildHermesRestUsageData(
         },
       })
     } else {
-      // Legacy path: cumulative tokenUsage (no time filtering)
+      // Legacy/"all" path: no time filtering.
+      //
+      // Prefer per-turn history (v0.4.4+) because it carries entry.model so
+      // byModel shows real names like "gemini-2.5-flash" instead of lumping
+      // everything under conv.model's "hermes-agent" proxy label. Only fall
+      // back to cumulative tokenUsage for pre-v0.4.4 conversations that lack
+      // history entries.
+      const history = conv.tokenUsageHistory
+      const convFallback = conv.resolvedModel || conv.model || 'unknown'
+
+      if (history && history.length > 0) {
+        let convInput = 0
+        let convOutput = 0
+        for (const entry of history) {
+          convInput += entry.input
+          convOutput += entry.output
+          totals.input += entry.input
+          totals.output += entry.output
+          totals.totalTokens += entry.input + entry.output
+          const modelName = entry.model || convFallback
+          addToModelMap(modelMap, modelName, entry.input, entry.output)
+        }
+        if (convInput === 0 && convOutput === 0) continue
+
+        sessions.push({
+          key: conv.id,
+          label: conv.title || '',
+          sessionId: conv.id,
+          updatedAt: conv.updatedAt,
+          model: convFallback,
+          usage: {
+            input: convInput,
+            output: convOutput,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: convInput + convOutput,
+            totalCost: 0,
+          },
+        })
+        continue
+      }
+
+      // Pre-v0.4.4 fallback: cumulative tokenUsage with no per-turn model info
       if (!conv.tokenUsage) continue
       const { totalInput, totalOutput } = conv.tokenUsage
       const convTotalTokens = totalInput + totalOutput
@@ -94,15 +136,14 @@ export function buildHermesRestUsageData(
       totals.output += totalOutput
       totals.totalTokens += convTotalTokens
 
-      const modelName = conv.resolvedModel || conv.model || 'unknown'
-      addToModelMap(modelMap, modelName, totalInput, totalOutput)
+      addToModelMap(modelMap, convFallback, totalInput, totalOutput)
 
       sessions.push({
         key: conv.id,
         label: conv.title || '',
         sessionId: conv.id,
         updatedAt: conv.updatedAt,
-        model: modelName,
+        model: convFallback,
         usage: {
           input: totalInput,
           output: totalOutput,
