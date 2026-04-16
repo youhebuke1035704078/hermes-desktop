@@ -8,6 +8,7 @@ import {
 } from 'naive-ui'
 import { GridOutline, RefreshOutline } from '@vicons/ionicons5'
 import { useHermesChatStore } from '@/stores/hermes-chat'
+import { buildHermesRestUsageData } from '@/stores/hermes-rest-usage'
 import { useCronStore } from '@/stores/cron'
 import { useConnectionStore } from '@/stores/connection'
 import { useWebSocketStore } from '@/stores/websocket'
@@ -116,9 +117,9 @@ function goCron() {
 }
 
 async function fetchUsageData() {
-  // Skip: hermes-rest servers don't expose usage RPC (only /health, /v1/models, /v1/chat/completions)
+  // Hermes REST has no usage RPC — aggregate from locally-persisted conversation tokenUsage
   if (isHermesRest.value) {
-    usageData.value = null
+    usageData.value = buildHermesRestUsageData(hermesChatStore.conversations)
     usageError.value = null
     return
   }
@@ -211,10 +212,7 @@ onMounted(() => {
       </template>
 
       <NSpin :show="usageLoading" size="small">
-        <div v-if="isHermesRest" style="text-align: center; padding: 24px 16px;">
-          <NText depth="3" style="font-size: 13px;">{{ t('pages.dashboard.usage.unavailableHermesRest') }}</NText>
-        </div>
-        <div v-else-if="usageError" style="text-align: center; padding: 16px;">
+        <div v-if="usageError" style="text-align: center; padding: 16px;">
           <NText type="error" style="font-size: 13px;">{{ usageError }}</NText>
         </div>
         <div v-else>
@@ -305,10 +303,10 @@ onMounted(() => {
       </NSpin>
     </NCard>
 
-    <!-- Two-column: Daily Trend + Top Models (hidden in hermes-rest mode) -->
-    <NGrid v-if="!isHermesRest" cols="1 m:2" responsive="screen" :x-gap="12" :y-gap="12">
-      <!-- Left: Daily Trend -->
-      <NGridItem>
+    <!-- Two-column: Daily Trend + Top Models (Daily Trend hidden in hermes-rest mode — no per-turn timestamps) -->
+    <NGrid cols="1 m:2" responsive="screen" :x-gap="12" :y-gap="12">
+      <!-- Left: Daily Trend (ACP only) -->
+      <NGridItem v-if="!isHermesRest">
         <NCard :title="t('pages.dashboard.cards.trend')" size="small">
           <div v-if="!dailyTrend.length" style="text-align: center; padding: 24px;">
             <NText depth="3">{{ t('pages.dashboard.trend.empty') }}</NText>
@@ -344,7 +342,7 @@ onMounted(() => {
       </NGridItem>
 
       <!-- Right: Top Models -->
-      <NGridItem>
+      <NGridItem :span="isHermesRest ? 2 : 1">
         <NCard :title="t('pages.dashboard.top.models')" size="small">
           <div v-if="!topModels.length" style="text-align: center; padding: 24px;">
             <NText depth="3">-</NText>
