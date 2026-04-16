@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   NCard,
@@ -35,6 +35,7 @@ import { useThemeStore, type ThemeMode } from '@/stores/theme'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useConnectionStore } from '@/stores/connection'
 import { ConnectionState } from '@/api/types'
+import { useMgmtProbe, type MgmtFetchResult } from '@/composables/useMgmtProbe'
 
 const router = useRouter()
 const themeStore = useThemeStore()
@@ -92,10 +93,40 @@ const mgmtUrl = computed(() => {
     return u.origin
   } catch { return '' }
 })
-/** Whether the remote management API is reachable */
-const mgmtAvailable = ref(false)
+
+/** Wall-clock timeout for the mgmt-server health probe. Main-process
+ *  httpFetch has no built-in timeout, so we race against a setTimeout
+ *  to avoid a hung Tailscale connect leaving the UI in "probing" forever. */
+const MGMT_PROBE_TIMEOUT_MS = 5000
+
+async function mgmtHealthFetcher(url: string): Promise<MgmtFetchResult> {
+  const fetchPromise: Promise<MgmtFetchResult> = window.api
+    ? window.api.httpFetch(url).then(r => ({ ok: r.ok, status: r.status, body: r.body }))
+    : fetch(url, { signal: AbortSignal.timeout(MGMT_PROBE_TIMEOUT_MS) })
+        .then(async r => ({ ok: r.ok, status: r.status, body: await r.text() }))
+        .catch((e: any) => ({ ok: false, status: 0, body: e?.message || 'fetch failed' }))
+  const timeoutPromise = new Promise<MgmtFetchResult>((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), MGMT_PROBE_TIMEOUT_MS)
+  )
+  return Promise.race([fetchPromise, timeoutPromise])
+}
+
+const mgmtProbe = useMgmtProbe(mgmtHealthFetcher)
+// Destructure refs so templates can bind them with auto-unwrap.
+const mgmtAvailable = mgmtProbe.available
+const mgmtProbing = mgmtProbe.probing
+const mgmtErrorKind = mgmtProbe.errorKind
+const mgmtErrorDetail = mgmtProbe.errorDetail
+
 /** True if version/config/restart features should be shown */
 const canManage = computed(() => isHermesRest.value && (isLocalServer.value || mgmtAvailable.value))
+
+/** Human-friendly message for the current probe failure, or '' on success. */
+const mgmtErrorMessage = computed(() => {
+  const kind = mgmtErrorKind.value
+  if (!kind || kind === 'empty-url') return ''
+  return t(`pages.settings.mgmtError.${kind}`, { url: mgmtUrl.value })
+})
 
 /** Call remote management API with auth */
 async function mgmtFetch(path: string, options: { method?: string; body?: string } = {}): Promise<any> {
@@ -110,19 +141,17 @@ async function mgmtFetch(path: string, options: { method?: string; body?: string
   return resp.json()
 }
 
-/** Probe management API availability (silent, for remote servers) */
-async function probeMgmtApi() {
-  if (isLocalServer.value || !mgmtUrl.value) return
-  try {
-    const url = `${mgmtUrl.value}/health`
-    const resp = window.api
-      ? await window.api.httpFetch(url)
-      : await fetch(url, { signal: AbortSignal.timeout(3000) }).then(r => ({ ok: r.ok, body: '' }))
-    if (resp.ok) {
-      const data = typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}
-      mgmtAvailable.value = data?.platform === 'hermes-mgmt'
-    }
-  } catch { mgmtAvailable.value = false }
+/** Probe the mgmt-server and, on success, eagerly populate the feature cards.
+ *  Safe to call repeatedly — used by onMounted, the Retry button, and the
+ *  connection-status watcher after a reconnect. */
+async function triggerMgmtProbe(): Promise<void> {
+  if (isLocalServer.value || !isHermesRest.value) return
+  await mgmtProbe.probe(mgmtUrl.value)
+  if (mgmtAvailable.value) {
+    loadConfigFiles()
+    await fetchHermesVersion()
+    checkHermesUpdate()
+  }
 }
 
 function handleThemeChange(mode: ThemeMode) {
@@ -373,13 +402,24 @@ onMounted(async () => {
       checkHermesUpdate()
     }
   } else if (isHermesRest.value) {
-    // Remote: probe management API, then load if available
-    await probeMgmtApi()
-    if (mgmtAvailable.value) {
-      loadConfigFiles()
-      await fetchHermesVersion()
-      checkHermesUpdate()
-    }
+    // Remote: probe management API; on success, triggerMgmtProbe loads
+    // config/version/update status for the newly-visible feature cards.
+    await triggerMgmtProbe()
+  }
+})
+
+// Auto-re-probe when the connection transitions back to 'connected' after
+// a drop (Tailscale reconnect, server restart, manual disconnect+reconnect).
+// Without this, a one-shot probe failure during mount would leave the
+// Settings page permanently showing the misleading "local-only" banner.
+watch(() => connectionStore.status, (newStatus, oldStatus) => {
+  if (
+    newStatus === 'connected' &&
+    oldStatus !== 'connected' &&
+    isHermesRest.value &&
+    !isLocalServer.value
+  ) {
+    void triggerMgmtProbe()
   }
 })
 </script>
@@ -450,9 +490,40 @@ onMounted(async () => {
         </NDescriptionsItem>
       </NDescriptions>
 
-      <NAlert type="info" :closable="false" style="margin-top: 12px;">
-        {{ t('pages.settings.serverLocalOnly') }}
-      </NAlert>
+      <!-- Probe status / diagnostic + Retry -->
+      <div style="margin-top: 12px;">
+        <NAlert v-if="mgmtProbing" type="default" :closable="false">
+          <template #icon><NSpin :size="14" /></template>
+          {{ t('pages.settings.mgmtProbing') }}
+        </NAlert>
+        <NAlert
+          v-else-if="mgmtErrorKind && mgmtErrorKind !== 'empty-url'"
+          type="info"
+          :closable="false"
+          :title="t('pages.settings.mgmtNotAvailable')"
+        >
+          <div style="font-size: 13px; margin-bottom: 6px;">{{ mgmtErrorMessage }}</div>
+          <div
+            v-if="mgmtErrorDetail"
+            style="font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 12px; opacity: 0.75; word-break: break-word;"
+          >
+            {{ mgmtErrorDetail }}
+          </div>
+          <div style="font-size: 12px; margin-top: 8px; opacity: 0.85;">
+            {{ t('pages.settings.mgmtInstallHint') }}
+          </div>
+        </NAlert>
+        <NAlert v-else type="info" :closable="false">
+          {{ t('pages.settings.serverLocalOnly') }}
+        </NAlert>
+      </div>
+
+      <NSpace style="margin-top: 12px;" :size="8">
+        <NButton size="small" :loading="mgmtProbing" @click="triggerMgmtProbe">
+          <template #icon><NIcon :component="RefreshOutline" /></template>
+          {{ t('pages.settings.mgmtRetryProbe') }}
+        </NButton>
+      </NSpace>
     </NCard>
 
     <!-- Hermes Agent Version & Update (local server only — uses local git/binary) -->
