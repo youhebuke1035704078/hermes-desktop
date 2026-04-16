@@ -255,6 +255,10 @@ async function handleSave() {
     message.warning(t('pages.cron.validation.nameRequired'))
     return
   }
+  if (!form.value.schedule.trim()) {
+    message.warning(t('pages.cron.validation.cronExprRequired'))
+    return
+  }
   if (!form.value.prompt.trim()) {
     message.warning(t('pages.cron.validation.payloadRequired'))
     return

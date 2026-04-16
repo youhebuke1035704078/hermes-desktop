@@ -65,7 +65,8 @@ export function useSSEAutoRefresh(refreshMap: {
   if (refreshMap.services) {
     const fn = refreshMap.services
     handlers['service.status'] = () => debounced('services', fn)
-    handlers['gatewayState'] = () => debounced('services', fn)
+    // gatewayState may also be needed by 'summary' — build it after all
+    // blocks so we can compose rather than overwrite (see below).
   }
 
   if (refreshMap.alerts) {
@@ -93,9 +94,21 @@ export function useSSEAutoRefresh(refreshMap: {
 
   if (refreshMap.summary) {
     const fn = refreshMap.summary
-    // Summary should refresh on many events
-    handlers['gatewayState'] = () => debounced('summary', fn)
     if (!handlers['alert.new']) handlers['alert.new'] = () => debounced('summary', fn)
+  }
+
+  // Build a single gatewayState handler that fans out to every subscriber.
+  // Previously, assigning handlers['gatewayState'] twice (once for 'services',
+  // once for 'summary') meant the second assignment silently dropped the first.
+  {
+    const servicesFn = refreshMap.services
+    const summaryFn = refreshMap.summary
+    if (servicesFn || summaryFn) {
+      handlers['gatewayState'] = () => {
+        if (servicesFn) debounced('services', servicesFn)
+        if (summaryFn) debounced('summary', summaryFn)
+      }
+    }
   }
 
   useSSERefresh({ handlers })

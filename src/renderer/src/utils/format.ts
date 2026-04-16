@@ -237,6 +237,12 @@ export function downloadJSON(data: unknown, filename: string) {
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  // Must be in the DOM for Firefox; append/remove around the click.
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  document.body.removeChild(a)
+  // Delay revocation to give the browser time to start reading the blob.
+  // Revoking synchronously (before the browser fetches the URL) breaks
+  // downloads on Safari and Firefox.
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

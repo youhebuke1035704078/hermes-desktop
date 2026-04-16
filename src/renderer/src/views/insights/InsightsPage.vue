@@ -249,7 +249,7 @@ onMounted(() => {
             <div class="trend-bar-container">
               <div
                 class="trend-bar"
-                :style="{ height: (day.tokens / insightsStore.maxDailyTokens * 100) + '%' }"
+                :style="{ height: insightsStore.maxDailyTokens ? (day.tokens / insightsStore.maxDailyTokens * 100) + '%' : '0%' }"
               />
             </div>
             <div class="trend-bar-date">{{ formatDate(day.date) }}</div>

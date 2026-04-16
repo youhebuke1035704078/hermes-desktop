@@ -30,6 +30,14 @@ async function scrollToBottom() {
   logContainer.value.scrollTop = logContainer.value.scrollHeight
 }
 
+/** Force-scroll to bottom regardless of autoScroll state (used by the explicit button). */
+async function forceScrollToBottom() {
+  if (!logContainer.value) return
+  await nextTick()
+  logContainer.value.scrollTop = logContainer.value.scrollHeight
+  autoScroll.value = true
+}
+
 watch(() => logsStore.filteredEntries.length, () => {
   scrollToBottom()
 })
@@ -303,7 +311,7 @@ onUnmounted(() => {
               <template #icon><NIcon :component="RefreshOutline" /></template>
               {{ t('pages.logs.reload') }}
             </NButton>
-            <NButton size="tiny" quaternary @click="scrollToBottom">
+            <NButton size="tiny" quaternary @click="forceScrollToBottom">
               <template #icon><NIcon :component="ArrowDownOutline" /></template>
               {{ t('pages.logs.scrollBottom') }}
             </NButton>

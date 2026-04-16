@@ -242,18 +242,22 @@ function resolveImagePath(src: string, basePath: string): string {
   }
   
   const normalizedBase = basePath.replace(/\\/g, '/')
-  const lastSlash = normalizedBase.lastIndexOf('/')
-  const baseDir = lastSlash >= 0 ? normalizedBase.substring(0, lastSlash) : ''
-  
+  const initialSlash = normalizedBase.lastIndexOf('/')
+  let baseDir = initialSlash >= 0 ? normalizedBase.substring(0, initialSlash) : ''
+
+  // Strip each leading '../' segment and correspondingly walk up baseDir.
+  // The original code returned inside the loop, which silently ignored all
+  // but the first '../' traversal (e.g. '../../foo' would only strip one level).
   while (src.startsWith('../')) {
     src = src.slice(3)
     const lastSlash = baseDir.lastIndexOf('/')
     if (lastSlash >= 0) {
-      return baseDir.substring(0, lastSlash) + '/' + src
+      baseDir = baseDir.substring(0, lastSlash)
+    } else {
+      baseDir = ''
     }
-    return src
   }
-  
+
   return baseDir ? `${baseDir}/${src}` : src
 }
 

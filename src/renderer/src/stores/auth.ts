@@ -33,8 +33,10 @@ export const useAuthStore = defineStore('auth', () => {
       authEnabled.value = data.enabled
       return data.enabled
     } catch {
-      authEnabled.value = false
-      return false
+      // Network error: don't change authEnabled — keep current state to avoid
+      // silently granting unauthenticated access when the config endpoint is
+      // temporarily unreachable.
+      return authEnabled.value
     }
   }
 

@@ -77,6 +77,7 @@ export const useCronStore = defineStore('cron', () => {
   }
 
   async function deleteJob(id: string): Promise<boolean> {
+    saving.value = true
     lastError.value = null
     try {
       await cronApi.deleteJob(getApiOpts(), id)
@@ -85,6 +86,8 @@ export const useCronStore = defineStore('cron', () => {
     } catch (e: any) {
       lastError.value = e.message
       return false
+    } finally {
+      saving.value = false
     }
   }
 

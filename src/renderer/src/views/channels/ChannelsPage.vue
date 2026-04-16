@@ -287,13 +287,13 @@ onMounted(() => {
 
         <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="10" :y-gap="10">
           <NGridItem>
-            <NCard embedded ::bordered="false" size="small" style="border-radius: 10px;">
+            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
               <NText depth="3" style="font-size: 12px;">{{ t('pages.channels.metrics.total') }}</NText>
               <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">{{ channelsStore.channels.length }}</div>
             </NCard>
           </NGridItem>
           <NGridItem>
-            <NCard embedded ::bordered="false" size="small" style="border-radius: 10px;">
+            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
               <NText depth="3" style="font-size: 12px;">{{ t('pages.channels.metrics.connected') }}</NText>
               <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
                 <NText type="success">{{ channelsStore.connectedCount }}</NText>
@@ -301,7 +301,7 @@ onMounted(() => {
             </NCard>
           </NGridItem>
           <NGridItem>
-            <NCard embedded ::bordered="false" size="small" style="border-radius: 10px;">
+            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
               <NText depth="3" style="font-size: 12px;">{{ t('pages.channels.metrics.errors') }}</NText>
               <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
                 <NText type="error">{{ channelsStore.errorCount }}</NText>
@@ -309,7 +309,7 @@ onMounted(() => {
             </NCard>
           </NGridItem>
           <NGridItem>
-            <NCard embedded ::bordered="false" size="small" style="border-radius: 10px;">
+            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
               <NText depth="3" style="font-size: 12px;">{{ t('pages.channels.metrics.members') }}</NText>
               <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
                 <NText type="info">{{ channelsStore.totalMembers }}</NText>

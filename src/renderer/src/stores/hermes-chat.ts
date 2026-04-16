@@ -112,12 +112,12 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
 
         for (const id of allIds) {
           const local = localMap.get(id)
-          const remote = remoteMap.get(id)
-          if (local && remote) {
+          const remoteConv = remoteMap.get(id)
+          if (local && remoteConv) {
             // Both exist — keep newer
-            merged.push(local.updatedAt >= remote.updatedAt ? local : remote)
+            merged.push(local.updatedAt >= remoteConv.updatedAt ? local : remoteConv)
           } else {
-            merged.push((local || remote)!)
+            merged.push((local || remoteConv)!)
           }
         }
 

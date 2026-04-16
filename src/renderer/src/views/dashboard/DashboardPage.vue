@@ -316,6 +316,7 @@ watch(
         hermesChatStore.conversations,
         buildFilterFromPreset(rangePreset.value),
       )
+      lastUpdatedAt.value = Date.now()
     }
   },
 )

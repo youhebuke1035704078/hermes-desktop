@@ -845,12 +845,17 @@ function registerIpcHandlers(): void {
         )
       })
       for (const entry of entries) {
+        // `tar tzf` on macOS/GNU tar may prepend `./` to every entry.
+        // Strip it before the safety checks so `./.hermes/config.yaml`
+        // is correctly treated as `.hermes/config.yaml` rather than rejected.
+        const normalized = entry.startsWith('./') ? entry.slice(2) : entry
         if (
-          entry.startsWith('/') ||
-          entry.startsWith('..') ||
-          entry.includes('/../') ||
-          entry.includes('\\') ||
-          !(entry === '.hermes' || entry === '.hermes/' || entry.startsWith('.hermes/'))
+          normalized.startsWith('/') ||
+          normalized.startsWith('..') ||
+          normalized.includes('/../') ||
+          normalized.includes('\\') ||
+          // Allow the root entry ('') and anything under .hermes/
+          !(normalized === '' || normalized === '.hermes' || normalized === '.hermes/' || normalized.startsWith('.hermes/'))
         ) {
           return {
             ok: false,

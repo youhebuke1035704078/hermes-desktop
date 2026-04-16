@@ -246,6 +246,10 @@ export const useConnectionStore = defineStore('connection', () => {
       if (msg === 'Connection superseded') return
 
       status.value = 'error'
+      // Clean up any watcher that may have been installed by a previous
+      // successful connection (or by connectFlow before the timeout fired).
+      stopStateSync?.()
+      stopStateSync = null
       // Stop background reconnect attempts on failure / timeout
       const wsStore = useWebSocketStore()
       wsStore.disconnect()
@@ -361,6 +365,7 @@ export const useConnectionStore = defineStore('connection', () => {
       // Roll back auth state so a retry doesn't reuse a bad token.
       hermesAuthToken.value = null
       authStore.setToken(null)
+      authStore.authEnabled = true  // Reset to default; don't leave it false if no key was found
       if (e instanceof ConnectionError) throw e
       throw new ConnectionError('network', '无法连接到本地 Hermes 服务器')
     }

@@ -1657,6 +1657,7 @@ export default {
       mgmtRetryProbe: 'Retry probe',
       mgmtInstallHint: 'Run `npm run mgmt-server:install` on the remote Hermes host, then click Retry (macOS only for now).',
       mgmtError: {
+        'empty-url': 'Management API URL is empty — please ensure a valid server URL has been set.',
         network: 'Cannot reach {url}. The management service may not be running or port 8643 may be blocked by a firewall.',
         timeout: 'Connection to {url} timed out (5s). Check network connectivity and whether the service is alive.',
         http: '{url} returned an unexpected HTTP status — port 8643 may be occupied by another service.',

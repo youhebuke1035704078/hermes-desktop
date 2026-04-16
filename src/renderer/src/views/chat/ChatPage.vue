@@ -1724,17 +1724,17 @@ function splitLeadingJsonValue(line: string): { parsed: unknown; rest: string } 
         escaped = false
         continue
       }
-      if (ch === '\\\\') {
+      if (ch === '\\') {
         escaped = true
         continue
       }
-      if (ch === '\"') {
+      if (ch === '"') {
         inString = false
       }
       continue
     }
 
-    if (ch === '\"') {
+    if (ch === '"') {
       inString = true
       continue
     }

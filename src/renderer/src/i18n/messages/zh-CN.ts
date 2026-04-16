@@ -1657,6 +1657,7 @@ export default {
       mgmtRetryProbe: '重新检测',
       mgmtInstallHint: '在远程 Hermes 主机上运行 npm run mgmt-server:install 后点击重新检测（当前仅支持 macOS）',
       mgmtError: {
+        'empty-url': '管理接口地址为空，请确认已正确填写服务器 URL。',
         network: '无法连接到 {url}，可能管理服务未运行或端口 8643 被防火墙拦截。',
         timeout: '连接 {url} 超时（5 秒），请检查网络或服务是否存活。',
         http: '{url} 返回了异常 HTTP 状态码，可能端口 8643 被其他服务占用。',
