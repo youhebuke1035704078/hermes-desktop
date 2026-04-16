@@ -425,6 +425,7 @@ function registerIpcHandlers(): void {
       switch (action) {
         case 'toggle': {
           const { name, disabled } = payload as { name: string; disabled: boolean }
+          if (typeof name !== 'string' || !name.trim()) return { ok: false, error: 'Invalid skill name' }
           if (!Array.isArray(skills.disabled)) skills.disabled = []
           if (disabled) {
             if (!skills.disabled.includes(name)) skills.disabled.push(name)
@@ -435,6 +436,9 @@ function registerIpcHandlers(): void {
         }
         case 'setConfigValue': {
           const { key, value } = payload as { key: string; value: any }
+          if (typeof key !== 'string' || !key.trim()) return { ok: false, error: 'Invalid config key' }
+          const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype'])
+          if (key.split('.').some((k) => FORBIDDEN.has(k))) return { ok: false, error: 'Forbidden key segment' }
           if (!skills.config || typeof skills.config !== 'object') skills.config = {}
           setNestedValue(skills.config, key, value)
           break
@@ -870,7 +874,7 @@ function registerIpcHandlers(): void {
         execFile('tar', [
           'xzf', srcPath,
           '-C', homedir(),
-        ], { timeout: 300000 }, (err) => {
+        ], { timeout: 300000, maxBuffer: 10 * 1024 * 1024 }, (err) => {
           if (err) reject(new Error(err.message))
           else resolve()
         })

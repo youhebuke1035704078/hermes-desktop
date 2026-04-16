@@ -43,9 +43,15 @@ function toIsoMs(s: string | null): number | undefined {
 }
 
 function normalizeCronJob(raw: HermesJobRaw): CronJob {
-  const scheduleObj: CronSchedule = raw.schedule?.kind === 'cron'
-    ? { kind: 'cron', expr: raw.schedule.expr || raw.schedule_display || '' }
-    : { kind: 'cron', expr: raw.schedule_display || '' }
+  const rawKind = raw.schedule?.kind || 'cron'
+  let scheduleObj: CronSchedule
+  if (rawKind === 'at') {
+    scheduleObj = { kind: 'at', at: raw.schedule?.expr || raw.schedule_display || '' }
+  } else if (rawKind === 'every') {
+    scheduleObj = { kind: 'every', everyMs: Number(raw.schedule?.expr) || 0 }
+  } else {
+    scheduleObj = { kind: 'cron', expr: raw.schedule?.expr || raw.schedule_display || '' }
+  }
 
   const state: CronJobState = {
     nextRunAtMs: toIsoMs(raw.next_run_at),

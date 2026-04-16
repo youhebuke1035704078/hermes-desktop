@@ -28,10 +28,11 @@ function dbg(...args: unknown[]): void {
   process.stderr.write('[ws-bridge] ' + args.map(String).join(' ') + '\n')
 }
 
-let ws: WebSocket | null = null
+// Per-WebContents WebSocket map (keyed by webContents.id)
+const wsMap = new Map<number, WebSocket>()
 
 /** Safely close a WebSocket without throwing */
-function safeClose(socket: WebSocket | null, code?: number, reason?: string): void {
+function safeClose(socket: WebSocket | null | undefined, code?: number, reason?: string): void {
   if (!socket) return
   try {
     socket.removeAllListeners()
@@ -53,15 +54,18 @@ function isSafeWsUrl(url: string): boolean {
   }
 }
 
-/** Cleanup any open socket on app shutdown — exported for main/index.ts to call. */
+/** Cleanup all open sockets on app shutdown — exported for main/index.ts to call. */
 export function shutdownWsBridge(): void {
-  safeClose(ws, 1001, 'app shutting down')
-  ws = null
+  for (const [, socket] of wsMap) {
+    safeClose(socket, 1001, 'app shutting down')
+  }
+  wsMap.clear()
 }
 
 export function registerWsBridge(): void {
   ipcMain.handle('ws:connect', (event, url: string, origin?: string) => {
-    dbg('ws:connect called, url =', url, 'origin =', origin)
+    const senderId = event.sender.id
+    dbg('ws:connect called, senderId =', senderId, 'url =', url, 'origin =', origin)
     if (!isSafeWsUrl(url)) {
       dbg('ws:connect BLOCKED — invalid scheme:', url)
       if (!event.sender.isDestroyed()) {
@@ -69,21 +73,22 @@ export function registerWsBridge(): void {
       }
       return
     }
-    // Tear down previous connection
-    safeClose(ws)
-    ws = null
+    // Tear down previous connection for this sender
+    safeClose(wsMap.get(senderId))
+    wsMap.delete(senderId)
 
     // Forward the renderer's own Origin so the gateway's allowedOrigins
     // check sees the same value it would from a normal browser connection.
     const headers: Record<string, string> = {}
     if (origin) headers['Origin'] = origin
 
-    ws = new WebSocket(url, { headers })
+    const ws = new WebSocket(url, { headers })
+    wsMap.set(senderId, ws)
 
     const sender: WebContents = event.sender
 
     ws.on('open', () => {
-      dbg('WebSocket opened')
+      dbg('WebSocket opened, senderId =', senderId)
       if (!sender.isDestroyed()) sender.send('ws:open')
     })
 
@@ -99,18 +104,20 @@ export function registerWsBridge(): void {
     })
 
     ws.on('close', (code: number, reason: Buffer) => {
-      dbg('close, code =', code, 'reason =', reason.toString())
+      dbg('close, senderId =', senderId, 'code =', code, 'reason =', reason.toString())
+      wsMap.delete(senderId)
       if (!sender.isDestroyed()) sender.send('ws:close', code, reason.toString())
     })
 
     ws.on('error', (err: Error) => {
-      dbg('WebSocket error:', err.message)
+      dbg('WebSocket error, senderId =', senderId, ':', err.message)
       if (!sender.isDestroyed()) sender.send('ws:error', err.message)
     })
   })
 
-  ipcMain.on('ws:send', (_event, data: string) => {
-    dbg('ws:send, len =', data.length, 'preview:', data.substring(0, 120))
+  ipcMain.on('ws:send', (event, data: string) => {
+    const ws = wsMap.get(event.sender.id)
+    dbg('ws:send, senderId =', event.sender.id, 'len =', data.length, 'preview:', data.substring(0, 120))
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(data)
     } else {
@@ -118,8 +125,9 @@ export function registerWsBridge(): void {
     }
   })
 
-  ipcMain.on('ws:close', (_event, code?: number, reason?: string) => {
+  ipcMain.on('ws:close', (event, code?: number, reason?: string) => {
+    const ws = wsMap.get(event.sender.id)
     safeClose(ws, code, reason)
-    ws = null
+    wsMap.delete(event.sender.id)
   })
 }

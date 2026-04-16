@@ -121,8 +121,11 @@ export async function scanSkillsDirectory(rootDir: string): Promise<SkillMeta[]>
  * Set a nested value in an object using a dot-delimited key path.
  * e.g. setNestedValue(obj, 'wiki.path', '/foo') → obj.wiki.path = '/foo'
  */
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
 export function setNestedValue(obj: Record<string, any>, dotPath: string, value: any): void {
   const keys = dotPath.split('.')
+  if (keys.some((k) => FORBIDDEN_KEYS.has(k))) return
   let current = obj
   for (let i = 0; i < keys.length - 1; i++) {
     const k = keys[i]!

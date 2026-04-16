@@ -92,6 +92,8 @@ export const useCronStore = defineStore('cron', () => {
   }
 
   async function toggleJob(id: string, enabled: boolean): Promise<boolean> {
+    if (saving.value) return false
+    saving.value = true
     lastError.value = null
     try {
       if (enabled) {
@@ -105,6 +107,8 @@ export const useCronStore = defineStore('cron', () => {
     } catch (e: any) {
       lastError.value = e.message
       return false
+    } finally {
+      saving.value = false
     }
   }
 

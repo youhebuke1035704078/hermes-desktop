@@ -32,8 +32,6 @@ export interface HermesConversation {
 const STORAGE_KEY = 'hermes_conversations'
 const MAX_CONVERSATIONS = 50
 
-/** Debounce timer for server sync */
-let syncTimer: ReturnType<typeof setTimeout> | null = null
 const SYNC_DEBOUNCE = 2000
 
 export const useHermesChatStore = defineStore('hermes-chat', () => {
@@ -42,6 +40,8 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
   const model = ref('hermes-agent')
   /** Whether server sync is available (management API detected) */
   const serverSyncAvailable = ref(false)
+  /** Debounce timer for server sync */
+  let syncTimer: ReturnType<typeof setTimeout> | null = null
 
   const activeConversation = computed(() =>
     conversations.value.find(c => c.id === activeId.value) || null,
@@ -75,9 +75,14 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     if (token) headers['Authorization'] = `Bearer ${token}`
     if (window.api?.httpFetch) {
       const resp = await window.api.httpFetch(url, { method: opts.method || 'GET', headers, body: opts.body })
+      if (!resp.ok) {
+        const errBody = typeof resp.body === 'string' ? resp.body : ''
+        throw new Error(errBody || `HTTP ${resp.status}`)
+      }
       return typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}
     }
     const resp = await fetch(url, { method: opts.method || 'GET', headers, body: opts.body, signal: AbortSignal.timeout(10000) })
+    if (!resp.ok) throw new Error(await resp.text() || `HTTP ${resp.status}`)
     return resp.json()
   }
 
@@ -205,10 +210,19 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
       activeId.value = conversations.value[0]?.id || null
     }
 
-    // Async: probe server sync and merge
-    probeServerSync().then(() => {
+    // Async: probe server sync and merge. After the server merge completes,
+    // ensure there is still at least one conversation (the server may have
+    // returned an empty list, or the blank conversation created above may
+    // have been correctly superseded by real server history).
+    probeServerSync().then(async () => {
       if (serverSyncAvailable.value) {
-        loadFromServer()
+        await loadFromServer()
+        if (!conversations.value.length) {
+          createConversation()
+          if (!activeId.value || !conversations.value.find(c => c.id === activeId.value)) {
+            activeId.value = conversations.value[0]?.id || null
+          }
+        }
       }
     })
   }

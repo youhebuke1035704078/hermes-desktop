@@ -2511,7 +2511,8 @@ export class RPCClient {
           agents: mergedAgents,
         }
       }
-      throw new Error('agents list is empty')
+      // Server returned empty agents list — fall back to config-based construction
+      throw new Error('unknown method: agents list is empty')
     } catch (error) {
       if (!this.shouldFallbackOnError(error)) {
         throw error

@@ -373,7 +373,7 @@ function parseToolResultMessage(item: ChatMessage): StructuredMessageView | null
   if (item.rawContent && Array.isArray(item.rawContent)) {
     for (const part of item.rawContent) {
       if (part.type === 'text' && part.text) {
-        contentText = part.text
+        contentText += part.text
       }
     }
   } else if (item.content) {

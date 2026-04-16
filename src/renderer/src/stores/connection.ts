@@ -90,7 +90,11 @@ export const useConnectionStore = defineStore('connection', () => {
         const data = body ? JSON.parse(body) : {}
         const modelId = data?.data?.[0]?.id
         if (modelId && modelId !== 'hermes-agent') {
-          hermesRealModel.value = modelId
+          // Guard against disconnect() racing with this non-blocking fetch.
+          // Only update if still connected to the same server.
+          if (currentServer.value?.url === serverUrl) {
+            hermesRealModel.value = modelId
+          }
           return
         }
       }
@@ -101,7 +105,9 @@ export const useConnectionStore = defineStore('connection', () => {
       try {
         const result = await window.api.hermesConfig()
         if (result.ok && result.model) {
-          hermesRealModel.value = result.model
+          if (currentServer.value?.url === serverUrl) {
+            hermesRealModel.value = result.model
+          }
           return
         }
       } catch { /* config read failed */ }

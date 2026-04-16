@@ -17,7 +17,8 @@ export const useConfigStore = defineStore('config', () => {
     try {
       config.value = await wsStore.rpc.getConfig()
     } catch (error) {
-      config.value = null
+      // Keep existing config on transient failures — don't blank the UI after a
+      // successful patchConfig just because the follow-up read hit a glitch.
       lastError.value = error instanceof Error ? error.message : String(error)
       console.error('[ConfigStore] fetchConfig failed:', error)
     } finally {

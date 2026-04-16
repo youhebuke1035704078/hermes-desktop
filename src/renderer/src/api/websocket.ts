@@ -86,17 +86,11 @@ export class HermesWebSocket {
   connect(url?: string, auth?: string): void {
     if (url) this.config.url = url
     if (auth !== undefined) this.config.auth = auth
-
-    this._state = ConnectionState.CONNECTING
-    this.emit('stateChange', ConnectionState.CONNECTING)
-
     this.apiClient.connect()
   }
 
   disconnect(): void {
-    this._state = ConnectionState.DISCONNECTED
     this.apiClient.disconnect()
-    this.emit('stateChange', ConnectionState.DISCONNECTED)
   }
 
   async send(data: RPCFrame): Promise<void> {
