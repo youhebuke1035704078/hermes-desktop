@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -8,12 +8,14 @@ import {
 } from 'naive-ui'
 import { GridOutline, RefreshOutline } from '@vicons/ionicons5'
 import { useHermesChatStore } from '@/stores/hermes-chat'
-import { buildHermesRestUsageData } from '@/stores/hermes-rest-usage'
+import { buildHermesRestUsageData, type UsageFilter } from '@/stores/hermes-rest-usage'
 import { useCronStore } from '@/stores/cron'
 import { useConnectionStore } from '@/stores/connection'
 import { useWebSocketStore } from '@/stores/websocket'
 import { formatRelativeTime } from '@/utils/format'
 import type { SessionsUsageResult } from '@/api/types'
+
+type RangePreset = 'all' | 'today' | 'yesterday' | '7d' | '15d' | '30d'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -37,6 +39,53 @@ const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest'
 const usageData = ref<SessionsUsageResult | null>(null)
 const usageLoading = ref(false)
 const usageError = ref<string | null>(null)
+// Default: 'all' preserves pre-v0.4.4 cumulative data visibility on first launch
+const rangePreset = ref<RangePreset>('all')
+
+/** Compute Unix-ms range from preset. Returns undefined for 'all' (no filter). */
+function buildFilterFromPreset(preset: RangePreset): UsageFilter | undefined {
+  if (preset === 'all') return undefined
+  const now = new Date()
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const day = 24 * 60 * 60 * 1000
+  switch (preset) {
+    case 'today':
+      return { startTs: startOfToday, endTs: endOfToday }
+    case 'yesterday':
+      return { startTs: startOfToday - day, endTs: startOfToday - 1 }
+    case '7d':
+      return { startTs: startOfToday - 6 * day, endTs: endOfToday }
+    case '15d':
+      return { startTs: startOfToday - 14 * day, endTs: endOfToday }
+    case '30d':
+      return { startTs: startOfToday - 29 * day, endTs: endOfToday }
+  }
+}
+
+function setRangePreset(preset: RangePreset) {
+  rangePreset.value = preset
+  // Re-aggregate immediately for REST mode (ACP mode range is server-side and currently unsupported)
+  if (isHermesRest.value) {
+    usageData.value = buildHermesRestUsageData(
+      hermesChatStore.conversations,
+      buildFilterFromPreset(preset),
+    )
+  }
+}
+
+// Re-aggregate REST data whenever conversations change (e.g. after a new turn completes)
+watch(
+  () => [hermesChatStore.conversations.length, hermesChatStore.activeConversation?.updatedAt],
+  () => {
+    if (isHermesRest.value) {
+      usageData.value = buildHermesRestUsageData(
+        hermesChatStore.conversations,
+        buildFilterFromPreset(rangePreset.value),
+      )
+    }
+  },
+)
 
 const totalTokens = computed(() => usageData.value?.totals?.totalTokens || 0)
 const inputTokens = computed(() => usageData.value?.totals?.input || 0)
@@ -68,6 +117,11 @@ const maxDailyTokens = computed(() => {
   if (!dailyTrend.value.length) return 1
   return Math.max(...dailyTrend.value.map(d => d.tokens), 1)
 })
+
+/** Daily trend card: always shown for ACP; for REST only when we actually have per-turn history data */
+const showDailyTrend = computed(() => !isHermesRest.value || dailyTrend.value.length > 0)
+/** Top Models spans full width when daily trend card is hidden (REST + no data) */
+const topModelsSpan = computed(() => showDailyTrend.value ? 1 : 2)
 
 // ── Recent data ──
 const recentConversations = computed(() =>
@@ -119,7 +173,10 @@ function goCron() {
 async function fetchUsageData() {
   // Hermes REST has no usage RPC — aggregate from locally-persisted conversation tokenUsage
   if (isHermesRest.value) {
-    usageData.value = buildHermesRestUsageData(hermesChatStore.conversations)
+    usageData.value = buildHermesRestUsageData(
+      hermesChatStore.conversations,
+      buildFilterFromPreset(rangePreset.value),
+    )
     usageError.value = null
     return
   }
@@ -208,6 +265,16 @@ onMounted(() => {
       <template #header>
         <NSpace align="center" :size="8">
           <span>{{ t('pages.dashboard.usage.totalTokens') }}</span>
+        </NSpace>
+      </template>
+      <template #header-extra>
+        <NSpace :size="6" wrap>
+          <NButton size="tiny" :type="rangePreset === 'today' ? 'primary' : 'default'" secondary @click="setRangePreset('today')">{{ t('pages.dashboard.range.today') }}</NButton>
+          <NButton size="tiny" :type="rangePreset === 'yesterday' ? 'primary' : 'default'" secondary @click="setRangePreset('yesterday')">{{ t('pages.dashboard.range.yesterday') }}</NButton>
+          <NButton size="tiny" :type="rangePreset === '7d' ? 'primary' : 'default'" secondary @click="setRangePreset('7d')">{{ t('pages.dashboard.range.last7d') }}</NButton>
+          <NButton size="tiny" :type="rangePreset === '15d' ? 'primary' : 'default'" secondary @click="setRangePreset('15d')">{{ t('pages.dashboard.range.last15d') }}</NButton>
+          <NButton size="tiny" :type="rangePreset === '30d' ? 'primary' : 'default'" secondary @click="setRangePreset('30d')">{{ t('pages.dashboard.range.last30d') }}</NButton>
+          <NButton size="tiny" :type="rangePreset === 'all' ? 'primary' : 'default'" secondary @click="setRangePreset('all')">{{ t('pages.dashboard.range.all') }}</NButton>
         </NSpace>
       </template>
 
@@ -303,10 +370,10 @@ onMounted(() => {
       </NSpin>
     </NCard>
 
-    <!-- Two-column: Daily Trend + Top Models (Daily Trend hidden in hermes-rest mode — no per-turn timestamps) -->
+    <!-- Two-column: Daily Trend + Top Models (Daily hidden in REST-all mode since we only have per-turn data under a time range) -->
     <NGrid cols="1 m:2" responsive="screen" :x-gap="12" :y-gap="12">
-      <!-- Left: Daily Trend (ACP only) -->
-      <NGridItem v-if="!isHermesRest">
+      <!-- Left: Daily Trend -->
+      <NGridItem v-if="showDailyTrend">
         <NCard :title="t('pages.dashboard.cards.trend')" size="small">
           <div v-if="!dailyTrend.length" style="text-align: center; padding: 24px;">
             <NText depth="3">{{ t('pages.dashboard.trend.empty') }}</NText>
@@ -342,7 +409,7 @@ onMounted(() => {
       </NGridItem>
 
       <!-- Right: Top Models -->
-      <NGridItem :span="isHermesRest ? 2 : 1">
+      <NGridItem :span="topModelsSpan">
         <NCard :title="t('pages.dashboard.top.models')" size="small">
           <div v-if="!topModels.length" style="text-align: center; padding: 24px;">
             <NText depth="3">-</NText>

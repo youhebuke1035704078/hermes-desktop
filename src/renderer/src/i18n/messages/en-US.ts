@@ -1006,6 +1006,11 @@ export default {
       },
       range: {
         today: 'Today',
+        yesterday: 'Yesterday',
+        last7d: 'Last 7d',
+        last15d: 'Last 15d',
+        last30d: 'Last 30d',
+        all: 'All',
         to: 'to',
       },
       usageMode: {

@@ -12,6 +12,7 @@ function mkConv(partial: Partial<HermesConversation>): HermesConversation {
     createdAt: partial.createdAt || 1_700_000_000_000,
     updatedAt: partial.updatedAt || 1_700_000_000_000,
     tokenUsage: partial.tokenUsage,
+    tokenUsageHistory: partial.tokenUsageHistory,
   }
 }
 
@@ -169,5 +170,121 @@ describe('buildHermesRestUsageData', () => {
     const after = Date.now()
     expect(result.updatedAt).toBeGreaterThanOrEqual(before)
     expect(result.updatedAt).toBeLessThanOrEqual(after)
+  })
+
+  describe('with time-range filter', () => {
+    const day = 24 * 60 * 60 * 1000
+    const now = 1_700_000_000_000 // fixed reference
+    const today = now
+    const yesterday = now - day
+    const weekAgo = now - 7 * day
+
+    it('filter includes only entries within [startTs, endTs]', () => {
+      const convs = [
+        mkConv({
+          id: 'c1',
+          model: 'gpt-5.4',
+          tokenUsage: { totalInput: 160, totalOutput: 300 },
+          tokenUsageHistory: [
+            { ts: today, input: 100, output: 200 },
+            { ts: yesterday, input: 50, output: 80 },
+            { ts: weekAgo, input: 10, output: 20 },
+          ],
+        }),
+      ]
+      const result = buildHermesRestUsageData(convs, { startTs: yesterday, endTs: today })
+      expect(result.totals.input).toBe(150)
+      expect(result.totals.output).toBe(280)
+      expect(result.totals.totalTokens).toBe(430)
+    })
+
+    it('filter excludes conversations whose history is entirely outside range', () => {
+      const convs = [
+        mkConv({
+          id: 'c1',
+          tokenUsage: { totalInput: 100, totalOutput: 200 },
+          tokenUsageHistory: [{ ts: today, input: 100, output: 200 }],
+        }),
+        mkConv({
+          id: 'c2',
+          tokenUsage: { totalInput: 50, totalOutput: 80 },
+          tokenUsageHistory: [{ ts: weekAgo, input: 50, output: 80 }],
+        }),
+      ]
+      const result = buildHermesRestUsageData(convs, { startTs: yesterday, endTs: today + day })
+      expect(result.totals.input).toBe(100)
+      expect(result.sessions.length).toBe(1)
+      expect(result.sessions[0]!.key).toBe('c1')
+    })
+
+    it('filter excludes conversations without history (old data pre-v0.4.4)', () => {
+      const convs = [
+        mkConv({
+          id: 'c1',
+          tokenUsage: { totalInput: 100, totalOutput: 200 },
+          // no tokenUsageHistory
+        }),
+      ]
+      const result = buildHermesRestUsageData(convs, { startTs: yesterday, endTs: today + day })
+      expect(result.totals.totalTokens).toBe(0)
+      expect(result.sessions.length).toBe(0)
+    })
+
+    it('byModel groups by entry.model when filter applied', () => {
+      const convs = [
+        mkConv({
+          id: 'c1',
+          model: 'hermes-agent',
+          resolvedModel: 'gpt-5.4',
+          tokenUsage: { totalInput: 150, totalOutput: 280 },
+          tokenUsageHistory: [
+            { ts: today, input: 100, output: 200, model: 'gpt-5.4' },
+            { ts: today, input: 50, output: 80, model: 'claude-sonnet-4.5' },
+          ],
+        }),
+      ]
+      const result = buildHermesRestUsageData(convs, { startTs: today - 60_000, endTs: today + 60_000 })
+      expect(result.aggregates.byModel.length).toBe(2)
+      const gpt = result.aggregates.byModel.find(m => m.model === 'gpt-5.4')!
+      expect(gpt.totals.totalTokens).toBe(300)
+      const claude = result.aggregates.byModel.find(m => m.model === 'claude-sonnet-4.5')!
+      expect(claude.totals.totalTokens).toBe(130)
+    })
+
+    it('daily aggregation is populated from history entries within range', () => {
+      const convs = [
+        mkConv({
+          id: 'c1',
+          model: 'gpt-5.4',
+          tokenUsage: { totalInput: 160, totalOutput: 300 },
+          tokenUsageHistory: [
+            { ts: today, input: 100, output: 200 }, // day A
+            { ts: today + 1000, input: 30, output: 60 }, // same day A, later
+            { ts: yesterday, input: 30, output: 40 }, // day B
+          ],
+        }),
+      ]
+      const result = buildHermesRestUsageData(convs, { startTs: yesterday - day, endTs: today + day })
+      expect(result.aggregates.daily.length).toBe(2)
+      // Should be sorted by date ascending
+      const sorted = [...result.aggregates.daily].sort((a, b) => a.date.localeCompare(b.date))
+      expect(sorted).toEqual(result.aggregates.daily)
+      // Sum across both days = 160 + 300 = 460 tokens
+      const totalFromDaily = result.aggregates.daily.reduce((s, d) => s + d.tokens, 0)
+      expect(totalFromDaily).toBe(460)
+    })
+
+    it('without filter, falls back to cumulative tokenUsage behavior', () => {
+      const convs = [
+        mkConv({
+          id: 'c1',
+          tokenUsage: { totalInput: 100, totalOutput: 200 },
+          // No history — old v0.4.2/v0.4.3 data
+        }),
+      ]
+      const result = buildHermesRestUsageData(convs)
+      expect(result.totals.totalTokens).toBe(300)
+      expect(result.sessions.length).toBe(1)
+    })
   })
 })

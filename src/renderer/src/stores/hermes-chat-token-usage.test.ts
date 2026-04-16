@@ -54,4 +54,69 @@ describe('hermes-chat token usage', () => {
     const roundTripped = JSON.parse(JSON.stringify(conv))
     expect(roundTripped.tokenUsage).toEqual({ totalInput: 100, totalOutput: 200 })
   })
+
+  it('accumulateTokenUsage appends per-turn history entry with timestamp', () => {
+    const store = useHermesChatStore()
+    const id = store.createConversation()
+    const before = Date.now()
+    store.accumulateTokenUsage(id, 100, 200)
+    const after = Date.now()
+    const conv = store.conversations.find(c => c.id === id)
+    expect(conv?.tokenUsageHistory).toBeDefined()
+    expect(conv!.tokenUsageHistory!.length).toBe(1)
+    const entry = conv!.tokenUsageHistory![0]!
+    expect(entry.input).toBe(100)
+    expect(entry.output).toBe(200)
+    expect(entry.ts).toBeGreaterThanOrEqual(before)
+    expect(entry.ts).toBeLessThanOrEqual(after)
+  })
+
+  it('accumulateTokenUsage appends multiple history entries preserving order', () => {
+    const store = useHermesChatStore()
+    const id = store.createConversation()
+    store.accumulateTokenUsage(id, 100, 200)
+    store.accumulateTokenUsage(id, 50, 80)
+    store.accumulateTokenUsage(id, 10, 20)
+    const conv = store.conversations.find(c => c.id === id)
+    expect(conv!.tokenUsageHistory!.length).toBe(3)
+    expect(conv!.tokenUsageHistory![0]!.input).toBe(100)
+    expect(conv!.tokenUsageHistory![1]!.input).toBe(50)
+    expect(conv!.tokenUsageHistory![2]!.input).toBe(10)
+  })
+
+  it('accumulateTokenUsage records optional model on history entry', () => {
+    const store = useHermesChatStore()
+    const id = store.createConversation()
+    store.accumulateTokenUsage(id, 100, 200, 'gpt-5.4')
+    const conv = store.conversations.find(c => c.id === id)
+    expect(conv!.tokenUsageHistory![0]!.model).toBe('gpt-5.4')
+  })
+
+  it('accumulateTokenUsage works without model argument (backward compat)', () => {
+    const store = useHermesChatStore()
+    const id = store.createConversation()
+    store.accumulateTokenUsage(id, 100, 200)
+    const conv = store.conversations.find(c => c.id === id)
+    expect(conv!.tokenUsageHistory![0]!.model).toBeUndefined()
+  })
+
+  it('tokenUsageHistory survives round-trip through JSON serialization', () => {
+    const store = useHermesChatStore()
+    const id = store.createConversation()
+    store.accumulateTokenUsage(id, 100, 200, 'gpt-5.4')
+    store.accumulateTokenUsage(id, 50, 80, 'gpt-5.4')
+    const conv = store.conversations.find(c => c.id === id)!
+    const roundTripped = JSON.parse(JSON.stringify(conv))
+    expect(roundTripped.tokenUsageHistory).toHaveLength(2)
+    expect(roundTripped.tokenUsageHistory[0].model).toBe('gpt-5.4')
+    expect(roundTripped.tokenUsageHistory[1].input).toBe(50)
+  })
+
+  it('zero-value call does not append history entry', () => {
+    const store = useHermesChatStore()
+    const id = store.createConversation()
+    store.accumulateTokenUsage(id, 0, 0)
+    const conv = store.conversations.find(c => c.id === id)
+    expect(conv?.tokenUsageHistory).toBeUndefined()
+  })
 })

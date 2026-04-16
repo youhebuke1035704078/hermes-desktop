@@ -1006,6 +1006,11 @@ export default {
       },
       range: {
         today: '今天',
+        yesterday: '昨天',
+        last7d: '近 7 天',
+        last15d: '近 15 天',
+        last30d: '近 30 天',
+        all: '全部',
         to: '到',
       },
       usageMode: {

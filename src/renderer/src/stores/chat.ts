@@ -1012,6 +1012,7 @@ export const useChatStore = defineStore('chat', () => {
       // applyFallbackStamp helper is a no-op when the state isn't in
       // fallback or the message is already stamped.
       let lastChunkUsage: { inputTokens: number; outputTokens: number } | null = null
+      let lastChunkModel: string | null = null
       const cleanupChunkListener = window.api.onHermesChatChunk((chunk) => {
         if (chunk.done) return
         const delta = chunk.data?.choices?.[0]?.delta
@@ -1025,6 +1026,9 @@ export const useChatStore = defineStore('chat', () => {
             messages.value = [...messages.value] // trigger Vue reactivity
           }
         }
+        // Capture resolved model name from chunk (gateway echoes it in every chunk)
+        const chunkModel = (chunk.data as { model?: unknown } | null)?.model
+        if (typeof chunkModel === 'string' && chunkModel) lastChunkModel = chunkModel
         // Capture usage from the final chunk (finish_reason: "stop")
         const usage = extractUsageFromChunk(chunk.data)
         if (usage) lastChunkUsage = usage
@@ -1053,11 +1057,13 @@ export const useChatStore = defineStore('chat', () => {
         // Note: TypeScript can't track assignments inside callbacks, so we
         // cast to escape the `never` narrowing on the closure-mutated variable.
         const finalUsage = lastChunkUsage as { inputTokens: number; outputTokens: number } | null
+        const finalModel = lastChunkModel as string | null
         if (finalUsage && hermesChatStore.activeId) {
           hermesChatStore.accumulateTokenUsage(
             hermesChatStore.activeId,
             finalUsage.inputTokens,
             finalUsage.outputTokens,
+            finalModel || undefined,
           )
         }
 

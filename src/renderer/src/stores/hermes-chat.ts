@@ -4,6 +4,15 @@ import { safeGet, safeSet } from '@/utils/safe-storage'
 import { useConnectionStore } from './connection'
 import type { ChatMessage } from '@/api/types'
 
+export interface TokenUsageEntry {
+  /** Unix ms timestamp when this turn completed */
+  ts: number
+  input: number
+  output: number
+  /** Resolved model for this specific turn (may differ across turns if user switched) */
+  model?: string
+}
+
 export interface HermesConversation {
   id: string
   title: string
@@ -15,6 +24,9 @@ export interface HermesConversation {
   updatedAt: number
   /** Cumulative token usage across all turns in this conversation */
   tokenUsage?: { totalInput: number; totalOutput: number }
+  /** Per-turn usage records — enables time-range filtering.
+   *  Added in v0.4.4; older conversations may only have cumulative `tokenUsage`. */
+  tokenUsageHistory?: TokenUsageEntry[]
 }
 
 const STORAGE_KEY = 'hermes_conversations'
@@ -265,8 +277,8 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     save()
   }
 
-  /** Accumulate token usage from a single turn into the conversation total */
-  function accumulateTokenUsage(id: string, inputTokens: number, outputTokens: number) {
+  /** Accumulate token usage from a single turn into the conversation total AND append a per-turn history entry */
+  function accumulateTokenUsage(id: string, inputTokens: number, outputTokens: number, model?: string) {
     if (inputTokens <= 0 && outputTokens <= 0) return
     const conv = conversations.value.find(c => c.id === id)
     if (!conv) return
@@ -275,6 +287,14 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
       totalInput: prev.totalInput + inputTokens,
       totalOutput: prev.totalOutput + outputTokens,
     }
+    if (!conv.tokenUsageHistory) conv.tokenUsageHistory = []
+    const entry: TokenUsageEntry = {
+      ts: Date.now(),
+      input: inputTokens,
+      output: outputTokens,
+    }
+    if (model) entry.model = model
+    conv.tokenUsageHistory.push(entry)
     conv.updatedAt = Date.now()
     save()
   }
