@@ -295,6 +295,11 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     }
     if (model) entry.model = model
     conv.tokenUsageHistory.push(entry)
+    // Persist the real model from the SSE chunk onto the conversation so the
+    // dashboard's "all" preset (legacy byModel aggregation via
+    // conv.resolvedModel) shows real names like "gemini-2.5-flash" instead of
+    // the generic "hermes-agent" proxy label.
+    if (model) conv.resolvedModel = model
     conv.updatedAt = Date.now()
     save()
   }

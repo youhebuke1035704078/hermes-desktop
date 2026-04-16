@@ -92,12 +92,37 @@ describe('hermes-chat token usage', () => {
     expect(conv!.tokenUsageHistory![0]!.model).toBe('gpt-5.4')
   })
 
+  it('accumulateTokenUsage with model also sets conv.resolvedModel', () => {
+    const store = useHermesChatStore()
+    const id = store.createConversation()
+    // Initially resolvedModel is undefined (fresh conversation)
+    expect(store.conversations.find(c => c.id === id)?.resolvedModel).toBeUndefined()
+    store.accumulateTokenUsage(id, 100, 200, 'gemini-2.5-flash')
+    const conv = store.conversations.find(c => c.id === id)
+    // The real model name from the SSE chunk should be persisted on the conversation
+    // so legacy-mode byModel aggregation (no time filter) doesn't fall back to "hermes-agent".
+    expect(conv!.resolvedModel).toBe('gemini-2.5-flash')
+  })
+
+  it('accumulateTokenUsage updates conv.resolvedModel when the model changes mid-conversation', () => {
+    const store = useHermesChatStore()
+    const id = store.createConversation()
+    store.accumulateTokenUsage(id, 100, 200, 'gpt-5.4')
+    store.accumulateTokenUsage(id, 50, 80, 'claude-sonnet-4.5')
+    const conv = store.conversations.find(c => c.id === id)
+    // Most recent real model wins on the conversation (per-turn history still
+    // has each turn's own model for filtered aggregation).
+    expect(conv!.resolvedModel).toBe('claude-sonnet-4.5')
+  })
+
   it('accumulateTokenUsage works without model argument (backward compat)', () => {
     const store = useHermesChatStore()
     const id = store.createConversation()
     store.accumulateTokenUsage(id, 100, 200)
     const conv = store.conversations.find(c => c.id === id)
     expect(conv!.tokenUsageHistory![0]!.model).toBeUndefined()
+    // Without a real model, we don't touch resolvedModel — stays undefined
+    expect(conv!.resolvedModel).toBeUndefined()
   })
 
   it('tokenUsageHistory survives round-trip through JSON serialization', () => {
