@@ -66,6 +66,24 @@ function capMessages(list: readonly ChatMessage[]): ChatMessage[] {
   return list.slice(list.length - MAX_MESSAGES_IN_MEMORY)
 }
 
+/**
+ * Extract token usage from an SSE chunk.
+ * hermes-agent sends usage in the final chunk (the one with finish_reason: "stop").
+ * Returns { inputTokens, outputTokens } or null if no usage data present.
+ */
+export function extractUsageFromChunk(
+  chunkData: unknown,
+): { inputTokens: number; outputTokens: number } | null {
+  if (!chunkData || typeof chunkData !== 'object') return null
+  const usage = (chunkData as Record<string, unknown>).usage
+  if (!usage || typeof usage !== 'object') return null
+  const u = usage as Record<string, unknown>
+  const input = typeof u.prompt_tokens === 'number' ? u.prompt_tokens : 0
+  const output = typeof u.completion_tokens === 'number' ? u.completion_tokens : 0
+  if (input === 0 && output === 0) return null
+  return { inputTokens: input, outputTokens: output }
+}
+
 export const useChatStore = defineStore('chat', () => {
   const CONTEXT_COMPACTION_DETAIL_ZH = '上下文压缩中...'
   const CONTEXT_COMPACTION_DETAIL_EN = 'Compacting context...'
@@ -993,6 +1011,7 @@ export const useChatStore = defineStore('chat', () => {
       // current modelStore state on every content chunk. The
       // applyFallbackStamp helper is a no-op when the state isn't in
       // fallback or the message is already stamped.
+      let lastChunkUsage: { inputTokens: number; outputTokens: number } | null = null
       const cleanupChunkListener = window.api.onHermesChatChunk((chunk) => {
         if (chunk.done) return
         const delta = chunk.data?.choices?.[0]?.delta
@@ -1006,6 +1025,9 @@ export const useChatStore = defineStore('chat', () => {
             messages.value = [...messages.value] // trigger Vue reactivity
           }
         }
+        // Capture usage from the final chunk (finish_reason: "stop")
+        const usage = extractUsageFromChunk(chunk.data)
+        if (usage) lastChunkUsage = usage
       })
 
       try {
@@ -1025,6 +1047,18 @@ export const useChatStore = defineStore('chat', () => {
 
         if (!result.ok) {
           throw new Error(result.error || 'Chat request failed')
+        }
+
+        // Accumulate token usage into the conversation.
+        // Note: TypeScript can't track assignments inside callbacks, so we
+        // cast to escape the `never` narrowing on the closure-mutated variable.
+        const finalUsage = lastChunkUsage as { inputTokens: number; outputTokens: number } | null
+        if (finalUsage && hermesChatStore.activeId) {
+          hermesChatStore.accumulateTokenUsage(
+            hermesChatStore.activeId,
+            finalUsage.inputTokens,
+            finalUsage.outputTokens,
+          )
         }
 
         setAgentStatusPhase(agentId, 'done', { runId: null, detail: null })

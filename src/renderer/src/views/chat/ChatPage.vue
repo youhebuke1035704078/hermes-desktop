@@ -244,8 +244,19 @@ const sessionTokenUsageFromList = computed<SessionTokenUsage | null>(() => {
   })
 })
 
+/** Token usage from hermes-chat store (REST mode — accumulated from SSE chunks) */
+const hermesTokenUsage = computed<SessionTokenUsage | null>(() => {
+  if (!isHermesRest.value) return null
+  const conv = hermesChatStore.activeConversation
+  if (!conv?.tokenUsage) return null
+  return createSessionTokenUsage({
+    input: conv.tokenUsage.totalInput,
+    output: conv.tokenUsage.totalOutput,
+  })
+})
+
 const currentSessionTokenUsage = computed<SessionTokenUsage | null>(() =>
-  sessionTokenUsage.value || sessionTokenUsageFromList.value
+  sessionTokenUsage.value || sessionTokenUsageFromList.value || hermesTokenUsage.value
 )
 
 function formatTokenCount(value: number): string {
@@ -256,13 +267,19 @@ const sessionTokenMetricTags = computed(() => {
   const usage = currentSessionTokenUsage.value
   if (!usage) return []
 
-  return [
+  const tags = [
     { key: 'total', label: t('pages.chat.tokens.total'), value: formatTokenCount(usage.total), highlight: true },
     { key: 'input', label: t('pages.chat.tokens.input'), value: formatTokenCount(usage.input), highlight: false },
     { key: 'output', label: t('pages.chat.tokens.output'), value: formatTokenCount(usage.output), highlight: false },
-    { key: 'cacheRead', label: t('pages.chat.tokens.cacheRead'), value: formatTokenCount(usage.cacheRead), highlight: false },
-    { key: 'cacheWrite', label: t('pages.chat.tokens.cacheWrite'), value: formatTokenCount(usage.cacheWrite), highlight: false },
   ]
+  // Only show cache metrics when they have non-zero values (REST API doesn't report them)
+  if (usage.cacheRead > 0) {
+    tags.push({ key: 'cacheRead', label: t('pages.chat.tokens.cacheRead'), value: formatTokenCount(usage.cacheRead), highlight: false })
+  }
+  if (usage.cacheWrite > 0) {
+    tags.push({ key: 'cacheWrite', label: t('pages.chat.tokens.cacheWrite'), value: formatTokenCount(usage.cacheWrite), highlight: false })
+  }
+  return tags
 })
 
 const sessionTokenStatusText = computed(() =>
@@ -2525,9 +2542,9 @@ async function handleSend() {
     <NCard :title="t('pages.chat.title')" class="app-card chat-root-card">
       <template #header-extra>
         <NSpace :size="8" class="app-toolbar">
-          <!-- ACP Token metrics -->
-          <template v-if="!isHermesRest">
-            <div v-if="sessionTokenMetricTags.length" class="chat-token-metrics">
+          <!-- Token metrics (both ACP and Hermes REST) -->
+          <template v-if="sessionTokenMetricTags.length">
+            <div class="chat-token-metrics">
               <NTag
                 v-for="metric in sessionTokenMetricTags"
                 :key="metric.key"
@@ -2541,13 +2558,14 @@ async function handleSend() {
                 <span class="chat-token-chip__value">{{ metric.value }}</span>
               </NTag>
             </div>
-            <NTag v-else size="small" :bordered="false" round class="chat-token-chip chat-token-chip--loading">
-              {{ sessionTokenStatusText }}
-            </NTag>
           </template>
-          <!-- Hermes REST: model indicator (show actual model from config) -->
-          <NTag v-else size="small" :bordered="false" round type="info">
+          <!-- Hermes REST: model indicator (when no token data yet) -->
+          <NTag v-else-if="isHermesRest" size="small" :bordered="false" round type="info">
             {{ connectionStore.hermesRealModel || hermesModel }}
+          </NTag>
+          <!-- ACP: loading/unavailable state -->
+          <NTag v-else size="small" :bordered="false" round class="chat-token-chip chat-token-chip--loading">
+            {{ sessionTokenStatusText }}
           </NTag>
           <NButton size="small" class="app-toolbar-btn app-toolbar-btn--refresh" :loading="refreshingChatData" @click="handleRefreshChatData">
             <template #icon><NIcon :component="RefreshOutline" /></template>

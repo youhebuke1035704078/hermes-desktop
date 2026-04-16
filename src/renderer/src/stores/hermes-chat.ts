@@ -13,6 +13,8 @@ export interface HermesConversation {
   resolvedModel?: string
   createdAt: number
   updatedAt: number
+  /** Cumulative token usage across all turns in this conversation */
+  tokenUsage?: { totalInput: number; totalOutput: number }
 }
 
 const STORAGE_KEY = 'hermes_conversations'
@@ -263,6 +265,20 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     save()
   }
 
+  /** Accumulate token usage from a single turn into the conversation total */
+  function accumulateTokenUsage(id: string, inputTokens: number, outputTokens: number) {
+    if (inputTokens <= 0 && outputTokens <= 0) return
+    const conv = conversations.value.find(c => c.id === id)
+    if (!conv) return
+    const prev = conv.tokenUsage || { totalInput: 0, totalOutput: 0 }
+    conv.tokenUsage = {
+      totalInput: prev.totalInput + inputTokens,
+      totalOutput: prev.totalOutput + outputTokens,
+    }
+    conv.updatedAt = Date.now()
+    save()
+  }
+
   return {
     conversations,
     activeId,
@@ -278,5 +294,6 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     renameConversation,
     setMessages,
     setModel,
+    accumulateTokenUsage,
   }
 })
