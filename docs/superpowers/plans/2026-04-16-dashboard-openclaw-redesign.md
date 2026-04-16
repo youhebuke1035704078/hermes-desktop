@@ -1,3 +1,93 @@
+# Dashboard openclaw Redesign Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Rewrite `DashboardPage.vue` to mirror openclaw-desktop's Dashboard.vue visual language while preserving v0.4.4 time-range filter data flow; drop Recent Conversations / Cron Runs / Server Info modules per user directive.
+
+**Architecture:** Pure UI refactor — no data model changes. Existing `buildHermesRestUsageData` + `tokenUsageHistory` feed the new layout unchanged. New computeds + SVG chart ported from openclaw. Scoped styles replace the inline `style=""` attrs.
+
+**Tech Stack:** Vue 3 `<script setup>`, Pinia stores (already present), naive-ui (NCard/NGrid/NButton/NTag/NSpin/NAlert/NSpace), SVG for trend, scoped CSS, vue-i18n.
+
+**Spec:** `docs/superpowers/specs/2026-04-16-dashboard-openclaw-redesign-design.md`
+
+---
+
+### Task 1: Extend i18n with new keys, mark deprecated ones as dead
+
+**Files:**
+- Modify: `src/renderer/src/i18n/messages/zh-CN.ts:969-1111`
+- Modify: `src/renderer/src/i18n/messages/en-US.ts` (corresponding dashboard section)
+
+Inspection shows many needed keys already exist (`hero.title/subtitle`, `connection.*`, `lastUpdated.*`, `usage.coverage.*`, `cards.trend/structure/top`, `kpis.messages/activeDays`, `top.models`, `trend.empty/pointTitle`, `stats.sessions/cronJobs/totalTokens`). Only net-new keys needed:
+
+- [ ] **Step 1: Add net-new keys to `zh-CN.ts`**
+
+Add inside `pages.dashboard`:
+
+```typescript
+// under pages.dashboard.stats (after `skills: '已安装技能'`)
+modelsSeen: '见过的模型数',
+
+// under pages.dashboard.kpis (after activeDays block)
+totalTokens: {
+  label: '总 Token',
+  hint: '范围内累计 token 消耗',
+},
+lastUsed: {
+  label: '最近使用',
+  hint: '最近一次产生 token 的时间',
+  never: '尚未使用',
+},
+```
+
+Also update `kpis.activeDays.hint` from existing `'已选范围 {days} 天'` to `'已选范围内 {days} 天有记录'` (the current string implies total days in range; we want days *with* usage).
+
+- [ ] **Step 2: Add net-new keys to `en-US.ts`**
+
+Mirror the zh-CN additions:
+
+```typescript
+modelsSeen: 'Models Seen',
+
+totalTokens: {
+  label: 'Total Tokens',
+  hint: 'Cumulative tokens in range',
+},
+lastUsed: {
+  label: 'Last Used',
+  hint: 'Most recent token-consuming turn',
+  never: 'Never',
+},
+```
+
+And `kpis.activeDays.hint`: `'{days} days with activity in range'`.
+
+- [ ] **Step 3: Verify typecheck**
+
+Run: `pnpm typecheck`
+Expected: PASS (existing, no regression).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/renderer/src/i18n/messages/zh-CN.ts src/renderer/src/i18n/messages/en-US.ts
+git commit -m "i18n(dashboard): add modelsSeen/totalTokens/lastUsed keys for openclaw redesign"
+```
+
+---
+
+### Task 2: Rewrite DashboardPage.vue script block — computeds & helpers
+
+**Files:**
+- Modify: `src/renderer/src/views/dashboard/DashboardPage.vue:1-209` (script section)
+
+This task replaces the existing script with a new structure that keeps v0.4.4 data flow (filter preset → `buildHermesRestUsageData`) and adds openclaw-style computeds. Template is rewritten in Task 3.
+
+- [ ] **Step 1: Replace script block**
+
+Overwrite lines 1-209 with the following. (Note: the entire file is being rewritten in two steps — script now, template+style in Task 3. Preserve line 210 `</script>` and everything below.)
+
+```vue
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -6,7 +96,7 @@ import {
   NCard, NGrid, NGridItem, NText, NSpace, NButton, NIcon, NTag,
   NSpin, NAlert,
 } from 'naive-ui'
-import { RefreshOutline, ChatboxEllipsesOutline } from '@vicons/ionicons5'
+import { GridOutline, RefreshOutline, ChatboxEllipsesOutline } from '@vicons/ionicons5'
 import { useHermesChatStore } from '@/stores/hermes-chat'
 import { buildHermesRestUsageData, type UsageFilter } from '@/stores/hermes-rest-usage'
 import { useCronStore } from '@/stores/cron'
@@ -56,7 +146,8 @@ const connectionLabel = computed(() => {
   switch (connectionStore.status) {
     case 'connected': return t('pages.dashboard.connection.connected')
     case 'connecting': return t('pages.dashboard.connection.connecting')
-    case 'error': return t('pages.dashboard.connection.failed')
+    case 'reconnecting': return t('pages.dashboard.connection.reconnecting')
+    case 'failed': return t('pages.dashboard.connection.failed')
     default: return t('pages.dashboard.connection.disconnected')
   }
 })
@@ -64,8 +155,9 @@ const connectionLabel = computed(() => {
 const connectionType = computed<'success' | 'warning' | 'error' | 'default'>(() => {
   switch (connectionStore.status) {
     case 'connected': return 'success'
-    case 'connecting': return 'warning'
-    case 'error': return 'error'
+    case 'connecting':
+    case 'reconnecting': return 'warning'
+    case 'failed': return 'error'
     default: return 'default'
   }
 })
@@ -387,6 +479,32 @@ onMounted(() => {
   if (cronStore.jobs.length === 0) cronStore.fetchJobs()
   fetchUsageData()
 })
+</script>
+```
+
+- [ ] **Step 2: Run typecheck**
+
+Run: `pnpm typecheck`
+Expected: PASS (the template references below in Task 3 will be added next; template block from previous version will error until Task 3 is complete, so note: run typecheck AFTER Task 3 Step 1, not after Task 2 Step 1).
+
+Skip this step; verification runs at end of Task 3.
+
+- [ ] **Step 3: Do NOT commit yet**
+
+Leave uncommitted; template still references removed computeds. Commit happens at end of Task 3.
+
+---
+
+### Task 3: Rewrite DashboardPage.vue template and styles
+
+**Files:**
+- Modify: `src/renderer/src/views/dashboard/DashboardPage.vue:210-530` (template + style)
+
+- [ ] **Step 1: Replace template and style blocks**
+
+Overwrite from line 210 onward (replace everything from `</script>` onward with the below, including the closing `</script>`, new `<template>`, and `<style scoped>`):
+
+```vue
 </script>
 
 <template>
@@ -917,3 +1035,94 @@ onMounted(() => {
   }
 }
 </style>
+```
+
+- [ ] **Step 2: Run typecheck**
+
+Run: `pnpm typecheck`
+Expected: PASS. If fails, inspect error; likely cause: missing i18n key → add to zh-CN.ts and en-US.ts.
+
+- [ ] **Step 3: Run tests**
+
+Run: `pnpm test`
+Expected: `148 passed | 0 failed` (no test changes, data model unchanged).
+
+- [ ] **Step 4: Manual visual verification**
+
+Run `pnpm dev` and verify:
+1. Dashboard loads without console errors.
+2. Hero card shows title + subtitle + 3 tags (connection, coverage, last-updated).
+3. 6 range preset pills work; clicking updates tags and trend chart.
+4. 4 stat cards show correct counts.
+5. 4 KPI cards populate (Messages, Total Tokens, Active Days, Last Used).
+6. With preset other than `all`, trend chart shows SVG line + area + grid lines.
+7. Hovering trend chart shows a dashed vertical guide + larger point + tooltip pinned inside card.
+8. Structure card shows 2-segment bar sized by input/output proportion + legend rows.
+9. Top Models card shows gradient bars sized by proportion.
+10. Alert renders if fetchUsageData fails (e.g. disconnect Hermes and refresh).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/renderer/src/views/dashboard/DashboardPage.vue
+git commit -m "feat(dashboard): rewrite to mirror openclaw-desktop layout
+
+- Hero card with gradient + connection/coverage/last-updated tags
+- 4-card stat row (conversations/cron/models-seen/total-tokens)
+- 4-KPI grid (messages/total-tokens/active-days/last-used)
+- SVG trend chart with hover tooltip (ported from openclaw)
+- 2-segment structure bar (input/output only)
+- Top Models card with gradient bars
+- Dropped: Recent Conversations, Recent Cron Runs, Server Info
+
+Refs: docs/superpowers/specs/2026-04-16-dashboard-openclaw-redesign-design.md"
+```
+
+---
+
+### Task 4: Version bump + finish
+
+**Files:**
+- Modify: `package.json` (version field)
+- Modify: `CHANGELOG.md` (if present; otherwise skip)
+
+- [ ] **Step 1: Bump version**
+
+Edit `package.json`: change `"version": "0.4.4"` to `"version": "0.5.0"`.
+
+- [ ] **Step 2: Commit version bump**
+
+```bash
+git add package.json
+git commit -m "chore: bump version to 0.5.0"
+```
+
+- [ ] **Step 3: Final verification**
+
+Run: `pnpm typecheck && pnpm test`
+Expected: Both pass.
+
+- [ ] **Step 4: Handoff**
+
+Report completion to user. Do NOT create a release automatically — user will review the visual changes first and trigger release manually.
+
+---
+
+## Self-review notes
+
+**Spec coverage:** Each spec section (§3 layout, §4.1-4.6 components, §5 script changes, §6 i18n, §7 CSS) maps to at least one task step. ✅
+
+**Placeholder scan:** No TBDs; all CSS blocks, code blocks, file paths are concrete.
+
+**Type consistency:**
+- `RangePreset` defined once in Task 2 Step 1.
+- `usageData` typed as `SessionsUsageResult | null` — same as v0.4.4.
+- `TokenUsageEntry.ts` read in Task 2 Step 1 `lastUsedMs` — matches type from `hermes-chat.ts` (already imported transitively via `HermesConversation`).
+- `totalConversations`, `totalJobs`, `enabledJobs`, `modelsSeen`, `totalTokens`, `inputTokens`, `outputTokens`, `kpiCells`, `topModels`, `topModelMax`, `trendGeometry`, `trendSeries`, `trendAxisLabels`, `hoveredTrendPoint`, `hoveredTrendText` all defined in Task 2 Step 1 and referenced in Task 3 Step 1 template — names consistent.
+- `handleRefresh`, `setRangePreset`, `handleTrendMouseMove`, `clearTrendHover`, `goChat`, `goSessions`, `goCron`, `formatTokens`, `segmentWidth`, `topBarWidth` — all defined Task 2, used Task 3. ✅
+
+**Potentially missing imports:** `ChatboxEllipsesOutline` is imported in Task 2 Step 1 — confirmed vicons has it (openclaw uses it too).
+
+**CSS var fallbacks:** Used `var(--n-border-color)`, `var(--n-text-color-3)`, `var(--n-card-color)`, `var(--n-color-embedded)` — these are the naive-ui runtime theme vars, which hermes uses elsewhere in scoped styles (verified by grepping existing scoped styles). Fallback values provided where openclaw used its own `--border-color` etc.
+
+**Uses of `NTooltip` removed:** The old token-breakdown bar used `<NTooltip>` wrappers; new structure bar doesn't. Import list in Task 2 Step 1 omits `NTooltip` accordingly. ✅

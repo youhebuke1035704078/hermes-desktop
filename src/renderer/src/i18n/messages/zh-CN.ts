@@ -1046,6 +1046,7 @@ export default {
         models: '已配置模型',
         skills: '已安装技能',
         totalTokens: '总 Token',
+        modelsSeen: '见过的模型数',
       },
       cards: {
         kpis: 'Usage 关键指标',
@@ -1080,7 +1081,16 @@ export default {
         },
         activeDays: {
           label: '活跃天数',
-          hint: '已选范围 {days} 天',
+          hint: '已选范围内 {days} 天有记录',
+        },
+        totalTokens: {
+          label: '总 Token',
+          hint: '范围内累计 token 消耗',
+        },
+        lastUsed: {
+          label: '最近使用',
+          hint: '最近一次产生 token 的时间',
+          never: '尚未使用',
         },
       },
       trend: {
