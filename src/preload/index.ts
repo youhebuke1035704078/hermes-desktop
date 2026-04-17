@@ -178,6 +178,17 @@ const api = {
   getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
   getHomedir: (): Promise<string> => ipcRenderer.invoke('app:homedir'),
 
+  // ── Device identity (private key stays in main process) ──
+  deviceEnsure: (migration?: { publicKey: string; privateKey: string } | null): Promise<{
+    ok: boolean
+    deviceId?: string
+    publicKey?: string
+    encrypted?: boolean
+    error?: string
+  }> => ipcRenderer.invoke('device:ensure', migration ?? null),
+  deviceSign: (payload: string): Promise<{ ok: boolean; signature?: string; error?: string }> =>
+    ipcRenderer.invoke('device:sign', payload),
+
   // ── App auto-updater ──
   updaterCheck: (): Promise<{ ok: boolean; version?: string; error?: string }> =>
     ipcRenderer.invoke('updater:check'),

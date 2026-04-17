@@ -32,35 +32,69 @@ const { t } = useI18n()
 const activeTab = ref('general')
 const rawJsonEdit = ref('')
 
+// Per-section "dirty" flags. When true, a refetch (triggered by patchConfig
+// or the user hitting refresh) will NOT overwrite the corresponding local
+// refs — otherwise the three `immediate: true` watchers in the old
+// implementation clobbered any unsaved edits whenever the store refetched.
+// Each save handler resets its section's flag so the next refetch re-syncs.
+const generalDirty = ref(false)
+const toolsDirty = ref(false)
+const sessionDirty = ref(false)
+
 onMounted(() => {
   configStore.fetchConfig()
 })
-
-watch(
-  () => configStore.config,
-  (config) => {
-    if (config) {
-      rawJsonEdit.value = JSON.stringify(config, null, 2)
-    }
-  },
-  { immediate: true }
-)
 
 // -- General settings --
 const primaryModel = ref('')
 const gatewayPort = ref(18789)
 const workspace = ref('')
 
+// -- Tools settings --
+const toolProfile = ref('full')
+const allowedTools = ref<string[]>([])
+const deniedTools = ref<string[]>([])
+
+// -- Session settings --
+const sessionResetMode = ref('off')
+const sessionResetHour = ref(6)
+const sessionIdleMinutes = ref(30)
+const queueMode = ref('sequential')
+
+// Single merged watcher: re-syncs every section from the store on fetch, but
+// skips any section whose dirty flag is set — that section owns in-flight
+// user edits that must not be clobbered by the refetch.
 watch(
   () => configStore.config,
   (config) => {
     if (!config) return
-    primaryModel.value = config.models?.primary || config.agents?.defaults?.model?.primary || ''
-    gatewayPort.value = config.gateway?.port || 18789
-    workspace.value = config.agents?.defaults?.workspace || '~/.hermes/workspace'
+    rawJsonEdit.value = JSON.stringify(config, null, 2)
+    if (!generalDirty.value) {
+      primaryModel.value = config.models?.primary || config.agents?.defaults?.model?.primary || ''
+      gatewayPort.value = config.gateway?.port || 18789
+      workspace.value = config.agents?.defaults?.workspace || '~/.hermes/workspace'
+    }
+    if (!toolsDirty.value) {
+      toolProfile.value = config.tools?.profile || config.agents?.defaults?.tools?.profile || 'full'
+      allowedTools.value = config.tools?.allow || config.agents?.defaults?.tools?.allow || []
+      deniedTools.value = config.tools?.deny || config.agents?.defaults?.tools?.deny || []
+    }
+    if (!sessionDirty.value) {
+      sessionResetMode.value = config.session?.reset?.mode || 'off'
+      sessionResetHour.value = config.session?.reset?.hour ?? 6
+      sessionIdleMinutes.value = config.session?.reset?.idleMinutes ?? 30
+      queueMode.value = config.session?.queue?.mode || 'sequential'
+    }
   },
   { immediate: true }
 )
+
+// Mark a section dirty the moment the user changes any of its bound refs so
+// the merged watcher above stops overwriting the local state mid-edit. The
+// corresponding save handler clears the flag after a successful patch.
+watch([primaryModel, gatewayPort, workspace], () => { generalDirty.value = true })
+watch([toolProfile, allowedTools, deniedTools], () => { toolsDirty.value = true })
+watch([sessionResetMode, sessionResetHour, sessionIdleMinutes, queueMode], () => { sessionDirty.value = true })
 
 async function saveGeneralSettings() {
   const patches: ConfigPatch[] = []
@@ -81,27 +115,12 @@ async function saveGeneralSettings() {
 
   try {
     await configStore.patchConfig(patches)
+    generalDirty.value = false
     message.success(t('pages.config.saved'))
   } catch {
     message.error(t('common.saveFailed'))
   }
 }
-
-// -- Tools settings --
-const toolProfile = ref('full')
-const allowedTools = ref<string[]>([])
-const deniedTools = ref<string[]>([])
-
-watch(
-  () => configStore.config,
-  (config) => {
-    if (!config) return
-    toolProfile.value = config.tools?.profile || config.agents?.defaults?.tools?.profile || 'full'
-    allowedTools.value = config.tools?.allow || config.agents?.defaults?.tools?.allow || []
-    deniedTools.value = config.tools?.deny || config.agents?.defaults?.tools?.deny || []
-  },
-  { immediate: true }
-)
 
 async function saveToolSettings() {
   const patches: ConfigPatch[] = [
@@ -112,29 +131,12 @@ async function saveToolSettings() {
 
   try {
     await configStore.patchConfig(patches)
+    toolsDirty.value = false
     message.success(t('pages.config.toolsSaved'))
   } catch {
     message.error(t('common.saveFailed'))
   }
 }
-
-// -- Session settings --
-const sessionResetMode = ref('off')
-const sessionResetHour = ref(6)
-const sessionIdleMinutes = ref(30)
-const queueMode = ref('sequential')
-
-watch(
-  () => configStore.config,
-  (config) => {
-    if (!config) return
-    sessionResetMode.value = config.session?.reset?.mode || 'off'
-    sessionResetHour.value = config.session?.reset?.hour ?? 6
-    sessionIdleMinutes.value = config.session?.reset?.idleMinutes ?? 30
-    queueMode.value = config.session?.queue?.mode || 'sequential'
-  },
-  { immediate: true }
-)
 
 async function saveSessionSettings() {
   const patches: ConfigPatch[] = [
@@ -150,6 +152,7 @@ async function saveSessionSettings() {
 
   try {
     await configStore.patchConfig(patches)
+    sessionDirty.value = false
     message.success(t('pages.config.sessionsSaved'))
   } catch {
     message.error(t('common.saveFailed'))

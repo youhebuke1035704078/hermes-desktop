@@ -1,7 +1,26 @@
-import { getPublicKeyAsync, signAsync, utils } from '@noble/ed25519'
+/**
+ * Renderer-side device identity — proxies to the main process.
+ *
+ * The private key lives in the main process (encrypted by Electron's
+ * safeStorage); the renderer only ever sees the deviceId and the public key.
+ * Signing is delegated via IPC.
+ *
+ * Backwards-compat: the old v1 renderer stored the full keypair in
+ * localStorage. On first launch of this binary we hand that blob to main via
+ * `deviceEnsure({migration})` so the user's deviceId is preserved. After a
+ * successful migration the legacy key is wiped from localStorage.
+ */
 import { safeGet, safeSet } from '@/utils/safe-storage'
 
-type StoredIdentity = {
+export type DeviceIdentity = {
+  deviceId: string
+  publicKey: string
+}
+
+const LEGACY_STORAGE_KEY = 'hermes-device-identity-v1'
+const MIGRATED_FLAG_KEY = 'hermes-device-identity-v1-migrated'
+
+type LegacyStoredIdentity = {
   version: 1
   deviceId: string
   publicKey: string
@@ -9,108 +28,70 @@ type StoredIdentity = {
   createdAtMs: number
 }
 
-export type DeviceIdentity = {
-  deviceId: string
-  publicKey: string
-  privateKey: string
-}
-
-const STORAGE_KEY = 'hermes-device-identity-v1'
-
-function base64UrlEncode(bytes: Uint8Array): string {
-  let binary = ''
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte)
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
-}
-
-function base64UrlDecode(input: string): Uint8Array {
-  const normalized = input.replace(/-/g, '+').replace(/_/g, '/')
-  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
-  const binary = atob(padded)
-  const out = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i += 1) {
-    out[i] = binary.charCodeAt(i)
-  }
-  return out
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-async function fingerprintPublicKey(publicKeyRaw: Uint8Array): Promise<string> {
-  if (!crypto?.subtle) {
-    throw new Error('crypto.subtle unavailable (secure context required)')
-  }
-  const hash = await crypto.subtle.digest('SHA-256', publicKeyRaw.slice().buffer)
-  return bytesToHex(new Uint8Array(hash))
-}
-
-async function generateIdentity(): Promise<DeviceIdentity> {
-  const privateKeyRaw = utils.randomSecretKey()
-  const publicKeyRaw = await getPublicKeyAsync(privateKeyRaw)
-  const deviceId = await fingerprintPublicKey(publicKeyRaw)
-  return {
-    deviceId,
-    publicKey: base64UrlEncode(publicKeyRaw),
-    privateKey: base64UrlEncode(privateKeyRaw),
-  }
-}
-
-export async function loadOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
+function readLegacyIdentity(): { publicKey: string; privateKey: string } | null {
+  if (safeGet(MIGRATED_FLAG_KEY)) return null
   try {
-    const raw = safeGet(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as StoredIdentity
-      if (
-        parsed?.version === 1 &&
-        typeof parsed.deviceId === 'string' &&
-        typeof parsed.publicKey === 'string' &&
-        typeof parsed.privateKey === 'string'
-      ) {
-        const derivedId = await fingerprintPublicKey(base64UrlDecode(parsed.publicKey))
-        if (derivedId !== parsed.deviceId) {
-          const updated: StoredIdentity = {
-            ...parsed,
-            deviceId: derivedId,
-          }
-          safeSet(STORAGE_KEY, JSON.stringify(updated))
-          return {
-            deviceId: derivedId,
-            publicKey: parsed.publicKey,
-            privateKey: parsed.privateKey,
-          }
-        }
-        return {
-          deviceId: parsed.deviceId,
-          publicKey: parsed.publicKey,
-          privateKey: parsed.privateKey,
-        }
-      }
+    const raw = safeGet(LEGACY_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as LegacyStoredIdentity
+    if (
+      parsed?.version === 1 &&
+      typeof parsed.publicKey === 'string' &&
+      typeof parsed.privateKey === 'string'
+    ) {
+      return { publicKey: parsed.publicKey, privateKey: parsed.privateKey }
     }
   } catch {
-    // ignore and regenerate
+    // corrupt blob — leave as-is so the user can inspect later
   }
-
-  const identity = await generateIdentity()
-  const stored: StoredIdentity = {
-    version: 1,
-    deviceId: identity.deviceId,
-    publicKey: identity.publicKey,
-    privateKey: identity.privateKey,
-    createdAtMs: Date.now(),
-  }
-  safeSet(STORAGE_KEY, JSON.stringify(stored))
-  return identity
+  return null
 }
 
-export async function signDevicePayload(privateKeyBase64Url: string, payload: string): Promise<string> {
-  const key = base64UrlDecode(privateKeyBase64Url)
-  const data = new TextEncoder().encode(payload)
-  const sig = await signAsync(data, key)
-  return base64UrlEncode(sig)
+function wipeLegacyIdentity(): void {
+  try {
+    window.localStorage?.removeItem(LEGACY_STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+  try {
+    safeSet(MIGRATED_FLAG_KEY, String(Date.now()))
+  } catch {
+    /* ignore */
+  }
+}
+
+let cachedIdentity: DeviceIdentity | null = null
+
+export async function loadOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
+  if (cachedIdentity) return cachedIdentity
+  const bridge = window.api?.deviceEnsure
+  if (!bridge) {
+    throw new Error('device identity bridge unavailable')
+  }
+  const migration = readLegacyIdentity()
+  const result = await bridge(migration)
+  if (!result?.ok || !result.deviceId || !result.publicKey) {
+    throw new Error(result?.error || 'device identity bootstrap failed')
+  }
+  // Only wipe the legacy blob after we confirm main has persisted an identity
+  // (either by migrating ours or by generating a fresh one). If migration
+  // actually succeeded the deviceId will equal the legacy one; if not, main
+  // generated a fresh key — in either case the legacy copy is now redundant.
+  if (migration) wipeLegacyIdentity()
+  cachedIdentity = { deviceId: result.deviceId, publicKey: result.publicKey }
+  return cachedIdentity
+}
+
+/**
+ * Sign `payload` using the main-process private key. The renderer never sees
+ * the key material.
+ */
+export async function signDevicePayload(payload: string): Promise<string> {
+  const bridge = window.api?.deviceSign
+  if (!bridge) throw new Error('device signing bridge unavailable')
+  const result = await bridge(payload)
+  if (!result?.ok || !result.signature) {
+    throw new Error(result?.error || 'signing failed')
+  }
+  return result.signature
 }

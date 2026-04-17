@@ -16,6 +16,7 @@ import { extractApiServerKey } from './dotenv-parser'
 import { parseSseLine, makeInitialSseParserState } from './sse-parser'
 import { registerWsBridge, shutdownWsBridge } from './ws-bridge'
 import { runGit, gitFetchWithRetry, createGitLock } from './hermes-git'
+import { ensureDeviceIdentity, signDevicePayload } from './device-identity'
 import icon from '../../resources/icon.png?asset'
 
 // Disable GPU hardware acceleration on Windows to prevent black screen
@@ -241,6 +242,34 @@ function registerIpcHandlers(): void {
 
   // App info
   ipcMain.handle('app:getVersion', () => app.getVersion())
+
+  // ── Device identity (main-process Ed25519; private key never leaves main) ──
+  ipcMain.handle('device:ensure', async (_, migration?: { publicKey?: unknown; privateKey?: unknown } | null) => {
+    try {
+      const mig =
+        migration &&
+        typeof migration.publicKey === 'string' &&
+        typeof migration.privateKey === 'string'
+          ? { publicKey: migration.publicKey, privateKey: migration.privateKey }
+          : null
+      const result = await ensureDeviceIdentity(mig)
+      return { ok: true, ...result }
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? 'device identity unavailable' }
+    }
+  })
+
+  ipcMain.handle('device:sign', async (_, payload: unknown) => {
+    try {
+      if (typeof payload !== 'string' || !payload) {
+        return { ok: false, error: 'payload must be a non-empty string' }
+      }
+      const signature = await signDevicePayload(payload)
+      return { ok: true, signature }
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? 'sign failed' }
+    }
+  })
 
   // HTTP proxy — allows renderer to fetch from external URLs without CORS restrictions.
   // URL scheme is validated to block file://, data:, javascript:, etc.

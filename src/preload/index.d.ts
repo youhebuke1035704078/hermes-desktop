@@ -130,6 +130,16 @@ interface HermesAPI {
   hermesUpdate(): Promise<{ ok: boolean; error?: string }>
   onHermesUpdateProgress(cb: (data: string) => void): () => void
 
+  // Device identity (main-process Ed25519; private key stays in main)
+  deviceEnsure(migration?: { publicKey: string; privateKey: string } | null): Promise<{
+    ok: boolean
+    deviceId?: string
+    publicKey?: string
+    encrypted?: boolean
+    error?: string
+  }>
+  deviceSign(payload: string): Promise<{ ok: boolean; signature?: string; error?: string }>
+
   // App auto-updater
   updaterCheck(): Promise<{ ok: boolean; version?: string; error?: string }>
   updaterDownload(): Promise<{ ok: boolean; error?: string }>

@@ -116,7 +116,7 @@ export async function buildConnectParams(
       token: params.auth.token ?? null,
       nonce: nonce || null,
     })
-    const signature = await signDevicePayload(deviceIdentity.privateKey, payload)
+    const signature = await signDevicePayload(payload)
     params.device = {
       id: deviceIdentity.deviceId,
       publicKey: deviceIdentity.publicKey,
@@ -124,8 +124,10 @@ export async function buildConnectParams(
       signedAt: signedAtMs,
       ...(nonce ? { nonce } : {}),
     }
-  } catch {
-    // 非安全上下文或设备身份生成失败时：回退为 legacy connect（兼容旧 Gateway，但在 v2026.2.14+ 会被清空 scopes）
+  } catch (err) {
+    // 非安全上下文或设备身份生成失败时：回退为 legacy connect（兼容旧 Gateway，但在 v2026.2.14+ 会被清空 scopes）。
+    // 记录原因以便诊断 —— 之前的静默 catch 让"握手后 scopes 被清空"的故障几乎无从排查。
+    console.warn('[connect] device-identity signing failed, falling back to legacy connect:', err)
   }
 
   return params
