@@ -135,30 +135,30 @@ function restoreLatex(html: string, extract: LatexExtract): string {
   return html.replace(pattern, (_, idx) => extract.segments[Number(idx)] || '')
 }
 
-let headingCounters: number[] = [0, 0, 0, 0, 0, 0]
+// Per-render heading counters live on the markdown-it `env` object so two
+// concurrent renders (e.g. two chat panels flushing in the same reactivity
+// tick) don't leak counter state across each other. The counters are
+// initialised at the start of each renderSimpleMarkdown call.
+const HEADING_COUNTERS_KEY = '__headingCounters'
 
-function resetHeadingCounters() {
-  headingCounters = [0, 0, 0, 0, 0, 0]
-}
-
-function getHeadingNumber(level: number): string {
+function getHeadingNumber(counters: number[], level: number): string {
   const idx = level - 1
   if (idx >= 0 && idx < 6) {
-    headingCounters[idx] = (headingCounters[idx] ?? 0) + 1
+    counters[idx] = (counters[idx] ?? 0) + 1
   }
-  
+
   for (let i = level; i < 6; i++) {
-    headingCounters[i] = 0
+    counters[i] = 0
   }
-  
+
   const parts: string[] = []
   for (let i = 0; i < level; i++) {
-    const count = headingCounters[i] ?? 0
+    const count = counters[i] ?? 0
     if (count > 0) {
       parts.push(String(count))
     }
   }
-  
+
   return parts.join('.')
 }
 
@@ -166,25 +166,32 @@ const defaultHeadingOpenRule = markdownRenderer.renderer.rules.heading_open
 markdownRenderer.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
   const token = tokens[idx]
   const nextToken = tokens[idx + 1]
-  
+
   if (token && nextToken && nextToken.type === 'inline') {
     const text = nextToken.content || ''
     const id = text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
     token.attrSet('id', id)
-    
-    const level = token.tag === 'h1' ? 1 : 
-                  token.tag === 'h2' ? 2 : 
-                  token.tag === 'h3' ? 3 : 
-                  token.tag === 'h4' ? 4 : 
-                  token.tag === 'h5' ? 5 : 
+
+    const level = token.tag === 'h1' ? 1 :
+                  token.tag === 'h2' ? 2 :
+                  token.tag === 'h3' ? 3 :
+                  token.tag === 'h4' ? 4 :
+                  token.tag === 'h5' ? 5 :
                   token.tag === 'h6' ? 6 : 1
-    
-    const number = getHeadingNumber(level)
+
+    const envRow = (env || {}) as Record<string, unknown>
+    const existing = envRow[HEADING_COUNTERS_KEY]
+    const counters: number[] = Array.isArray(existing)
+      ? (existing as number[])
+      : [0, 0, 0, 0, 0, 0]
+    envRow[HEADING_COUNTERS_KEY] = counters
+
+    const number = getHeadingNumber(counters, level)
     if (number) {
       token.attrSet('data-heading-number', number)
     }
   }
-  
+
   if (defaultHeadingOpenRule) {
     return defaultHeadingOpenRule(tokens, idx, options, env, self)
   }
@@ -544,14 +551,13 @@ function normalizeMarkdownInput(markdown: string, options: { autoNestList: boole
 }
 
 export function renderSimpleMarkdown(markdown: string, options: SimpleMarkdownRenderOptions = {}): string {
-  resetHeadingCounters()
-  
   const normalized = normalizeMarkdownInput(markdown || '', { autoNestList: options.autoNestList ?? false })
   if (!normalized.trim()) {
     return options.emptyHtml || ''
   }
-  
-  const env: Record<string, unknown> = {}
+
+  // Fresh per-render heading counters on env (no module-level singleton).
+  const env: Record<string, unknown> = { [HEADING_COUNTERS_KEY]: [0, 0, 0, 0, 0, 0] }
   if (options.imageBasePath) {
     env.imageBasePath = options.imageBasePath
   }

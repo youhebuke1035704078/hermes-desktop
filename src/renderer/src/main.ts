@@ -10,9 +10,6 @@ import './assets/styles/main.css'
 import 'katex/dist/katex.min.css'
 import 'highlight.js/styles/github-dark.css'
 
-// Clean up legacy localStorage token from old Admin frontend
-try { localStorage.removeItem('auth_token') } catch {}
-
 const app = createApp(App)
 const pinia = createPinia()
 app.use(pinia)
