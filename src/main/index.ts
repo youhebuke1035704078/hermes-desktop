@@ -1,9 +1,11 @@
 import { app, shell, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage, session, dialog } from 'electron'
-import { join, resolve, extname, basename } from 'path'
+import { join, resolve, extname, basename, relative as pathRelative, isAbsolute as pathIsAbsolute } from 'path'
 import { execFile } from 'child_process'
-import { readdir, stat, readFile, writeFile, mkdir, unlink, copyFile, realpath } from 'fs/promises'
+import { readdir, stat, readFile, mkdir, unlink, copyFile, realpath, rename, mkdtemp, rm, open as openFile } from 'fs/promises'
 import { existsSync } from 'fs'
-import { homedir } from 'os'
+import { homedir, tmpdir } from 'os'
+import { randomBytes } from 'crypto'
+import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import { getServers, saveServer, removeServer, decryptPassword, isEncryptionAvailable } from './store'
@@ -99,7 +101,11 @@ function createWindow(): void {
     }
     // In production the renderer is loaded via loadFile(); will-navigate
     // fires for anything that isn't the same file:// URL already rendered.
-    const isSameDoc = url.startsWith('file://') && url.includes('/renderer/index.html')
+    // Anchor to the exact bundled renderer path rather than substring-matching
+    // `/renderer/index.html` — otherwise `file:///Users/x/renderer/index.html`
+    // dropped by another IPC handler could pass.
+    const bundledRendererUrl = pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
+    const isSameDoc = url === bundledRendererUrl || url.startsWith(bundledRendererUrl + '#')
     const isAllowedDev = allowedPrefixes.some((p) => url.startsWith(p))
     if (!isSameDoc && !isAllowedDev) {
       event.preventDefault()
@@ -177,6 +183,43 @@ function isSafeHttpUrl(url: string): boolean {
     return false
   }
 }
+
+/**
+ * Cross-platform home-directory containment check. Using a raw
+ * `startsWith(realHome + '/')` breaks on Windows where `realpath` returns
+ * backslash-separated paths and would deny every legitimate sub-path.
+ */
+function isUnderHome(realHome: string, candidate: string): boolean {
+  if (candidate === realHome) return true
+  const rel = pathRelative(realHome, candidate)
+  return rel !== '' && !rel.startsWith('..') && !pathIsAbsolute(rel)
+}
+
+/**
+ * Atomically write a file by staging to a sibling temp file, fsync-ing, and
+ * renaming onto the target path. Prevents truncation on crash / power-loss
+ * and guarantees readers either see the old or new content, never partial.
+ */
+async function atomicWriteFile(targetPath: string, content: string): Promise<void> {
+  const tmpSuffix = `.tmp-${process.pid}-${randomBytes(4).toString('hex')}`
+  const tmpPath = targetPath + tmpSuffix
+  const fh = await openFile(tmpPath, 'w')
+  try {
+    await fh.writeFile(content, 'utf-8')
+    await fh.sync()
+  } finally {
+    await fh.close()
+  }
+  try {
+    await rename(tmpPath, targetPath)
+  } catch (err) {
+    try { await unlink(tmpPath) } catch { /* ignore */ }
+    throw err
+  }
+}
+
+/** Serialize config.yaml read-modify-write so concurrent IPC calls don't clobber each other. */
+const configYamlLock = createGitLock()
 
 function registerIpcHandlers(): void {
   // Store: server config (wrapped in try-catch to prevent unhandled IPC failures)
@@ -404,84 +447,94 @@ function registerIpcHandlers(): void {
   })
 
   // ── Skill management: write config changes ──
+  // Read-modify-write of config.yaml is serialized via `configYamlLock` so
+  // two rapid IPC calls (e.g. toggling several skills in quick succession)
+  // don't both load the same baseline and overwrite each other. Writes also
+  // go through atomicWriteFile so a crash mid-write cannot truncate the file.
   ipcMain.handle('hermes:skills:config', async (_, action: string, payload: any) => {
-    try {
-      const configPath = join(homedir(), '.hermes/config.yaml')
-
-      // Read existing config (or start fresh)
-      let config: Record<string, any> = {}
+    return await configYamlLock(async () => {
       try {
-        const raw = await readFile(configPath, 'utf-8')
-        const parsed = yaml.load(raw)
-        if (parsed && typeof parsed === 'object') config = parsed as Record<string, any>
-      } catch {
-        /* file missing — will create */
+        const configPath = join(homedir(), '.hermes/config.yaml')
+
+        // Read existing config (or start fresh)
+        let config: Record<string, any> = {}
+        try {
+          const raw = await readFile(configPath, 'utf-8')
+          const parsed = yaml.load(raw)
+          if (parsed && typeof parsed === 'object') config = parsed as Record<string, any>
+        } catch {
+          /* file missing — will create */
+        }
+
+        // Ensure skills section exists
+        if (!config.skills || typeof config.skills !== 'object') config.skills = {}
+        const skills = config.skills as Record<string, any>
+
+        switch (action) {
+          case 'toggle': {
+            const { name, disabled } = payload as { name: string; disabled: boolean }
+            if (typeof name !== 'string' || !name.trim()) return { ok: false, error: 'Invalid skill name' }
+            if (!Array.isArray(skills.disabled)) skills.disabled = []
+            if (disabled) {
+              if (!skills.disabled.includes(name)) skills.disabled.push(name)
+            } else {
+              skills.disabled = skills.disabled.filter((n: string) => n !== name)
+            }
+            break
+          }
+          case 'setConfigValue': {
+            const { key, value } = payload as { key: string; value: any }
+            if (typeof key !== 'string' || !key.trim()) return { ok: false, error: 'Invalid config key' }
+            const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype'])
+            if (key.split('.').some((k) => FORBIDDEN.has(k))) return { ok: false, error: 'Forbidden key segment' }
+            if (!skills.config || typeof skills.config !== 'object') skills.config = {}
+            setNestedValue(skills.config, key, value)
+            break
+          }
+          case 'addExternalDir': {
+            const { path: dirPath } = (payload ?? {}) as { path: unknown }
+            if (typeof dirPath !== 'string' || !dirPath.trim()) {
+              return { ok: false, error: 'Invalid directory path' }
+            }
+            if (!Array.isArray(skills.external_dirs)) skills.external_dirs = []
+            const resolvedDir = dirPath.replace(/^~/, homedir())
+            // Validate: must be under home and not duplicate (use realpath to prevent symlink bypass)
+            const realHome = await realpath(homedir())
+            let realDir: string
+            try {
+              realDir = await realpath(resolvedDir)
+            } catch {
+              return { ok: false, error: 'Directory does not exist' }
+            }
+            if (!isUnderHome(realHome, realDir)) {
+              return { ok: false, error: 'Path must be under home directory' }
+            }
+            if (skills.external_dirs.includes(dirPath)) {
+              return { ok: false, error: 'Directory already exists' }
+            }
+            skills.external_dirs.push(dirPath)
+            break
+          }
+          case 'removeExternalDir': {
+            const { path: dirPath } = (payload ?? {}) as { path: unknown }
+            if (typeof dirPath !== 'string') return { ok: false, error: 'Invalid directory path' }
+            if (Array.isArray(skills.external_dirs)) {
+              skills.external_dirs = skills.external_dirs.filter((d: string) => d !== dirPath)
+            }
+            break
+          }
+          default:
+            return { ok: false, error: `Unknown action: ${action}` }
+        }
+
+        // Write back atomically to avoid truncation on crash.
+        const output = yaml.dump(config, { lineWidth: 120, noRefs: true })
+        await atomicWriteFile(configPath, output)
+        return { ok: true }
+      } catch (e: any) {
+        return { ok: false, error: e.message }
       }
-
-      // Ensure skills section exists
-      if (!config.skills || typeof config.skills !== 'object') config.skills = {}
-      const skills = config.skills as Record<string, any>
-
-      switch (action) {
-        case 'toggle': {
-          const { name, disabled } = payload as { name: string; disabled: boolean }
-          if (typeof name !== 'string' || !name.trim()) return { ok: false, error: 'Invalid skill name' }
-          if (!Array.isArray(skills.disabled)) skills.disabled = []
-          if (disabled) {
-            if (!skills.disabled.includes(name)) skills.disabled.push(name)
-          } else {
-            skills.disabled = skills.disabled.filter((n: string) => n !== name)
-          }
-          break
-        }
-        case 'setConfigValue': {
-          const { key, value } = payload as { key: string; value: any }
-          if (typeof key !== 'string' || !key.trim()) return { ok: false, error: 'Invalid config key' }
-          const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype'])
-          if (key.split('.').some((k) => FORBIDDEN.has(k))) return { ok: false, error: 'Forbidden key segment' }
-          if (!skills.config || typeof skills.config !== 'object') skills.config = {}
-          setNestedValue(skills.config, key, value)
-          break
-        }
-        case 'addExternalDir': {
-          const { path: dirPath } = payload as { path: string }
-          if (!Array.isArray(skills.external_dirs)) skills.external_dirs = []
-          const resolvedDir = dirPath.replace(/^~/, homedir())
-          // Validate: must be under home and not duplicate (use realpath to prevent symlink bypass)
-          const realHome = await realpath(homedir())
-          let realDir: string
-          try {
-            realDir = await realpath(resolvedDir)
-          } catch {
-            return { ok: false, error: 'Directory does not exist' }
-          }
-          if (realDir !== realHome && !realDir.startsWith(realHome + '/')) {
-            return { ok: false, error: 'Path must be under home directory' }
-          }
-          if (skills.external_dirs.includes(dirPath)) {
-            return { ok: false, error: 'Directory already exists' }
-          }
-          skills.external_dirs.push(dirPath)
-          break
-        }
-        case 'removeExternalDir': {
-          const { path: dirPath } = payload as { path: string }
-          if (Array.isArray(skills.external_dirs)) {
-            skills.external_dirs = skills.external_dirs.filter((d: string) => d !== dirPath)
-          }
-          break
-        }
-        default:
-          return { ok: false, error: `Unknown action: ${action}` }
-      }
-
-      // Write back
-      const output = yaml.dump(config, { lineWidth: 120, noRefs: true })
-      await writeFile(configPath, output, 'utf-8')
-      return { ok: true }
-    } catch (e: any) {
-      return { ok: false, error: e.message }
-    }
+    })
   })
 
   // Return local home directory path (for constructing ~/.hermes path)
@@ -499,7 +552,7 @@ function registerIpcHandlers(): void {
       } catch {
         return { ok: false, error: 'Path does not exist', entries: [] }
       }
-      if (realDir !== realHome && !realDir.startsWith(realHome + '/')) {
+      if (!isUnderHome(realHome, realDir)) {
         return { ok: false, error: 'Access denied: path outside home directory', entries: [] }
       }
       const items = await readdir(realDir, { withFileTypes: true })
@@ -551,7 +604,7 @@ function registerIpcHandlers(): void {
       } catch {
         return { ok: false, error: 'File does not exist' }
       }
-      if (realFile !== realHome && !realFile.startsWith(realHome + '/')) {
+      if (!isUnderHome(realHome, realFile)) {
         return { ok: false, error: 'Access denied: path outside home directory' }
       }
       const s = await stat(realFile)
@@ -585,15 +638,18 @@ function registerIpcHandlers(): void {
         } catch {
           return { ok: false, error: 'Parent directory does not exist' }
         }
-        if (realParent !== realHome && !realParent.startsWith(realHome + '/')) {
+        if (!isUnderHome(realHome, realParent)) {
           return { ok: false, error: 'Access denied: path outside home directory' }
         }
         targetPath = resolved
       }
-      if (targetPath !== realHome && !targetPath.startsWith(realHome + '/')) {
+      if (!isUnderHome(realHome, targetPath)) {
         return { ok: false, error: 'Access denied: path outside home directory' }
       }
-      await writeFile(targetPath, content, 'utf-8')
+      // Atomic write: stage to sibling temp file, fsync, then rename.
+      // Protects against mid-write truncation if the app crashes or loses power
+      // while persisting user-critical files like `~/.hermes/config.yaml`.
+      await atomicWriteFile(targetPath, content)
       return { ok: true }
     } catch (e: any) {
       return { ok: false, error: e.message }
@@ -818,6 +874,11 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('backup:restore', async (event, filename: string) => {
+    // Copy the tarball to a private temp directory before validating + extracting
+    // so a local process with access to BACKUP_DIR can't swap the file between
+    // `tar tzf` and `tar xzf` (TOCTOU). Both commands operate on the immutable
+    // copy under tmpdir().
+    let tempDir: string | null = null
     try {
       if (!filename.endsWith('.tar.gz') || filename.includes('..') || filename.includes('/')) {
         return { ok: false, error: 'Invalid filename' }
@@ -831,6 +892,11 @@ function registerIpcHandlers(): void {
         }
       }
 
+      send(2, '正在准备备份副本...')
+      tempDir = await mkdtemp(join(tmpdir(), 'hermes-restore-'))
+      const stagedPath = join(tempDir, filename)
+      await copyFile(srcPath, stagedPath)
+
       // Security: list tarball contents first and verify every entry lives
       // under `.hermes/`. Rejects absolute paths, `..` traversal, and any
       // entry that would escape the hermes data directory. Without this a
@@ -840,7 +906,7 @@ function registerIpcHandlers(): void {
       const entries = await new Promise<string[]>((resolve, reject) => {
         execFile(
           'tar',
-          ['tzf', srcPath],
+          ['tzf', stagedPath],
           { timeout: 60000, maxBuffer: 16 * 1024 * 1024 },
           (err, stdout) => {
             if (err) reject(new Error(err.message))
@@ -872,7 +938,7 @@ function registerIpcHandlers(): void {
 
       await new Promise<void>((resolve, reject) => {
         execFile('tar', [
-          'xzf', srcPath,
+          'xzf', stagedPath,
           '-C', homedir(),
         ], { timeout: 300000, maxBuffer: 10 * 1024 * 1024 }, (err) => {
           if (err) reject(new Error(err.message))
@@ -884,6 +950,10 @@ function registerIpcHandlers(): void {
       return { ok: true }
     } catch (e: any) {
       return { ok: false, error: e.message }
+    } finally {
+      if (tempDir) {
+        try { await rm(tempDir, { recursive: true, force: true }) } catch { /* ignore */ }
+      }
     }
   })
 
@@ -931,9 +1001,15 @@ function registerIpcHandlers(): void {
   })
   ipcMain.on('window:close', () => mainWindow?.hide())
 
-  // Notifications — basic
-  ipcMain.on('notify', (_, title: string, body: string) => {
-    new Notification({ title, body }).show()
+  // Notifications — basic. Coerce args to strings defensively: the
+  // Notification constructor throws on non-string title/body, and an
+  // ipcMain.on handler exception would bubble as an uncaughtException.
+  ipcMain.on('notify', (_, title: unknown, body: unknown) => {
+    try {
+      new Notification({ title: String(title ?? ''), body: String(body ?? '') }).show()
+    } catch (e) {
+      console.error('[notify] failed to show notification:', e)
+    }
   })
 
   // Notifications — enhanced with severity, sound, and badge
@@ -973,6 +1049,8 @@ function registerIpcHandlers(): void {
 }
 
 // ── Auto-updater setup ──
+let initialUpdateCheckTimer: ReturnType<typeof setTimeout> | null = null
+
 function setupAutoUpdater(): void {
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
@@ -1037,9 +1115,14 @@ function setupAutoUpdater(): void {
     autoUpdater.quitAndInstall(true, true)
   })
 
-  // Check for updates 5s after launch (non-dev only)
+  // Check for updates 5s after launch (non-dev only). Track the handle so
+  // `before-quit` can cancel it — otherwise an app quit within 5 seconds
+  // triggers a network check after shutdown has begun.
   if (!is.dev) {
-    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000)
+    initialUpdateCheckTimer = setTimeout(() => {
+      initialUpdateCheckTimer = null
+      autoUpdater.checkForUpdates().catch(() => {})
+    }, 5000)
   }
 }
 
@@ -1080,5 +1163,9 @@ app.on('window-all-closed', () => {
 // gateway does not see a half-closed connection.
 app.on('before-quit', () => {
   isQuitting = true
+  if (initialUpdateCheckTimer) {
+    clearTimeout(initialUpdateCheckTimer)
+    initialUpdateCheckTimer = null
+  }
   shutdownWsBridge()
 })

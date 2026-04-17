@@ -59,6 +59,30 @@ export class ApiError extends Error {
   }
 }
 
+/** Default request timeout for non-streaming desktop API calls. Prevents
+ *  indefinitely-hung fetches when the monitor backend stalls or the network
+ *  blips during a request. */
+const DEFAULT_FETCH_TIMEOUT_MS = 15000
+
+/** Combine an optional caller-supplied signal with a timeout signal so
+ *  either source can abort the request. */
+function combineWithTimeout(caller?: AbortSignal | null): AbortSignal {
+  const timeout = AbortSignal.timeout(DEFAULT_FETCH_TIMEOUT_MS)
+  if (!caller) return timeout
+  // AbortSignal.any may be unavailable on older Electron/Chromium; fall back
+  // to whichever fires first by manual wiring.
+  const anyFn = (AbortSignal as unknown as { any?: (signals: AbortSignal[]) => AbortSignal }).any
+  if (typeof anyFn === 'function') return anyFn([caller, timeout])
+  const controller = new AbortController()
+  const abortFromCaller = () => controller.abort(caller.reason)
+  const abortFromTimeout = () => controller.abort(timeout.reason)
+  if (caller.aborted) controller.abort(caller.reason)
+  else caller.addEventListener('abort', abortFromCaller, { once: true })
+  if (timeout.aborted) controller.abort(timeout.reason)
+  else timeout.addEventListener('abort', abortFromTimeout, { once: true })
+  return controller.signal
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${baseURL}${path}`
   const currentToken = getAuthToken()
@@ -71,7 +95,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const res = await fetch(url, {
     ...init,
     headers,
-    cache: 'no-store'
+    cache: 'no-store',
+    signal: combineWithTimeout(init?.signal),
   })
 
   if (!res.ok) {
@@ -110,7 +135,7 @@ export async function authFetch(path: string, init?: RequestInit): Promise<Respo
     headers.set('Authorization', `Bearer ${currentToken}`)
   }
 
-  const res = await fetch(url, { ...init, headers })
+  const res = await fetch(url, { ...init, headers, signal: combineWithTimeout(init?.signal) })
 
   if (res.status === 401) {
     clearAuthToken()

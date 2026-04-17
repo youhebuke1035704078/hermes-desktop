@@ -145,6 +145,17 @@ export class ApiClient {
   }
 
   connect(): void {
+    // Tear down any prior socket + pending reconnect timer before starting a
+    // new connection. Without this, calling connect() while a reconnect is
+    // pending — or while an old socket is still draining — leaks the old
+    // BridgedWebSocket (its IPC listeners remain alive) and races the new
+    // connection for every inbound frame.
+    this.clearTimers()
+    if (this.ws) {
+      try { this.ws.close(1000, 'client reconnect') } catch { /* */ }
+      this.ws = null
+    }
+    this.rejectAllPending('Reconnecting')
     this._state = ConnectionState.CONNECTING
     this.emit('stateChange', ConnectionState.CONNECTING)
     this.reconnectAttempts = 0
@@ -328,6 +339,10 @@ export class ApiClient {
         this._state = ConnectionState.FAILED
         this.emit('stateChange', ConnectionState.FAILED)
         this.emit('failed', err.message)
+        // Reject any other pending requests synchronously — don't rely on
+        // `ws.close()` → `handleClose` to do it, since close() can silently
+        // no-op on already-closed sockets and leave callers hung.
+        this.rejectAllPending('handshake failed')
         try { this.ws?.close(1008, 'handshake failed') } catch { /* */ }
       })
   }
@@ -388,6 +403,11 @@ export class ApiClient {
     this.emit('disconnected', code, reason || 'WebSocket closed')
 
     if (this._state !== ConnectionState.DISCONNECTED && this._state !== ConnectionState.FAILED) {
+      // Clear any already-scheduled reconnect before arming a new one —
+      // otherwise a transient double-close can stack two `openWebSocket`
+      // invocations (the old timer still fires after the new one overwrites
+      // `reconnectTimer`).
+      this.clearTimers()
       this.scheduleReconnect()
     }
   }
@@ -403,13 +423,19 @@ export class ApiClient {
     this._state = ConnectionState.RECONNECTING
     this.emit('stateChange', ConnectionState.RECONNECTING)
 
-    const delay = Math.min(
+    // Exponential backoff + ±20% jitter. Without jitter, N disconnected
+    // clients reconnecting after a gateway restart re-converge on the same
+    // retry wave and amplify load.
+    const baseDelay = Math.min(
       this.config.reconnectInterval * Math.pow(1.5, this.reconnectAttempts),
       30000,
     )
+    const jitterFactor = 0.8 + Math.random() * 0.4
+    const delay = Math.round(baseDelay * jitterFactor)
     this.reconnectAttempts++
 
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
       this.handshakeCompleted = false
       this.openWebSocket()
     }, delay)

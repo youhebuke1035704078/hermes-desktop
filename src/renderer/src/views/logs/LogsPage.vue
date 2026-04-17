@@ -275,7 +275,7 @@ onUnmounted(() => {
           </div>
           <div
             v-for="(entry, idx) in logsStore.filteredEntries"
-            :key="idx"
+            :key="`${entry.time ?? ''}:${entry.level ?? ''}:${idx}:${entry.raw?.length ?? 0}`"
             class="log-line"
             :class="{
               'log-line--error': entry.level === 'error' || entry.level === 'fatal',

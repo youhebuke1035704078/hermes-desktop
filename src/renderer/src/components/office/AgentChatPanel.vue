@@ -1809,7 +1809,10 @@ const toolElapsedMs = computed(() => {
 
 function formatClock(ts: number): string {
   if (!Number.isFinite(ts) || ts <= 0) return '--:--:--'
-  return new Date(ts).toLocaleTimeString('zh-CN', {
+  // Use the runtime locale (or the browser default) rather than hard-coding
+  // zh-CN so English users see a clock formatted for their locale. The time
+  // digits are the same numerals in every locale but separators can differ.
+  return new Date(ts).toLocaleTimeString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',

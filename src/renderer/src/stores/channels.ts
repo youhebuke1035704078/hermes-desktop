@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, shallowRef, triggerRef } from 'vue'
 import { defineStore } from 'pinia'
 import { useWebSocketStore } from './websocket'
 import type { Channel, ChannelAuthParams, PairParams } from '@/api/types/channel'
@@ -8,7 +8,11 @@ export const useChannelsStore = defineStore('channels', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const selectedChannelId = ref<string | null>(null)
-  const authInFlight = ref<string | null>(null) // channelId of in-progress auth
+  // Set of channelIds with an auth/pair RPC in flight. Previously a single
+  // ref<string | null> — concurrent auth+pair on different channels would
+  // clobber each other's indicator (A's finally cleared B's in-progress
+  // state). Using a set, every action manages only its own id.
+  const authInFlightSet = shallowRef<Set<string>>(new Set())
 
   // ── Getters ──
   const connectedCount = computed(() => channels.value.filter((c) => c.status === 'connected').length)
@@ -44,9 +48,29 @@ export const useChannelsStore = defineStore('channels', () => {
     }
   }
 
+  function markInFlight(channelId: string): boolean {
+    if (authInFlightSet.value.has(channelId)) return false
+    authInFlightSet.value.add(channelId)
+    triggerRef(authInFlightSet)
+    return true
+  }
+
+  function clearInFlight(channelId: string): void {
+    if (authInFlightSet.value.delete(channelId)) {
+      triggerRef(authInFlightSet)
+    }
+  }
+
+  function isAuthInFlight(channelId: string | null | undefined): boolean {
+    if (!channelId) return false
+    return authInFlightSet.value.has(channelId)
+  }
+
   async function authChannel(params: ChannelAuthParams): Promise<{ ok: boolean; error?: string; payload?: unknown }> {
     const wsStore = useWebSocketStore()
-    authInFlight.value = params.channelId
+    if (!markInFlight(params.channelId)) {
+      return { ok: false, error: 'auth already in flight' }
+    }
     try {
       const payload = await wsStore.rpc.authChannel(params)
       await fetchChannels()
@@ -54,13 +78,15 @@ export const useChannelsStore = defineStore('channels', () => {
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) }
     } finally {
-      authInFlight.value = null
+      clearInFlight(params.channelId)
     }
   }
 
   async function pairChannel(params: PairParams): Promise<{ ok: boolean; error?: string }> {
     const wsStore = useWebSocketStore()
-    authInFlight.value = params.channelId
+    if (!markInFlight(params.channelId)) {
+      return { ok: false, error: 'pair already in flight' }
+    }
     try {
       await wsStore.rpc.pairChannel(params)
       await fetchChannels()
@@ -68,7 +94,7 @@ export const useChannelsStore = defineStore('channels', () => {
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) }
     } finally {
-      authInFlight.value = null
+      clearInFlight(params.channelId)
     }
   }
 
@@ -86,7 +112,8 @@ export const useChannelsStore = defineStore('channels', () => {
   }
 
   return {
-    channels, loading, error, selectedChannelId, authInFlight,
+    channels, loading, error, selectedChannelId, authInFlightSet,
+    isAuthInFlight,
     connectedCount, disconnectedCount, errorCount, totalMembers, platforms, selectedChannel,
     fetchChannels, authChannel, pairChannel, refreshStatus,
   }

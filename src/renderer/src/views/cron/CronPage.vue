@@ -16,7 +16,7 @@ import {
 import { useI18n } from 'vue-i18n'
 import { useCronStore } from '@/stores/cron'
 import type { CronJob } from '@/api/types'
-import { formatRelativeTime } from '@/utils/format'
+import { formatRelativeTime, formatDate } from '@/utils/format'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -88,13 +88,9 @@ const columns = computed<DataTableColumns<CronJob>>(() => [
     key: 'nextRun',
     width: 180,
     render(row) {
-      if (!row.nextRun) return h(NText, { depth: 3 }, { default: () => '-' })
-      try {
-        const d = new Date(row.nextRun)
-        return h(NText, { depth: 2, style: 'font-size: 13px;' }, { default: () => d.toLocaleString('zh-CN') })
-      } catch {
-        return h(NText, { depth: 3 }, { default: () => row.nextRun })
-      }
+      const nextRun = row.nextRun
+      if (!nextRun) return h(NText, { depth: 3 }, { default: () => '-' })
+      return h(NText, { depth: 2, style: 'font-size: 13px;' }, { default: () => formatDate(nextRun) })
     },
   },
   {

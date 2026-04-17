@@ -96,7 +96,16 @@ async function hermesFetch<T = any>(
       const errBody = typeof resp.body === 'string' ? resp.body : ''
       throw new Error(errBody || `HTTP ${resp.status}`)
     }
-    return (typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}) as T
+    if (typeof resp.body !== 'string' || !resp.body) return {} as T
+    // Wrap JSON.parse so a 200-with-non-JSON response (HTML error page from a
+    // reverse proxy, cached 200 with status banner, etc.) surfaces as a clear
+    // error instead of an opaque `SyntaxError: Unexpected token`.
+    try {
+      return JSON.parse(resp.body) as T
+    } catch {
+      const preview = resp.body.slice(0, 120).replace(/\s+/g, ' ')
+      throw new Error(`Non-JSON response from ${path}: ${preview}${resp.body.length > 120 ? '…' : ''}`)
+    }
   }
 
   const resp = await fetch(url, {

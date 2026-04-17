@@ -299,7 +299,7 @@ function handleHermesDeleteDetail() {
             >
               <div
                 v-for="(msg, index) in session.transcript"
-                :key="index"
+                :key="`${msg.role}:${msg.timestamp ?? ''}:${index}:${msg.content?.length ?? 0}`"
                 style="display: flex; gap: 12px; padding: 12px; border-radius: 8px;"
                 :style="{ backgroundColor: msg.role === 'assistant' ? 'var(--bg-secondary)' : 'transparent' }"
               >
@@ -409,10 +409,10 @@ function handleHermesDeleteDetail() {
             <NText code>{{ connectionStore.hermesRealModel || hermesConversation.model || '-' }}</NText>
           </NDescriptionsItem>
           <NDescriptionsItem label="Created">
-            {{ hermesConversation.createdAt ? new Date(hermesConversation.createdAt).toLocaleString() : '-' }}
+            {{ hermesConversation.createdAt ? formatDate(hermesConversation.createdAt) : '-' }}
           </NDescriptionsItem>
           <NDescriptionsItem label="Updated">
-            {{ hermesConversation.updatedAt ? new Date(hermesConversation.updatedAt).toLocaleString() : '-' }}
+            {{ hermesConversation.updatedAt ? formatDate(hermesConversation.updatedAt) : '-' }}
           </NDescriptionsItem>
         </NDescriptions>
       </NCard>
@@ -429,7 +429,7 @@ function handleHermesDeleteDetail() {
           >
             <div
               v-for="(msg, index) in hermesConversation.messages"
-              :key="index"
+              :key="`${msg.role}:${msg.timestamp ?? ''}:${index}:${msg.content?.length ?? 0}`"
               style="display: flex; gap: 12px; padding: 12px; border-radius: 8px;"
               :style="{ backgroundColor: msg.role === 'assistant' ? 'var(--bg-secondary)' : 'transparent' }"
             >
@@ -448,7 +448,7 @@ function handleHermesDeleteDetail() {
                   depth="3"
                   style="font-size: 11px; margin-bottom: 4px; display: block;"
                 >
-                  {{ new Date(msg.timestamp).toLocaleString() }}
+                  {{ formatDate(msg.timestamp) }}
                 </NText>
                 <div style="white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.6;">
                   {{ msg.content }}

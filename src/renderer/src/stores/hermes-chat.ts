@@ -186,8 +186,9 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
   /** Load persisted conversations from localStorage, then try server sync */
   function load() {
     // Load from localStorage first (instant)
+    let raw: string | null = null
     try {
-      const raw = safeGet(STORAGE_KEY)
+      raw = safeGet(STORAGE_KEY)
       if (raw) {
         const parsed = JSON.parse(raw) as {
           conversations: HermesConversation[]
@@ -198,7 +199,19 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
         activeId.value = parsed.activeId || null
         if (parsed.model) model.value = parsed.model
       }
-    } catch {
+    } catch (e) {
+      // Persisted blob is corrupt (truncated write, schema drift, user-edited).
+      // Quarantine it to a timestamped key instead of silently deleting so the
+      // user can recover history manually. Prior behavior wiped everything on
+      // a single bad read.
+      if (raw) {
+        try {
+          safeSet(`${STORAGE_KEY}.corrupt.${Date.now()}`, raw)
+          console.warn('[hermes-chat] Persisted conversations corrupt — quarantined to *.corrupt.*', e)
+        } catch (saveErr) {
+          console.warn('[hermes-chat] Failed to quarantine corrupt conversations:', saveErr)
+        }
+      }
       conversations.value = []
       activeId.value = null
     }

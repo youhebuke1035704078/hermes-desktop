@@ -943,6 +943,15 @@ export const useChatStore = defineStore('chat', () => {
     if (!sessionKey.value.trim()) {
       throw new Error(byLocale('请先填写会话 Key', 'Please enter the session key', getActiveLocale()))
     }
+    // In-flight guard: without this, a rapid second call registers a second
+    // global `onHermesChatChunk` IPC listener that persists through the
+    // overlap window. Both listeners receive every chunk, so token-usage
+    // accumulation fires twice and the active message receives duplicate
+    // deltas. Callers already guard in the ChatPage UI via `agentBusy`, but
+    // programmatic callers need the store to self-protect too.
+    if (sending.value) {
+      throw new Error(byLocale('上一条消息仍在发送中', 'A message is still being sent', getActiveLocale()))
+    }
 
     // 从 sessionKey 中提取 agentId
     let agentId = 'default'
@@ -983,58 +992,62 @@ export const useChatStore = defineStore('chat', () => {
       messages.value = capMessages([...messages.value, assistantMessage])
       setAgentStatusPhase(agentId, 'replying', { runId: idempotencyKey, detail: null })
 
-      // Watch for mid-stream fallback activation and retro-stamp the
-      // in-flight assistant message. flush: 'sync' guarantees the mark
-      // lands before the next SSE chunk handler observes the message.
-      const stopFallbackWatch = watch(
-        () => modelStore.state.kind,
-        () => {
-          const idx = messages.value.findIndex(m => m.id === assistantMsgId)
-          if (idx < 0) return
-          const stamped = applyFallbackStamp(messages.value[idx], modelStore.state)
-          if (!stamped) return
-          messages.value[idx] = stamped
-          messages.value = [...messages.value] // trigger Vue reactivity
-        },
-        { flush: 'sync' },
-      )
-
-      // Build OpenAI-format messages from local history (exclude the empty assistant placeholder)
-      const apiMessages = messages.value
-        .filter(m => (m.role === 'user' || m.role === 'assistant') && m.id !== assistantMsgId && m.content)
-        .map(m => ({ role: m.role, content: m.content }))
-
-      // Listen for SSE chunks. Bug 2 safety net: if a fallback_activated
-      // lifecycle event raced the chunk through a different IPC channel
-      // and the sync watcher didn't retro-stamp in time (e.g. the
-      // sendMessage scope had already torn down), stamp inline from the
-      // current modelStore state on every content chunk. The
-      // applyFallbackStamp helper is a no-op when the state isn't in
-      // fallback or the message is already stamped.
-      let lastChunkUsage: { inputTokens: number; outputTokens: number } | null = null
-      let lastChunkModel: string | null = null
-      const cleanupChunkListener = window.api.onHermesChatChunk((chunk) => {
-        if (chunk.done) return
-        const delta = chunk.data?.choices?.[0]?.delta
-        if (delta?.content) {
-          const idx = messages.value.findIndex(m => m.id === assistantMsgId)
-          if (idx >= 0) {
-            const existing = messages.value[idx]
-            const stamped = applyFallbackStamp(existing, modelStore.state)
-            const base = stamped ?? existing
-            messages.value[idx] = { ...base, content: base.content + delta.content }
-            messages.value = [...messages.value] // trigger Vue reactivity
-          }
-        }
-        // Capture resolved model name from chunk (gateway echoes it in every chunk)
-        const chunkModel = (chunk.data as { model?: unknown } | null)?.model
-        if (typeof chunkModel === 'string' && chunkModel) lastChunkModel = chunkModel
-        // Capture usage from the final chunk (finish_reason: "stop")
-        const usage = extractUsageFromChunk(chunk.data)
-        if (usage) lastChunkUsage = usage
-      })
+      // Watch + listener registrations kept inside try so a synchronous throw
+      // here (e.g. preload bridge missing) still runs the `finally` cleanup.
+      let stopFallbackWatch: (() => void) | null = null
+      let cleanupChunkListener: (() => void) | null = null
 
       try {
+        // Watch for mid-stream fallback activation and retro-stamp the
+        // in-flight assistant message. flush: 'sync' guarantees the mark
+        // lands before the next SSE chunk handler observes the message.
+        stopFallbackWatch = watch(
+          () => modelStore.state.kind,
+          () => {
+            const idx = messages.value.findIndex(m => m.id === assistantMsgId)
+            if (idx < 0) return
+            const stamped = applyFallbackStamp(messages.value[idx], modelStore.state)
+            if (!stamped) return
+            messages.value[idx] = stamped
+            messages.value = [...messages.value] // trigger Vue reactivity
+          },
+          { flush: 'sync' },
+        )
+
+        // Build OpenAI-format messages from local history (exclude the empty assistant placeholder)
+        const apiMessages = messages.value
+          .filter(m => (m.role === 'user' || m.role === 'assistant') && m.id !== assistantMsgId && m.content)
+          .map(m => ({ role: m.role, content: m.content }))
+
+        // Listen for SSE chunks. Bug 2 safety net: if a fallback_activated
+        // lifecycle event raced the chunk through a different IPC channel
+        // and the sync watcher didn't retro-stamp in time (e.g. the
+        // sendMessage scope had already torn down), stamp inline from the
+        // current modelStore state on every content chunk. The
+        // applyFallbackStamp helper is a no-op when the state isn't in
+        // fallback or the message is already stamped.
+        let lastChunkUsage: { inputTokens: number; outputTokens: number } | null = null
+        let lastChunkModel: string | null = null
+        cleanupChunkListener = window.api.onHermesChatChunk((chunk) => {
+          if (chunk.done) return
+          const delta = chunk.data?.choices?.[0]?.delta
+          if (delta?.content) {
+            const idx = messages.value.findIndex(m => m.id === assistantMsgId)
+            if (idx >= 0) {
+              const existing = messages.value[idx]
+              const stamped = applyFallbackStamp(existing, modelStore.state)
+              const base = stamped ?? existing
+              messages.value[idx] = { ...base, content: base.content + delta.content }
+              messages.value = [...messages.value] // trigger Vue reactivity
+            }
+          }
+          // Capture resolved model name from chunk (gateway echoes it in every chunk)
+          const chunkModel = (chunk.data as { model?: unknown } | null)?.model
+          if (typeof chunkModel === 'string' && chunkModel) lastChunkModel = chunkModel
+          // Capture usage from the final chunk (finish_reason: "stop")
+          const usage = extractUsageFromChunk(chunk.data)
+          if (usage) lastChunkUsage = usage
+        })
         const connectionStore = useConnectionStore()
         const hermesChatStore = useHermesChatStore()
         const baseUrl = connectionStore.currentServer?.url || 'http://localhost:8642'
@@ -1077,8 +1090,8 @@ export const useChatStore = defineStore('chat', () => {
         setAgentStatusPhase(agentId, 'error', { runId: null, detail: lastError.value })
         throw error
       } finally {
-        stopFallbackWatch()
-        cleanupChunkListener()
+        try { stopFallbackWatch?.() } catch { /* */ }
+        try { cleanupChunkListener?.() } catch { /* */ }
         sending.value = false
       }
       return

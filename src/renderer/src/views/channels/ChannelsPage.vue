@@ -208,7 +208,7 @@ const columns = computed<DataTableColumns<Channel>>(() => [
             size: 'tiny',
             quaternary: true,
             type: 'primary',
-            loading: channelsStore.authInFlight === row.id,
+            loading: channelsStore.isAuthInFlight(row.id),
             onClick: () => handleStartAuth(row),
           }, {
             icon: () => h(NIcon, { component: row.status === 'connected' ? UnlinkOutline : LinkOutline }),

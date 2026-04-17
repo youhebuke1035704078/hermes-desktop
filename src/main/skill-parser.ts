@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'fs/promises'
+import { readdir, readFile, lstat } from 'fs/promises'
 import { join, relative } from 'path'
 import * as yaml from 'js-yaml'
 
@@ -83,15 +83,23 @@ export async function scanSkillsDirectory(rootDir: string): Promise<SkillMeta[]>
     for (const name of entries) {
       const fullPath = join(dir, name)
       try {
-        const s = await stat(fullPath)
+        // lstat (not stat): skip symlinks during recursion so a symlink inside
+        // a user-approved external skills directory cannot point to an
+        // arbitrary filesystem location (e.g. /etc) and cause us to read
+        // unrelated files.
+        const s = await lstat(fullPath)
+        if (s.isSymbolicLink()) continue
         if (s.isDirectory()) {
           // Check if this directory has a SKILL.md
           const skillMdPath = join(fullPath, 'SKILL.md')
           try {
-            const content = await readFile(skillMdPath, 'utf-8')
-            const fm = parseFrontmatter(content)
-            if (fm) {
-              results.push(frontmatterToMeta(fm, fullPath, rootDir))
+            const skillStat = await lstat(skillMdPath)
+            if (!skillStat.isSymbolicLink()) {
+              const content = await readFile(skillMdPath, 'utf-8')
+              const fm = parseFrontmatter(content)
+              if (fm) {
+                results.push(frontmatterToMeta(fm, fullPath, rootDir))
+              }
             }
           } catch {
             // No SKILL.md here, recurse deeper
