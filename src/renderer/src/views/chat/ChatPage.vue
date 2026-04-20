@@ -1190,8 +1190,49 @@ function collectConfiguredModelRefsFromProviders(input: unknown, refs: Set<strin
   }
 }
 
+/**
+ * Extract a `<provider>/<model>` ref from hermes-agent's top-level singular
+ * schema, e.g.:
+ *
+ *   model:
+ *     default: gemini-2.5-flash
+ *     provider: gemini
+ *   fallback_model:
+ *     provider: gemini
+ *     model: gemini-2.5-pro
+ *
+ * Falls through gracefully when only `default` or `model` is already a
+ * fully-qualified `provider/model` string.
+ */
+function collectNativeModelRef(node: unknown, refs: Set<string>) {
+  if (!node) return
+  if (typeof node === 'string') {
+    const parsed = splitModelRef(node)
+    if (parsed) refs.add(parsed.modelRef)
+    return
+  }
+  const row = asRecord(node)
+  if (!row) return
+  const modelField =
+    (typeof row.default === 'string' && row.default.trim()) ||
+    (typeof row.model === 'string' && row.model.trim()) ||
+    ''
+  if (!modelField) return
+  const alreadyQualified = splitModelRef(modelField)
+  if (alreadyQualified) {
+    refs.add(alreadyQualified.modelRef)
+    return
+  }
+  const providerField =
+    (typeof row.provider === 'string' && row.provider.trim()) || ''
+  if (providerField) {
+    refs.add(`${providerField}/${modelField}`)
+  }
+}
+
 const configuredModelOptions = computed<ConfiguredModelOption[]>(() => {
   const refs = new Set<string>()
+  const config = configStore.config as Record<string, unknown> | null | undefined
   const defaultsRaw = asRecord(configStore.config?.agents?.defaults)
   const defaultsModelRaw = asRecord(defaultsRaw?.model)
   const allowlistedRefs = new Set<string>()
@@ -1204,6 +1245,15 @@ const configuredModelOptions = computed<ConfiguredModelOption[]>(() => {
   collectConfiguredModelRefs(defaultsModelRaw?.fallback, refs)
   collectConfiguredModelRefs(defaultsModelRaw?.fallbacks, refs)
   collectConfiguredModelRefsFromProviders(configStore.config?.models?.providers, refs)
+  // Hermes-agent's native top-level schema (`model:` / `fallback_model:`).
+  // Without these the slash-command picker comes up empty for every real-world
+  // config.yaml that matches the format config-parser.ts already understands.
+  collectNativeModelRef(config?.model, refs)
+  collectNativeModelRef(config?.fallback_model, refs)
+  const fallbackModels = (config as { fallback_models?: unknown } | undefined)?.fallback_models
+  if (Array.isArray(fallbackModels)) {
+    for (const entry of fallbackModels) collectNativeModelRef(entry, refs)
+  }
 
   const finalRefs = new Set<string>()
   if (allowlistedRefs.size > 0) {
