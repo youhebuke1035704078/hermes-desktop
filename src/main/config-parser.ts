@@ -41,6 +41,13 @@ export interface HermesConfigSummary {
    * Empty array if nothing resolvable.
    */
   fallback_chain: string[]
+  /**
+   * Full-form chain (primary first, then fallbacks) as `<provider>/<model>`
+   * refs where provider can be determined. Falls back to the bare short
+   * name when provider is unknown. Consumed by the chat `/model` picker
+   * to surface real choices instead of an empty list.
+   */
+  fallback_chain_full: string[]
 }
 
 const EMPTY: HermesConfigSummary = {
@@ -48,6 +55,7 @@ const EMPTY: HermesConfigSummary = {
   fullModel: null,
   provider: null,
   fallback_chain: [],
+  fallback_chain_full: [],
 }
 
 function shortName(full: string): string {
@@ -96,6 +104,41 @@ function extractFallbackList(node: unknown): string[] {
   return single ? [single] : []
 }
 
+/**
+ * Same as extractFallbackList but emits `<provider>/<model>` when each entry
+ * carries its own provider (structured fallback_model), falling back to a
+ * caller-supplied default provider or the bare short name.
+ */
+function extractFallbackListFull(node: unknown, defaultProvider: string | null): string[] {
+  if (node == null) return []
+  const items: unknown[] = Array.isArray(node) ? node : [node]
+  const out: string[] = []
+  for (const item of items) {
+    if (typeof item === 'string' && item.trim()) {
+      // Already qualified?
+      if (item.includes('/')) out.push(item.trim())
+      else if (defaultProvider) out.push(`${defaultProvider}/${item.trim()}`)
+      else out.push(item.trim())
+      continue
+    }
+    if (item && typeof item === 'object') {
+      const obj = item as Record<string, unknown>
+      const model =
+        (typeof obj.model === 'string' && obj.model.trim()) ||
+        (typeof obj.default === 'string' && obj.default.trim()) ||
+        ''
+      if (!model) continue
+      if (model.includes('/')) { out.push(model); continue }
+      const prov =
+        (typeof obj.provider === 'string' && obj.provider.trim()) ||
+        defaultProvider ||
+        ''
+      out.push(prov ? `${prov}/${model}` : model)
+    }
+  }
+  return out
+}
+
 export function parseHermesConfig(raw: string): HermesConfigSummary {
   let parsed: unknown
   try {
@@ -115,5 +158,15 @@ export function parseHermesConfig(raw: string): HermesConfigSummary {
   const fallbacks = extractFallbackList(obj.fallback_model)
   const fallback_chain = primary ? [primary, ...fallbacks] : fallbacks
 
-  return { primary, fullModel, provider, fallback_chain }
+  // Full-form chain for the /model picker in the renderer.
+  // Primary: use fullModel if already qualified, else build `<provider>/<primary>`.
+  const primaryFull = fullModel && fullModel.includes('/')
+    ? fullModel
+    : primary && provider ? `${provider}/${primary}` : primary
+  const fallbackFull = extractFallbackListFull(obj.fallback_model, provider)
+  const fallback_chain_full: string[] = []
+  if (primaryFull) fallback_chain_full.push(primaryFull)
+  for (const f of fallbackFull) if (!fallback_chain_full.includes(f)) fallback_chain_full.push(f)
+
+  return { primary, fullModel, provider, fallback_chain, fallback_chain_full }
 }

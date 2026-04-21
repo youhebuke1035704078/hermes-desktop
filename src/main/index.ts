@@ -417,6 +417,10 @@ function registerIpcHandlers(): void {
       // New fields added in Task E2 for fallback-visibility bootstrap
       primary: summary.primary,
       fallback_chain: summary.fallback_chain,
+      // Full-form chain (`<provider>/<model>`) consumed by the chat
+      // `/model` picker so real-world hermes-agent configs actually
+      // produce choices instead of an empty list.
+      fallback_chain_full: summary.fallback_chain_full,
       // Bug 5 (post-merge): API_SERVER_KEY for connectLocal auth
       apiServerKey,
     }

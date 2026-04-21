@@ -82,6 +82,8 @@ const api = {
     provider: string | null
     primary: string | null
     fallback_chain: string[]
+    /** Full-form `<provider>/<model>` chain for the /model picker. */
+    fallback_chain_full: string[]
     // Bug 5 (fallback-visibility post-merge): API_SERVER_KEY pulled
     // from ~/.hermes/.env so connectLocal can set hermesAuthToken.
     // Null when no .env file or no key configured.

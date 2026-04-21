@@ -77,6 +77,24 @@ let nowTimer: ReturnType<typeof setInterval> | null = null
 // 侧边栏折叠状态
 const sideCollapsed = ref(false)
 
+// Full-form model chain (`<provider>/<model>`) pulled from the main-process
+// `hermes:config` IPC. The gateway's RPC getConfig() returns a normalized
+// HermesConfig that does NOT surface the user's raw `model:` / `fallback_model:`
+// fields, so the /model picker has to go through the main-process yaml parser
+// to see real-world configs.
+const nativeModelChain = ref<string[]>([])
+async function refreshNativeModelChain(): Promise<void> {
+  try {
+    const res = await window.api?.hermesConfig?.()
+    nativeModelChain.value = Array.isArray(res?.fallback_chain_full)
+      ? res!.fallback_chain_full.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      : []
+  } catch (err) {
+    console.warn('[ChatPage] hermesConfig fetch failed (nativeModelChain stays empty):', err)
+    nativeModelChain.value = []
+  }
+}
+
 const roleFilterOptions = computed<SelectOption[]>(() => [
   { label: t('pages.chat.filters.roles.all'), value: 'all' },
   { label: t('pages.chat.filters.roles.user'), value: 'user' },
@@ -1254,6 +1272,14 @@ const configuredModelOptions = computed<ConfiguredModelOption[]>(() => {
   if (Array.isArray(fallbackModels)) {
     for (const entry of fallbackModels) collectNativeModelRef(entry, refs)
   }
+  // The authoritative source for real-world configs: nativeModelChain is
+  // fetched from the main-process yaml parser on mount. The gateway RPC
+  // getConfig() doesn't surface `model:` / `fallback_model:` fields at all,
+  // so without this the picker stays empty for every canonical setup.
+  for (const ref of nativeModelChain.value) {
+    const parsed = splitModelRef(ref)
+    if (parsed) refs.add(parsed.modelRef)
+  }
 
   const finalRefs = new Set<string>()
   if (allowlistedRefs.size > 0) {
@@ -2414,6 +2440,12 @@ onMounted(async () => {
   nowTimer = setInterval(() => {
     nowMs.value = Date.now()
   }, 1000)
+
+  // Pull the real hermes-agent model chain from main-process yaml parser
+  // so the /model picker has something to offer even when the gateway's
+  // normalized getConfig() omits the raw `model:` / `fallback_model:`
+  // fields (canonical real-world layout).
+  void refreshNativeModelChain()
 
   // Skip WebSocket-dependent fetches in local Hermes REST mode
   if (!isHermesRest.value) {
