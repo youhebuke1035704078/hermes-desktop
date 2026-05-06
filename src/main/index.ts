@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage, session, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage, session, dialog, clipboard } from 'electron'
 import { join, resolve, extname, basename, relative as pathRelative, isAbsolute as pathIsAbsolute } from 'path'
 import { execFile } from 'child_process'
 import { readdir, stat, readFile, mkdir, unlink, copyFile, realpath, rename, mkdtemp, rm, open as openFile } from 'fs/promises'
@@ -287,6 +287,15 @@ function registerIpcHandlers(): void {
       return { status: res.status, ok: res.ok, body }
     } catch (e: any) {
       return { status: 0, ok: false, body: e.message || 'Network error' }
+    }
+  })
+
+  ipcMain.handle('clipboard:writeText', (_, text: string) => {
+    try {
+      clipboard.writeText(typeof text === 'string' ? text : String(text ?? ''))
+      return { ok: true }
+    } catch (e: unknown) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Clipboard write failed' }
     }
   })
 

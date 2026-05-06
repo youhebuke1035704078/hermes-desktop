@@ -927,14 +927,30 @@ export const useChatStore = defineStore('chat', () => {
     return connectionStore.serverType === 'hermes-rest'
   }
 
+  function formatChatRequestError(error: unknown): string {
+    const raw = error instanceof Error ? error.message : String(error)
+    if (/HTTP\s+401|HTTP\s+403|invalid[_\s-]?api[_\s-]?key|unauthorized|forbidden/i.test(raw)) {
+      return byLocale(
+        `认证失败：API Key 无效或已过期，请检查当前连接配置的 API_SERVER_KEY。原始错误：${raw}`,
+        `Authentication failed: the API key is invalid or expired. Check the API_SERVER_KEY for the current connection. Original error: ${raw}`,
+        getActiveLocale(),
+      )
+    }
+    return raw
+  }
+
   /** Replace in-memory messages (used by hermes-chat store to load conversations) */
   function setMessages(msgs: ChatMessage[]) {
-    messages.value = msgs
+    messages.value = capMessages(msgs)
   }
 
   /** Clear all in-memory messages */
   function clearMessages() {
     messages.value = []
+  }
+
+  function clearLastError() {
+    lastError.value = null
   }
 
   async function sendMessage(content: string, model?: string) {
@@ -1066,6 +1082,15 @@ export const useChatStore = defineStore('chat', () => {
           throw new Error(result.error || 'Chat request failed')
         }
 
+        const assistantIndex = messages.value.findIndex(m => m.id === assistantMsgId)
+        if (assistantIndex >= 0 && !messages.value[assistantIndex]?.content.trim()) {
+          messages.value[assistantIndex] = {
+            ...messages.value[assistantIndex],
+            content: byLocale('（未收到助手回复内容）', '(No assistant response received)', getActiveLocale()),
+          }
+          messages.value = [...messages.value]
+        }
+
         // Accumulate token usage into the conversation.
         // Note: TypeScript can't track assignments inside callbacks, so we
         // cast to escape the `never` narrowing on the closure-mutated variable.
@@ -1082,11 +1107,20 @@ export const useChatStore = defineStore('chat', () => {
 
         setAgentStatusPhase(agentId, 'done', { runId: null, detail: null })
       } catch (error) {
-        lastError.value = error instanceof Error ? error.message : String(error)
-        // Remove both user and empty assistant messages on failure
-        messages.value = messages.value.filter(
-          (item) => item.id !== idempotencyKey && item.id !== assistantMsgId,
-        )
+        lastError.value = formatChatRequestError(error)
+        const assistantIndex = messages.value.findIndex((item) => item.id === assistantMsgId)
+        if (assistantIndex >= 0) {
+          messages.value[assistantIndex] = {
+            ...messages.value[assistantIndex],
+            isError: true,
+            content: byLocale(
+              `发送失败：${lastError.value}`,
+              `Send failed: ${lastError.value}`,
+              getActiveLocale(),
+            ),
+          }
+          messages.value = [...messages.value]
+        }
         setAgentStatusPhase(agentId, 'error', { runId: null, detail: lastError.value })
         throw error
       } finally {
@@ -1174,6 +1208,7 @@ export const useChatStore = defineStore('chat', () => {
     clearTimers,
     setMessages,
     clearMessages,
+    clearLastError,
     sendMessage,
     abortActiveRun,
   }

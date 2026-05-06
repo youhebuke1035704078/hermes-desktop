@@ -37,6 +37,8 @@ import { useSkillStore } from '@/stores/skill'
 import { formatDate, truncate } from '@/utils/format'
 import { renderSimpleMarkdown } from '@/utils/markdown'
 import { safeGet, safeSet } from '@/utils/safe-storage'
+import { writeTextToClipboard } from '@/utils/clipboard'
+import { collectStructuredMessageContent } from '@/utils/chat-copy'
 import type { ChatMessage, ChatMessageContent, Skill, SessionsUsageSession } from '@/api/types'
 
 const props = withDefaults(
@@ -938,7 +940,7 @@ function toggleToolResultExpand(key: string) {
 
 function getMessageContent(entry: RenderMessage): string {
   if (entry.structured) {
-    return entry.structured.plainTexts.join('\n')
+    return collectStructuredMessageContent(entry.structured)
   }
   return entry.item.content || ''
 }
@@ -946,7 +948,7 @@ function getMessageContent(entry: RenderMessage): string {
 async function copyMessageContent(entry: RenderMessage) {
   const content = getMessageContent(entry)
   try {
-    await navigator.clipboard.writeText(content)
+    await writeTextToClipboard(content)
     message.success(t('common.copied'))
   } catch {
     message.error(t('common.copyFailed'))
@@ -955,7 +957,7 @@ async function copyMessageContent(entry: RenderMessage) {
 
 async function copyToClipboard(text: string) {
   try {
-    await navigator.clipboard.writeText(text)
+    await writeTextToClipboard(text)
     message.success(t('common.copied'))
   } catch {
     message.error(t('common.copyFailed'))

@@ -38,6 +38,7 @@ interface HermesAPI {
 
   // HTTP proxy
   httpFetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; body: string }>
+  clipboardWriteText(text: string): Promise<{ ok: boolean; error?: string }>
 
   // Hermes config (read ~/.hermes/config.yaml for actual model name +
   // fallback chain surfaced to the model-state badge)

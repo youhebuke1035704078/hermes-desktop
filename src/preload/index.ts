@@ -74,6 +74,9 @@ const api = {
   httpFetch: (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; body: string }> =>
     ipcRenderer.invoke('http:fetch', url, init),
 
+  clipboardWriteText: (text: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('clipboard:writeText', text),
+
   // ── Hermes config (read ~/.hermes/config.yaml for actual model name) ──
   hermesConfig: (): Promise<{
     ok: boolean

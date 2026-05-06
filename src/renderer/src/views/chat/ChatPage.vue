@@ -32,6 +32,8 @@ import { useConnectionStore } from '@/stores/connection'
 import { useHermesChatStore } from '@/stores/hermes-chat'
 import { formatDate, formatRelativeTime, parseSessionKey } from '@/utils/format'
 import { renderSimpleMarkdown } from '@/utils/markdown'
+import { writeTextToClipboard } from '@/utils/clipboard'
+import { collectStructuredMessageContent } from '@/utils/chat-copy'
 import type { AgentInstance, ChatMessage, ChatMessageContent, SessionsUsageSession, Skill } from '@/api/types'
 import FallbackChip from '@/components/chat/FallbackChip.vue'
 
@@ -133,7 +135,7 @@ function toggleToolResultExpand(key: string) {
 
 function getMessageContent(entry: RenderMessage): string {
   if (entry.structured) {
-    return entry.structured.plainTexts.join('\n')
+    return collectStructuredMessageContent(entry.structured)
   }
   return entry.item.content || ''
 }
@@ -141,7 +143,7 @@ function getMessageContent(entry: RenderMessage): string {
 async function copyMessageContent(entry: RenderMessage) {
   const content = getMessageContent(entry)
   try {
-    await navigator.clipboard.writeText(content)
+    await writeTextToClipboard(content)
     message.success(t('common.copied'))
   } catch {
     message.error(t('common.copyFailed'))
@@ -150,7 +152,7 @@ async function copyMessageContent(entry: RenderMessage) {
 
 async function copyToClipboard(text: string) {
   try {
-    await navigator.clipboard.writeText(text)
+    await writeTextToClipboard(text)
     message.success(t('common.copied'))
   } catch {
     message.error(t('common.copyFailed'))
@@ -2528,6 +2530,7 @@ onUnmounted(() => {
 
 // ── Hermes REST conversation management ──
 function handleNewConversation() {
+  chatStore.clearLastError()
   // Save current conversation first
   if (isHermesRest.value && hermesChatStore.activeId) {
     hermesChatStore.setMessages([...chatStore.messages], connectionStore.hermesRealModel || undefined)
@@ -2539,6 +2542,7 @@ function handleNewConversation() {
 
 function handleSwitchConversation(id: string) {
   if (id === hermesChatStore.activeId) return
+  chatStore.clearLastError()
   // Save current conversation
   if (hermesChatStore.activeId) {
     hermesChatStore.setMessages([...chatStore.messages], connectionStore.hermesRealModel || undefined)
@@ -2550,6 +2554,7 @@ function handleSwitchConversation(id: string) {
 }
 
 function handleDeleteConversation(id: string) {
+  chatStore.clearLastError()
   hermesChatStore.deleteConversation(id)
   const conv = hermesChatStore.activeConversation
   chatStore.setMessages(conv?.messages ? [...conv.messages] : [])
@@ -2613,7 +2618,10 @@ async function handleSend() {
     autoFollowBottom.value = true
     requestScrollToBottom({ force: true })
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error)
+    if (isHermesRest.value) {
+      hermesChatStore.setMessages([...chatStore.messages], connectionStore.hermesRealModel || undefined)
+    }
+    const reason = chatStore.lastError || (error instanceof Error ? error.message : String(error))
     message.error(reason)
   }
 }
@@ -2848,7 +2856,7 @@ async function handleSend() {
                         v-for="entry in renderedMessages"
                         :key="entry.key"
                         class="chat-bubble"
-                        :class="`is-${entry.item.role}`"
+                        :class="[`is-${entry.item.role}`, { 'is-error': entry.item.isError }]"
                       >
                         <NSpace justify="space-between" align="center" class="chat-bubble-meta" :size="8">
                           <NSpace align="center" :size="6">
@@ -3942,6 +3950,11 @@ async function handleSend() {
   margin: 0 auto 12px;
   border-style: dashed;
   background: rgba(250, 173, 20, 0.08);
+}
+
+.chat-bubble.is-error {
+  border-color: rgba(208, 48, 80, 0.42);
+  background: rgba(208, 48, 80, 0.1);
 }
 
 .chat-bubble-meta {
