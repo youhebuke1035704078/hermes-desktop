@@ -84,6 +84,63 @@ export function extractUsageFromChunk(
   return { inputTokens: input, outputTokens: output }
 }
 
+function chunkValueToText(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => chunkValueToText(item))
+      .filter((item) => item.trim().length > 0)
+      .join('\n')
+  }
+  if (!value || typeof value !== 'object') return ''
+  const row = value as Record<string, unknown>
+  return chunkValueToText(row.text ?? row.content ?? row.output ?? row.message ?? row.delta ?? '')
+}
+
+/**
+ * Extract assistant text from the variety of streaming/non-streaming payloads
+ * Hermes-compatible servers may forward over SSE.
+ */
+export function extractAssistantContentFromChunk(chunkData: unknown): string {
+  if (!chunkData || typeof chunkData !== 'object') return ''
+  const row = chunkData as Record<string, unknown>
+
+  const choices = Array.isArray(row.choices) ? row.choices : []
+  const firstChoice = choices[0]
+  if (firstChoice && typeof firstChoice === 'object') {
+    const choice = firstChoice as Record<string, unknown>
+    const deltaText = chunkValueToText(choice.delta)
+    if (deltaText) return deltaText
+    const messageText = chunkValueToText(choice.message)
+    if (messageText) return messageText
+    const text = chunkValueToText(choice.text)
+    if (text) return text
+  }
+
+  const responseDelta = chunkValueToText(row.delta)
+  if (responseDelta) return responseDelta
+  const responseText = chunkValueToText(row.output_text ?? row.text ?? row.content ?? row.message)
+  if (responseText) return responseText
+
+  return ''
+}
+
+export function extractErrorMessageFromChunk(chunkData: unknown): string {
+  if (!chunkData || typeof chunkData !== 'object') return ''
+  const row = chunkData as Record<string, unknown>
+  const errorText = chunkValueToText(row.error)
+  if (errorText) return errorText
+
+  const choices = Array.isArray(row.choices) ? row.choices : []
+  const firstChoice = choices[0]
+  if (firstChoice && typeof firstChoice === 'object') {
+    const choice = firstChoice as Record<string, unknown>
+    if (choice.finish_reason === 'error') return 'Hermes Agent stream ended with an error.'
+  }
+  return ''
+}
+
 export const useChatStore = defineStore('chat', () => {
   const CONTEXT_COMPACTION_DETAIL_ZH = '上下文压缩中...'
   const CONTEXT_COMPACTION_DETAIL_EN = 'Compacting context...'
@@ -1044,16 +1101,19 @@ export const useChatStore = defineStore('chat', () => {
         // fallback or the message is already stamped.
         let lastChunkUsage: { inputTokens: number; outputTokens: number } | null = null
         let lastChunkModel: string | null = null
+        let streamError: string | null = null
         cleanupChunkListener = window.api.onHermesChatChunk((chunk) => {
           if (chunk.done) return
-          const delta = chunk.data?.choices?.[0]?.delta
-          if (delta?.content) {
+          const errorMessage = extractErrorMessageFromChunk(chunk.data)
+          if (errorMessage) streamError = errorMessage
+          const content = extractAssistantContentFromChunk(chunk.data)
+          if (content) {
             const idx = messages.value.findIndex(m => m.id === assistantMsgId)
             if (idx >= 0) {
               const existing = messages.value[idx]
               const stamped = applyFallbackStamp(existing, modelStore.state)
               const base = stamped ?? existing
-              messages.value[idx] = { ...base, content: base.content + delta.content }
+              messages.value[idx] = { ...base, content: base.content + content }
               messages.value = [...messages.value] // trigger Vue reactivity
             }
           }
@@ -1081,14 +1141,17 @@ export const useChatStore = defineStore('chat', () => {
         if (!result.ok) {
           throw new Error(result.error || 'Chat request failed')
         }
+        if (streamError) {
+          throw new Error(streamError)
+        }
 
         const assistantIndex = messages.value.findIndex(m => m.id === assistantMsgId)
         if (assistantIndex >= 0 && !messages.value[assistantIndex]?.content.trim()) {
-          messages.value[assistantIndex] = {
-            ...messages.value[assistantIndex],
-            content: byLocale('（未收到助手回复内容）', '(No assistant response received)', getActiveLocale()),
-          }
-          messages.value = [...messages.value]
+          throw new Error(byLocale(
+            'Hermes Agent 没有返回助手内容。请检查服务端模型调用日志，常见原因是模型请求超时、凭据失效或后备模型未配置。',
+            'Hermes Agent returned no assistant content. Check the server model-call logs; common causes are model timeouts, expired credentials, or an unconfigured fallback model.',
+            getActiveLocale(),
+          ))
         }
 
         // Accumulate token usage into the conversation.

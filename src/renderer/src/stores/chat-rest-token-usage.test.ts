@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractUsageFromChunk } from './chat'
+import { extractAssistantContentFromChunk, extractErrorMessageFromChunk, extractUsageFromChunk } from './chat'
 
 describe('extractUsageFromChunk', () => {
   it('returns null for content delta chunk (no usage)', () => {
@@ -43,5 +43,57 @@ describe('extractUsageFromChunk', () => {
       inputTokens: 100,
       outputTokens: 0,
     })
+  })
+})
+
+describe('extractAssistantContentFromChunk', () => {
+  it('extracts OpenAI streaming delta content', () => {
+    const chunk = {
+      choices: [{ index: 0, delta: { content: 'hello' } }],
+    }
+    expect(extractAssistantContentFromChunk(chunk)).toBe('hello')
+  })
+
+  it('extracts non-streaming message content when forwarded over SSE', () => {
+    const chunk = {
+      choices: [{ index: 0, message: { role: 'assistant', content: 'done' } }],
+    }
+    expect(extractAssistantContentFromChunk(chunk)).toBe('done')
+  })
+
+  it('extracts text from structured content arrays', () => {
+    const chunk = {
+      choices: [{
+        index: 0,
+        delta: {
+          content: [
+            { type: 'text', text: 'first' },
+            { type: 'output_text', text: 'second' },
+          ],
+        },
+      }],
+    }
+    expect(extractAssistantContentFromChunk(chunk)).toBe('first\nsecond')
+  })
+
+  it('ignores role-only chunks', () => {
+    const chunk = {
+      choices: [{ index: 0, delta: { role: 'assistant' } }],
+    }
+    expect(extractAssistantContentFromChunk(chunk)).toBe('')
+  })
+})
+
+describe('extractErrorMessageFromChunk', () => {
+  it('extracts OpenAI-style error messages', () => {
+    expect(extractErrorMessageFromChunk({
+      error: { message: 'Request timed out.' },
+    })).toBe('Request timed out.')
+  })
+
+  it('treats error finish reason as a stream error', () => {
+    expect(extractErrorMessageFromChunk({
+      choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
+    })).toBe('Hermes Agent stream ended with an error.')
   })
 })
