@@ -326,6 +326,20 @@ function registerIpcHandlers(): void {
       const decoder = new TextDecoder()
       const parserState = makeInitialSseParserState()
       let buffer = ''
+      let finalContent = ''
+
+      const appendAssistantContent = (chunk: unknown): void => {
+        if (!chunk || typeof chunk !== 'object') return
+        const row = chunk as Record<string, unknown>
+        const choices = Array.isArray(row.choices) ? row.choices : []
+        const choice = choices[0]
+        if (!choice || typeof choice !== 'object') return
+        const choiceRow = choice as Record<string, unknown>
+        const delta = choiceRow.delta
+        if (!delta || typeof delta !== 'object') return
+        const content = (delta as Record<string, unknown>).content
+        if (typeof content === 'string') finalContent += content
+      }
 
       try {
         // eslint-disable-next-line no-constant-condition
@@ -367,6 +381,7 @@ function registerIpcHandlers(): void {
             } else {
               try {
                 const parsedJson = JSON.parse(parsed.data)
+                appendAssistantContent(parsedJson)
                 if (!event.sender.isDestroyed()) {
                   event.sender.send('hermes:chat:chunk', { done: false, data: parsedJson })
                 }
@@ -378,7 +393,7 @@ function registerIpcHandlers(): void {
         reader.cancel().catch(() => {})
       }
 
-      return { ok: true }
+      return { ok: true, finalContent }
     } catch (e: any) {
       return { ok: false, error: e?.message || 'Network error' }
     }

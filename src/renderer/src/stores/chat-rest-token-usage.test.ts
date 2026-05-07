@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { extractAssistantContentFromChunk, extractErrorMessageFromChunk, extractUsageFromChunk } from './chat'
+import {
+  extractAssistantContentFromChunk,
+  extractErrorMessageFromChunk,
+  extractUsageFromChunk,
+  reconcileFinalAssistantContent,
+} from './chat'
 
 describe('extractUsageFromChunk', () => {
   it('returns null for content delta chunk (no usage)', () => {
@@ -95,5 +100,19 @@ describe('extractErrorMessageFromChunk', () => {
     expect(extractErrorMessageFromChunk({
       choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
     })).toBe('Hermes Agent stream ended with an error.')
+  })
+})
+
+describe('reconcileFinalAssistantContent', () => {
+  it('fills in chunks that were missed by the IPC listener cleanup race', () => {
+    expect(reconcileFinalAssistantContent('gpt-', 'gpt-5.4，openai-codex')).toBe('gpt-5.4，openai-codex')
+  })
+
+  it('does not duplicate when streaming already assembled the full answer', () => {
+    expect(reconcileFinalAssistantContent('gpt-5.4，openai-codex', 'gpt-5.4，openai-codex')).toBe('gpt-5.4，openai-codex')
+  })
+
+  it('appends final text only when it is not a replacement prefix', () => {
+    expect(reconcileFinalAssistantContent('hello ', 'world')).toBe('hello world')
   })
 })

@@ -54,7 +54,7 @@ interface HermesAPI {
   }>
 
   // Hermes streaming chat (SSE)
-  hermesChat(url: string, body: string, authToken?: string, sessionId?: string): Promise<{ ok: boolean; error?: string }>
+  hermesChat(url: string, body: string, authToken?: string, sessionId?: string): Promise<{ ok: boolean; error?: string; finalContent?: string }>
   onHermesChatChunk(cb: (chunk: { done: boolean; data?: any }) => void): () => void
   /**
    * Subscribe to hermes.model.* lifecycle events (fallback_activated,

@@ -141,6 +141,15 @@ export function extractErrorMessageFromChunk(chunkData: unknown): string {
   return ''
 }
 
+export function reconcileFinalAssistantContent(existing: string, finalContent: unknown): string {
+  if (typeof finalContent !== 'string' || !finalContent) return existing
+  if (!existing) return finalContent
+  if (existing === finalContent) return existing
+  if (finalContent.startsWith(existing)) return finalContent
+  if (existing.endsWith(finalContent)) return existing
+  return existing + finalContent
+}
+
 export const useChatStore = defineStore('chat', () => {
   const CONTEXT_COMPACTION_DETAIL_ZH = '上下文压缩中...'
   const CONTEXT_COMPACTION_DETAIL_EN = 'Compacting context...'
@@ -1140,6 +1149,17 @@ export const useChatStore = defineStore('chat', () => {
 
         if (!result.ok) {
           throw new Error(result.error || 'Chat request failed')
+        }
+        const finalContent = reconcileFinalAssistantContent(
+          messages.value.find((item) => item.id === assistantMsgId)?.content || '',
+          result.finalContent,
+        )
+        if (finalContent) {
+          const idx = messages.value.findIndex((item) => item.id === assistantMsgId)
+          if (idx >= 0) {
+            messages.value[idx] = { ...messages.value[idx], content: finalContent }
+            messages.value = [...messages.value]
+          }
         }
         if (streamError) {
           throw new Error(streamError)
