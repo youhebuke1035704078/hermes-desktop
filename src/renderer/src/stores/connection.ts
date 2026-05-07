@@ -63,6 +63,56 @@ export const useConnectionStore = defineStore('connection', () => {
     } catch { return false }
   }
 
+  async function fetchHermesModels(serverUrl: string, token: string | null) {
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    return window.api
+      ? await window.api.httpFetch(`${serverUrl}/v1/models`, { headers })
+      : await fetch(`${serverUrl}/v1/models`, { headers, signal: AbortSignal.timeout(3000) })
+          .then(async r => ({ ok: r.ok, status: r.status, body: await r.text() }))
+  }
+
+  function modelIdFromModelsResponse(body: string): string | null {
+    if (!body) return null
+    try {
+      const data = JSON.parse(body)
+      const modelId = data?.data?.[0]?.id
+      return typeof modelId === 'string' && modelId ? modelId : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Validate Hermes REST auth before marking the app connected.
+   *
+   * /health is intentionally public in hermes-agent, so a stale or wrong
+   * API_SERVER_KEY previously produced a false "connected" state and only
+   * failed later in 在线对话 with HTTP 401. Probing /v1/models here turns
+   * that into an immediate connection/auth error and gives the user a clear
+   * chance to update the saved token.
+   */
+  async function validateHermesRestAuth(serverUrl: string, token: string | null): Promise<string | null> {
+    const resp = await fetchHermesModels(serverUrl, token)
+    if (resp.status === 401 || resp.status === 403) {
+      throw new ConnectionError(
+        'auth',
+        token
+          ? 'API_SERVER_KEY 无效或已过期，请在连接服务器里更新该服务器的访问令牌'
+          : '该 Hermes REST API 需要 API_SERVER_KEY，请在连接服务器里填写访问令牌',
+      )
+    }
+    if (!resp.ok) {
+      if (resp.status === 0) {
+        throw new ConnectionError('network', '无法连接到 Hermes REST API，请检查服务器地址和网络')
+      }
+      throw new ConnectionError('server', `/v1/models 返回 HTTP ${resp.status}`)
+    }
+
+    const modelId = modelIdFromModelsResponse(resp.body)
+    return modelId && modelId !== 'hermes-agent' ? modelId : null
+  }
+
   /**
    * Fetch the actual underlying model name for a Hermes REST server.
    * Strategy:
@@ -78,17 +128,9 @@ export const useConnectionStore = defineStore('connection', () => {
 
     // Strategy 1: Fetch /v1/models (works for both local and remote)
     try {
-      const headers: Record<string, string> = {}
-      if (hermesAuthToken.value) headers['Authorization'] = `Bearer ${hermesAuthToken.value}`
-      const modelsResp = window.api
-        ? await window.api.httpFetch(`${serverUrl}/v1/models`, { headers })
-        : await fetch(`${serverUrl}/v1/models`, { headers, signal: AbortSignal.timeout(3000) })
-            .then(r => ({ ok: r.ok, status: r.status, body: '' }))
+      const modelsResp = await fetchHermesModels(serverUrl, hermesAuthToken.value)
       if (modelsResp.ok) {
-        const body = typeof modelsResp.body === 'string' && modelsResp.body
-          ? modelsResp.body : ''
-        const data = body ? JSON.parse(body) : {}
-        const modelId = data?.data?.[0]?.id
+        const modelId = modelIdFromModelsResponse(modelsResp.body)
         if (modelId && modelId !== 'hermes-agent') {
           // Guard against disconnect() racing with this non-blocking fetch.
           // Only update if still connected to the same server.
@@ -203,12 +245,14 @@ export const useConnectionStore = defineStore('connection', () => {
 
       if (isHermesRest) {
         // Hermes Agent REST API — no WebSocket needed
+        const modelId = await validateHermesRestAuth(server.url, isNoAuth ? null : password)
         serverType.value = 'hermes-rest'
         hermesAuthToken.value = isNoAuth ? null : password
+        if (modelId) hermesRealModel.value = modelId
         currentServer.value = server
         status.value = 'connected'
         safeSet('lastConnectedServerId', serverId)
-        fetchHermesModel() // non-blocking: read actual model name from config
+        if (!modelId) fetchHermesModel() // non-blocking fallback for local config/model name
         return
       }
 
@@ -361,11 +405,13 @@ export const useConnectionStore = defineStore('connection', () => {
       const data = typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}
       if (data?.status !== 'ok') throw new Error('unexpected health response')
 
+      const modelId = await validateHermesRestAuth(LOCAL_SERVER.url, configApiKey)
       serverType.value = 'hermes-rest'
+      if (modelId) hermesRealModel.value = modelId
       currentServer.value = { ...LOCAL_SERVER }
       status.value = 'connected'
       safeSet('lastConnectedServerId', LOCAL_SERVER.id)
-      fetchHermesModel() // non-blocking: resolve the final display name
+      if (!modelId) fetchHermesModel() // non-blocking: resolve the final display name
     } catch (e) {
       status.value = 'error'
       // Roll back auth state so a retry doesn't reuse a bad token.
