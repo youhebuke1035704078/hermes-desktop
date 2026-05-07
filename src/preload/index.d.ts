@@ -37,7 +37,10 @@ interface HermesAPI {
   onWsError(cb: (error: string) => void): () => void
 
   // HTTP proxy
-  httpFetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; body: string }>
+  httpFetch(
+    url: string,
+    init?: { method?: string; headers?: Record<string, string>; body?: string }
+  ): Promise<{ status: number; ok: boolean; body: string }>
   clipboardWriteText(text: string): Promise<{ ok: boolean; error?: string }>
 
   // Hermes config (read ~/.hermes/config.yaml for actual model name +
@@ -54,8 +57,23 @@ interface HermesAPI {
   }>
 
   // Hermes streaming chat (SSE)
-  hermesChat(url: string, body: string, authToken?: string, sessionId?: string): Promise<{ ok: boolean; error?: string; finalContent?: string }>
-  onHermesChatChunk(cb: (chunk: { done: boolean; data?: any }) => void): () => void
+  hermesChat(
+    url: string,
+    body: string,
+    authToken?: string,
+    sessionId?: string,
+    requestId?: string
+  ): Promise<{
+    ok: boolean
+    error?: string
+    requestId?: string
+    finalContent?: string
+    aborted?: boolean
+  }>
+  hermesChatAbort(requestId: string): Promise<{ ok: boolean; error?: string }>
+  onHermesChatChunk(
+    cb: (chunk: { requestId?: string; done: boolean; data?: any }) => void
+  ): () => void
   /**
    * Subscribe to hermes.model.* lifecycle events (fallback_activated,
    * primary_restored, chain_exhausted) streamed from the main process.
@@ -85,19 +103,22 @@ interface HermesAPI {
     externalDirs: string[]
     error?: string
   }>
-  hermesSkillsConfig(
-    action: string,
-    payload: any
-  ): Promise<{ ok: boolean; error?: string }>
+  hermesSkillsConfig(action: string, payload: any): Promise<{ ok: boolean; error?: string }>
 
   // Backup system
-  backupList(): Promise<{ ok: boolean; backups: Array<{ filename: string; size: number; createdAt: string; date: string }>; error?: string }>
+  backupList(): Promise<{
+    ok: boolean
+    backups: Array<{ filename: string; size: number; createdAt: string; date: string }>
+    error?: string
+  }>
   backupCreate(): Promise<{ ok: boolean; filename?: string; size?: number; error?: string }>
   backupDelete(filename: string): Promise<{ ok: boolean; error?: string }>
   backupDownload(filename: string): Promise<{ ok: boolean; error?: string }>
   backupRestore(filename: string): Promise<{ ok: boolean; error?: string }>
   backupUpload(): Promise<{ ok: boolean; filename?: string; size?: number; error?: string }>
-  onBackupProgress(cb: (data: { progress: number; message: string; status: string }) => void): () => void
+  onBackupProgress(
+    cb: (data: { progress: number; message: string; status: string }) => void
+  ): () => void
 
   // Local filesystem
   fsReaddir(dirPath: string): Promise<{
@@ -112,7 +133,10 @@ interface HermesAPI {
     }>
     error?: string
   }>
-  fsReadFile(filePath: string, encoding?: string): Promise<{
+  fsReadFile(
+    filePath: string,
+    encoding?: string
+  ): Promise<{
     ok: boolean
     content?: string
     encoding?: string
@@ -120,7 +144,10 @@ interface HermesAPI {
     size?: number
     error?: string
   }>
-  fsWriteFile(filePath: string, content: string): Promise<{
+  fsWriteFile(
+    filePath: string,
+    content: string
+  ): Promise<{
     ok: boolean
     error?: string
   }>
@@ -128,7 +155,13 @@ interface HermesAPI {
   // Hermes service control & updates
   hermesRestart(): Promise<{ ok: boolean; error?: string }>
   hermesVersion(): Promise<{ ok: boolean; version?: string; date?: string; error?: string }>
-  hermesCheckUpdate(): Promise<{ ok: boolean; current?: string; latest?: string; updateAvailable?: boolean; error?: string }>
+  hermesCheckUpdate(): Promise<{
+    ok: boolean
+    current?: string
+    latest?: string
+    updateAvailable?: boolean
+    error?: string
+  }>
   hermesUpdate(): Promise<{ ok: boolean; error?: string }>
   onHermesUpdateProgress(cb: (data: string) => void): () => void
 
@@ -146,16 +179,18 @@ interface HermesAPI {
   updaterCheck(): Promise<{ ok: boolean; version?: string; error?: string }>
   updaterDownload(): Promise<{ ok: boolean; error?: string }>
   updaterInstall(): void
-  onUpdaterStatus(cb: (data: {
-    event: 'checking' | 'available' | 'not-available' | 'progress' | 'downloaded' | 'error'
-    version?: string
-    releaseDate?: string
-    percent?: number
-    bytesPerSecond?: number
-    transferred?: number
-    total?: number
-    error?: string
-  }) => void): () => void
+  onUpdaterStatus(
+    cb: (data: {
+      event: 'checking' | 'available' | 'not-available' | 'progress' | 'downloaded' | 'error'
+      version?: string
+      releaseDate?: string
+      percent?: number
+      bytesPerSecond?: number
+      transferred?: number
+      total?: number
+      error?: string
+    }) => void
+  ): () => void
 }
 
 declare global {

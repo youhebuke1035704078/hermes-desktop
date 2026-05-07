@@ -72,7 +72,7 @@ function capMessages(list: readonly ChatMessage[]): ChatMessage[] {
  * Returns { inputTokens, outputTokens } or null if no usage data present.
  */
 export function extractUsageFromChunk(
-  chunkData: unknown,
+  chunkData: unknown
 ): { inputTokens: number; outputTokens: number } | null {
   if (!chunkData || typeof chunkData !== 'object') return null
   const usage = (chunkData as Record<string, unknown>).usage
@@ -161,17 +161,19 @@ export const useChatStore = defineStore('chat', () => {
   const sending = ref(false)
   const lastError = ref<string | null>(null)
   const lastSyncedAt = ref<number | null>(null)
-  
+
   // 支持多个智能体的状态管理
   const agentStatuses = ref<Map<string, AgentStatus>>(new Map())
   const agentSteps = ref<Map<string, AgentStep[]>>(new Map())
   const toolProgress = ref<Map<string, ToolProgress | null>>(new Map())
-  
+
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
   let pollTimers: Array<ReturnType<typeof setTimeout>> = []
   let streamFlushRaf: number | null = null
   let pendingStreamMessages: ChatMessage[] = []
   let lastToolPreviewUpdateAtMs = 0
+  let activeHermesRestRequestId: string | null = null
+  let hermesRestAbortRequested = false
   const finalizedRuns = new Map<string, number>()
 
   // 获取或创建智能体状态
@@ -185,10 +187,10 @@ export const useChatStore = defineStore('chat', () => {
         sinceMs: Date.now(),
         sessionKey: null,
         lastMessage: null,
-        finishedAtMs: null,
+        finishedAtMs: null
       })
     }
-    return agentStatuses.value.get(agentId)!  
+    return agentStatuses.value.get(agentId)!
   }
 
   // 获取或创建智能体步骤
@@ -196,7 +198,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!agentSteps.value.has(agentId)) {
       agentSteps.value.set(agentId, [])
     }
-    return agentSteps.value.get(agentId)!  
+    return agentSteps.value.get(agentId)!
   }
 
   // 获取或创建工具进度
@@ -204,7 +206,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!toolProgress.value.has(agentId)) {
       toolProgress.value.set(agentId, null)
     }
-    return toolProgress.value.get(agentId)!  
+    return toolProgress.value.get(agentId)!
   }
 
   const wsStore = useWebSocketStore()
@@ -301,7 +303,8 @@ export const useChatStore = defineStore('chat', () => {
     const locale = getActiveLocale()
     if (phase === 'sending') return byLocale('消息发送中', 'Sending', locale)
     if (phase === 'waiting') return byLocale('等待响应', 'Waiting', locale)
-    if (phase === 'thinking') return detail?.trim() ? detail.trim() : byLocale('思考中', 'Thinking', locale)
+    if (phase === 'thinking')
+      return detail?.trim() ? detail.trim() : byLocale('思考中', 'Thinking', locale)
     if (phase === 'tool') {
       return detail?.trim()
         ? byLocale(`调用工具：${detail.trim()}`, `Calling tool: ${detail.trim()}`, locale)
@@ -311,7 +314,10 @@ export const useChatStore = defineStore('chat', () => {
     if (phase === 'aborting') return byLocale('停止中...', 'Stopping...', locale)
     if (phase === 'done') return byLocale('本轮完成', 'Done', locale)
     if (phase === 'aborted') return byLocale('已停止', 'Stopped', locale)
-    if (phase === 'error') return detail?.trim() ? byLocale(`错误：${detail.trim()}`, `Error: ${detail.trim()}`, locale) : byLocale('错误', 'Error', locale)
+    if (phase === 'error')
+      return detail?.trim()
+        ? byLocale(`错误：${detail.trim()}`, `Error: ${detail.trim()}`, locale)
+        : byLocale('错误', 'Error', locale)
     return byLocale('空闲', 'Idle', locale)
   }
 
@@ -335,13 +341,27 @@ export const useChatStore = defineStore('chat', () => {
     lastToolPreviewUpdateAtMs = 0
   }
 
-  function setAgentStatusPhase(agentId: string, phase: AgentPhase, patch?: { runId?: string | null; detail?: string | null; sessionKey?: string | null; lastMessage?: string | null }) {
+  function setAgentStatusPhase(
+    agentId: string,
+    phase: AgentPhase,
+    patch?: {
+      runId?: string | null
+      detail?: string | null
+      sessionKey?: string | null
+      lastMessage?: string | null
+    }
+  ) {
     const now = Date.now()
     const prev = getOrCreateAgentStatus(agentId)
-    
-    const isTerminalPhase = phase === 'done' || phase === 'aborted' || phase === 'error' || phase === 'idle'
-    const wasActivePhase = prev.phase !== 'idle' && prev.phase !== 'done' && prev.phase !== 'aborted' && prev.phase !== 'error'
-    
+
+    const isTerminalPhase =
+      phase === 'done' || phase === 'aborted' || phase === 'error' || phase === 'idle'
+    const wasActivePhase =
+      prev.phase !== 'idle' &&
+      prev.phase !== 'done' &&
+      prev.phase !== 'aborted' &&
+      prev.phase !== 'error'
+
     const next: AgentStatus = {
       ...prev,
       phase,
@@ -351,7 +371,7 @@ export const useChatStore = defineStore('chat', () => {
       lastMessage: patch?.lastMessage === undefined ? prev.lastMessage : patch.lastMessage,
       updatedAtMs: now,
       sinceMs: prev.phase === phase ? prev.sinceMs : now,
-      finishedAtMs: isTerminalPhase && wasActivePhase ? now : prev.finishedAtMs,
+      finishedAtMs: isTerminalPhase && wasActivePhase ? now : prev.finishedAtMs
     }
 
     const unchanged =
@@ -375,13 +395,28 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function resolveChatEventState(normalizedEvent: string, payloadRow?: Record<string, unknown> | null): string {
-    const direct = asString(payloadRow?.state || payloadRow?.status || payloadRow?.phase).trim().toLowerCase()
+  function resolveChatEventState(
+    normalizedEvent: string,
+    payloadRow?: Record<string, unknown> | null
+  ): string {
+    const direct = asString(payloadRow?.state || payloadRow?.status || payloadRow?.phase)
+      .trim()
+      .toLowerCase()
     if (direct) return direct
 
     if (normalizedEvent === 'chat.delta' || normalizedEvent.endsWith('.delta')) return 'delta'
-    if (normalizedEvent === 'chat.final' || normalizedEvent.endsWith('.final') || normalizedEvent === 'chat.done') return 'final'
-    if (normalizedEvent === 'chat.aborted' || normalizedEvent.endsWith('.aborted') || normalizedEvent === 'chat.stop') return 'aborted'
+    if (
+      normalizedEvent === 'chat.final' ||
+      normalizedEvent.endsWith('.final') ||
+      normalizedEvent === 'chat.done'
+    )
+      return 'final'
+    if (
+      normalizedEvent === 'chat.aborted' ||
+      normalizedEvent.endsWith('.aborted') ||
+      normalizedEvent === 'chat.stop'
+    )
+      return 'aborted'
     if (normalizedEvent === 'chat.error' || normalizedEvent.endsWith('.error')) return 'error'
     return ''
   }
@@ -395,7 +430,7 @@ export const useChatStore = defineStore('chat', () => {
       sinceMs: Date.now(),
       sessionKey: null,
       lastMessage: null,
-      finishedAtMs: null,
+      finishedAtMs: null
     })
   }
 
@@ -548,7 +583,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function normalizeRole(value: unknown): ChatMessage['role'] {
-    if (value === 'user' || value === 'assistant' || value === 'tool' || value === 'system') return value
+    if (value === 'user' || value === 'assistant' || value === 'tool' || value === 'system')
+      return value
     if (value === 'toolResult') return 'tool'
     return 'assistant'
   }
@@ -562,7 +598,12 @@ export const useChatStore = defineStore('chat', () => {
     ).trim()
     if (!content) return null
 
-    const id = typeof row.id === 'string' ? row.id : typeof row.messageId === 'string' ? row.messageId : undefined
+    const id =
+      typeof row.id === 'string'
+        ? row.id
+        : typeof row.messageId === 'string'
+          ? row.messageId
+          : undefined
     const timestamp =
       typeof row.timestamp === 'string'
         ? row.timestamp
@@ -572,14 +613,18 @@ export const useChatStore = defineStore('chat', () => {
             ? row.time
             : undefined
     const name =
-      typeof row.name === 'string' ? row.name : typeof row.model === 'string' ? row.model : undefined
+      typeof row.name === 'string'
+        ? row.name
+        : typeof row.model === 'string'
+          ? row.model
+          : undefined
 
     return {
       id,
       role: normalizeRole(row.role ?? row.type),
       content,
       timestamp,
-      name,
+      name
     }
   }
 
@@ -600,12 +645,22 @@ export const useChatStore = defineStore('chat', () => {
       if (row.message) rawItems.push(row.message)
       if (row.item) rawItems.push(row.item)
 
-      if (row.role || row.type || row.content || row.text || row.message || row.output || row.delta) {
+      if (
+        row.role ||
+        row.type ||
+        row.content ||
+        row.text ||
+        row.message ||
+        row.output ||
+        row.delta
+      ) {
         rawItems.push(row)
       }
     }
 
-    return rawItems.map((item) => normalizeRealtimeMessage(item)).filter((item): item is ChatMessage => !!item)
+    return rawItems
+      .map((item) => normalizeRealtimeMessage(item))
+      .filter((item): item is ChatMessage => !!item)
   }
 
   function extractRunId(payload: unknown): string {
@@ -633,9 +688,7 @@ export const useChatStore = defineStore('chat', () => {
           const existing = list[existingIndex]
           if (!existing) continue
           list[existingIndex] =
-            next.content.length >= existing.content.length
-              ? { ...existing, ...next }
-              : existing
+            next.content.length >= existing.content.length ? { ...existing, ...next } : existing
           continue
         }
       }
@@ -659,7 +712,7 @@ export const useChatStore = defineStore('chat', () => {
         list[list.length - 1] = {
           ...last,
           ...next,
-          content: `${last.content}${next.content}`,
+          content: `${last.content}${next.content}`
         }
         continue
       }
@@ -685,7 +738,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   ) {
     const keyInEvent = extractSessionKey(payload)
-    
+
     // 即使 sessionKey 为空，也处理事件，更新全局状态
     if (!sessionKey.value.trim() && keyInEvent) {
       // 当 sessionKey 为空但事件中有 sessionKey 时，更新 sessionKey
@@ -747,13 +800,14 @@ export const useChatStore = defineStore('chat', () => {
       agentStatuses.value.set(agentId, {
         ...agentStatus,
         sessionKey: keyInEvent,
-        updatedAtMs: Date.now(),
+        updatedAtMs: Date.now()
       })
     }
 
     if (normalizedEvent === 'chat' || normalizedEvent.startsWith('chat.')) {
       const state = resolveChatEventState(normalizedEvent, payloadRow)
-      const isTerminal = state === 'final' || state === 'done' || state === 'aborted' || state === 'error'
+      const isTerminal =
+        state === 'final' || state === 'done' || state === 'aborted' || state === 'error'
       if (!isTerminal && runIdInEvent && isRunFinalized(runIdInEvent)) {
         return
       }
@@ -766,7 +820,7 @@ export const useChatStore = defineStore('chat', () => {
           setAgentStatusPhase(agentId, 'replying', {
             runId: activeRunId || runIdInEvent || null,
             detail: null,
-            sessionKey: keyInEvent,
+            sessionKey: keyInEvent
           })
         }
         return
@@ -805,11 +859,19 @@ export const useChatStore = defineStore('chat', () => {
           const phase = asString(data.phase).trim().toLowerCase()
           if (phase === 'start') {
             const prevPhase = agentStatus.phase
-            if (prevPhase === 'idle' || prevPhase === 'done' || prevPhase === 'aborted' || prevPhase === 'error') {
+            if (
+              prevPhase === 'idle' ||
+              prevPhase === 'done' ||
+              prevPhase === 'aborted' ||
+              prevPhase === 'error'
+            ) {
               resetAgentProgress(agentId)
             }
             if (agentStatus.phase !== 'thinking') {
-              setAgentStatusPhase(agentId, 'thinking', { runId: runIdInEvent || activeRunId || null, detail: null })
+              setAgentStatusPhase(agentId, 'thinking', {
+                runId: runIdInEvent || activeRunId || null,
+                detail: null
+              })
             }
             return
           }
@@ -832,7 +894,9 @@ export const useChatStore = defineStore('chat', () => {
           // touchAgentStatus(agentId)
           const toolName = asString(data.name || data.tool || data.toolName).trim()
           const toolCallId = asString(data.toolCallId || data.callId || data.id).trim()
-          const toolPhase = asString(data.phase || data.state).trim().toLowerCase()
+          const toolPhase = asString(data.phase || data.state)
+            .trim()
+            .toLowerCase()
 
           if (toolName && toolCallId) {
             const now = Date.now()
@@ -847,7 +911,7 @@ export const useChatStore = defineStore('chat', () => {
                 partialPreview: null,
                 resultPreview: null,
                 startedAtMs: now,
-                updatedAtMs: now,
+                updatedAtMs: now
               })
             } else if (toolPhase === 'update') {
               if (now - lastToolPreviewUpdateAtMs >= 120) {
@@ -864,7 +928,7 @@ export const useChatStore = defineStore('chat', () => {
                   partialPreview: partialPreview || prevProgress?.partialPreview || null,
                   resultPreview: null,
                   startedAtMs: prevProgress?.startedAtMs || now,
-                  updatedAtMs: now,
+                  updatedAtMs: now
                 })
               }
             } else if (toolPhase === 'result') {
@@ -874,12 +938,15 @@ export const useChatStore = defineStore('chat', () => {
                 name: toolName,
                 phase: 'result',
                 meta: asString(data.meta).trim() || prevProgress?.meta || null,
-                isError: typeof data.isError === 'boolean' ? data.isError : prevProgress?.isError ?? null,
+                isError:
+                  typeof data.isError === 'boolean'
+                    ? data.isError
+                    : (prevProgress?.isError ?? null),
                 argsPreview: prevProgress?.argsPreview || null,
                 partialPreview: prevProgress?.partialPreview || null,
                 resultPreview: toJsonPreview(data.result),
                 startedAtMs: prevProgress?.startedAtMs || now,
-                updatedAtMs: now,
+                updatedAtMs: now
               })
             }
           }
@@ -888,7 +955,7 @@ export const useChatStore = defineStore('chat', () => {
             if (agentStatus.phase !== 'tool' || agentStatus.detail !== (toolName || null)) {
               setAgentStatusPhase(agentId, 'tool', {
                 runId: runIdInEvent || activeRunId || null,
-                detail: toolName || null,
+                detail: toolName || null
               })
             }
             return
@@ -896,21 +963,32 @@ export const useChatStore = defineStore('chat', () => {
           if (toolPhase === 'result') {
             // 工具结束后通常会继续思考/生成；这里只做一次轻量状态回落
             if (agentStatus.phase === 'tool') {
-              setAgentStatusPhase(agentId, 'thinking', { runId: runIdInEvent || activeRunId || null, detail: toolName ? toolCompletedDetail(toolName) : null })
+              setAgentStatusPhase(agentId, 'thinking', {
+                runId: runIdInEvent || activeRunId || null,
+                detail: toolName ? toolCompletedDetail(toolName) : null
+              })
             }
             return
           }
         }
 
         if (stream === 'compaction') {
-          const phase = asString((data as Record<string, unknown>).phase).trim().toLowerCase()
+          const phase = asString((data as Record<string, unknown>).phase)
+            .trim()
+            .toLowerCase()
           if (phase === 'start') {
-            setAgentStatusPhase(agentId, 'thinking', { runId: runIdInEvent || activeRunId || null, detail: contextCompactionDetail() })
+            setAgentStatusPhase(agentId, 'thinking', {
+              runId: runIdInEvent || activeRunId || null,
+              detail: contextCompactionDetail()
+            })
             return
           }
           if (phase === 'end') {
             if (agentStatus.phase === 'thinking' && isContextCompactionDetail(agentStatus.detail)) {
-              setAgentStatusPhase(agentId, 'thinking', { runId: runIdInEvent || activeRunId || null, detail: null })
+              setAgentStatusPhase(agentId, 'thinking', {
+                runId: runIdInEvent || activeRunId || null,
+                detail: null
+              })
             }
             return
           }
@@ -922,21 +1000,21 @@ export const useChatStore = defineStore('chat', () => {
           const rawContent = asString(data.content || data.text || data.delta)
           const content = rawContent.replace(/\n{3,}/g, '\n\n').trim()
           const lastMessage = content || agentStatus.lastMessage
-          
+
           if (agentStatus.phase !== 'replying' && agentStatus.phase !== 'tool') {
             // chat delta 可能因节流略晚于 agent assistant stream，这里做兜底提示
-            setAgentStatusPhase(agentId, 'replying', { 
-              runId: runIdInEvent || activeRunId || null, 
+            setAgentStatusPhase(agentId, 'replying', {
+              runId: runIdInEvent || activeRunId || null,
               detail: null,
               sessionKey: keyInEvent,
-              lastMessage,
+              lastMessage
             })
           } else if (lastMessage && lastMessage !== agentStatus.lastMessage) {
             // 更新消息内容
             agentStatuses.value.set(agentId, {
               ...agentStatus,
               lastMessage,
-              updatedAtMs: Date.now(),
+              updatedAtMs: Date.now()
             })
           }
           return
@@ -947,11 +1025,17 @@ export const useChatStore = defineStore('chat', () => {
 
       // 旧版/兼容事件名：agent.started / agent.thinking / agent.done
       if (normalizedEvent === 'agent.started') {
-        setAgentStatusPhase(agentId, 'thinking', { runId: activeRunId || runIdInEvent || null, detail: null })
+        setAgentStatusPhase(agentId, 'thinking', {
+          runId: activeRunId || runIdInEvent || null,
+          detail: null
+        })
         return
       }
       if (normalizedEvent === 'agent.thinking') {
-        setAgentStatusPhase(agentId, 'thinking', { runId: activeRunId || runIdInEvent || null, detail: null })
+        setAgentStatusPhase(agentId, 'thinking', {
+          runId: activeRunId || runIdInEvent || null,
+          detail: null
+        })
         return
       }
       if (normalizedEvent === 'agent.done') {
@@ -965,11 +1049,17 @@ export const useChatStore = defineStore('chat', () => {
       if (normalizedEvent === 'tool.call') {
         const data = asRecord(payloadRow?.payload ?? payloadRow) || {}
         const toolName = asString(data.name || data.tool || data.toolName).trim() || null
-        setAgentStatusPhase(agentId, 'tool', { runId: activeRunId || runIdInEvent || null, detail: toolName })
+        setAgentStatusPhase(agentId, 'tool', {
+          runId: activeRunId || runIdInEvent || null,
+          detail: toolName
+        })
         return
       }
       if (normalizedEvent === 'tool.result') {
-        setAgentStatusPhase(agentId, 'thinking', { runId: activeRunId || runIdInEvent || null, detail: null })
+        setAgentStatusPhase(agentId, 'thinking', {
+          runId: activeRunId || runIdInEvent || null,
+          detail: null
+        })
         return
       }
       return
@@ -978,7 +1068,10 @@ export const useChatStore = defineStore('chat', () => {
     if (normalizedEvent.startsWith('model.')) {
       if (normalizedEvent === 'model.streaming') {
         if (agentStatus.phase !== 'replying') {
-          setAgentStatusPhase(agentId, 'replying', { runId: activeRunId || runIdInEvent || null, detail: null })
+          setAgentStatusPhase(agentId, 'replying', {
+            runId: activeRunId || runIdInEvent || null,
+            detail: null
+          })
         }
       }
     }
@@ -999,7 +1092,7 @@ export const useChatStore = defineStore('chat', () => {
       return byLocale(
         `认证失败：API Key 无效或已过期，请检查当前连接配置的 API_SERVER_KEY。原始错误：${raw}`,
         `Authentication failed: the API key is invalid or expired. Check the API_SERVER_KEY for the current connection. Original error: ${raw}`,
-        getActiveLocale(),
+        getActiveLocale()
       )
     }
     return raw
@@ -1023,7 +1116,9 @@ export const useChatStore = defineStore('chat', () => {
     const text = content.trim()
     if (!text) return
     if (!sessionKey.value.trim()) {
-      throw new Error(byLocale('请先填写会话 Key', 'Please enter the session key', getActiveLocale()))
+      throw new Error(
+        byLocale('请先填写会话 Key', 'Please enter the session key', getActiveLocale())
+      )
     }
     // In-flight guard: without this, a rapid second call registers a second
     // global `onHermesChatChunk` IPC listener that persists through the
@@ -1032,7 +1127,9 @@ export const useChatStore = defineStore('chat', () => {
     // deltas. Callers already guard in the ChatPage UI via `agentBusy`, but
     // programmatic callers need the store to self-protect too.
     if (sending.value) {
-      throw new Error(byLocale('上一条消息仍在发送中', 'A message is still being sent', getActiveLocale()))
+      throw new Error(
+        byLocale('上一条消息仍在发送中', 'A message is still being sent', getActiveLocale())
+      )
     }
 
     // 从 sessionKey 中提取 agentId
@@ -1049,7 +1146,7 @@ export const useChatStore = defineStore('chat', () => {
       id: idempotencyKey,
       role: 'user',
       content: text,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     }
     messages.value = capMessages([...messages.value, localMessage])
 
@@ -1058,6 +1155,10 @@ export const useChatStore = defineStore('chat', () => {
 
     // ── Hermes REST API path (POST /v1/chat/completions with SSE streaming) ──
     if (isHermesRestMode() && window.api?.hermesChat) {
+      const connectionStore = useConnectionStore()
+      const hermesChatStore = useHermesChatStore()
+      const conversationId = hermesChatStore.activeId
+      const requestId = `hermes-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
       const assistantMsgId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       // Stamp the placeholder with current fallback state so the
       // FallbackChip renders immediately on first-turn fallback (where
@@ -1069,15 +1170,37 @@ export const useChatStore = defineStore('chat', () => {
         role: 'assistant',
         content: '',
         timestamp: new Date().toISOString(),
-        ...initialFallbackStamp(modelStore.state),
+        ...initialFallbackStamp(modelStore.state)
       }
       messages.value = capMessages([...messages.value, assistantMessage])
       setAgentStatusPhase(agentId, 'replying', { runId: idempotencyKey, detail: null })
+      activeHermesRestRequestId = requestId
+      hermesRestAbortRequested = false
 
       // Watch + listener registrations kept inside try so a synchronous throw
       // here (e.g. preload bridge missing) still runs the `finally` cleanup.
       let stopFallbackWatch: (() => void) | null = null
       let cleanupChunkListener: (() => void) | null = null
+      let persistTimer: ReturnType<typeof setTimeout> | null = null
+      const persistConversation = (immediate = false): void => {
+        if (!conversationId) return
+        const flush = (): void => {
+          persistTimer = null
+          hermesChatStore.setMessagesFor(
+            conversationId,
+            [...messages.value],
+            connectionStore.hermesRealModel || undefined
+          )
+        }
+        if (immediate) {
+          if (persistTimer) clearTimeout(persistTimer)
+          flush()
+          return
+        }
+        if (persistTimer) return
+        persistTimer = setTimeout(flush, 250)
+      }
+      persistConversation(true)
 
       try {
         // Watch for mid-stream fallback activation and retro-stamp the
@@ -1086,20 +1209,24 @@ export const useChatStore = defineStore('chat', () => {
         stopFallbackWatch = watch(
           () => modelStore.state.kind,
           () => {
-            const idx = messages.value.findIndex(m => m.id === assistantMsgId)
+            const idx = messages.value.findIndex((m) => m.id === assistantMsgId)
             if (idx < 0) return
             const stamped = applyFallbackStamp(messages.value[idx], modelStore.state)
             if (!stamped) return
             messages.value[idx] = stamped
             messages.value = [...messages.value] // trigger Vue reactivity
+            persistConversation()
           },
-          { flush: 'sync' },
+          { flush: 'sync' }
         )
 
         // Build OpenAI-format messages from local history (exclude the empty assistant placeholder)
         const apiMessages = messages.value
-          .filter(m => (m.role === 'user' || m.role === 'assistant') && m.id !== assistantMsgId && m.content)
-          .map(m => ({ role: m.role, content: m.content }))
+          .filter(
+            (m) =>
+              (m.role === 'user' || m.role === 'assistant') && m.id !== assistantMsgId && m.content
+          )
+          .map((m) => ({ role: m.role, content: m.content }))
 
         // Listen for SSE chunks. Bug 2 safety net: if a fallback_activated
         // lifecycle event raced the chunk through a different IPC channel
@@ -1112,18 +1239,20 @@ export const useChatStore = defineStore('chat', () => {
         let lastChunkModel: string | null = null
         let streamError: string | null = null
         cleanupChunkListener = window.api.onHermesChatChunk((chunk) => {
+          if (chunk.requestId && chunk.requestId !== requestId) return
           if (chunk.done) return
           const errorMessage = extractErrorMessageFromChunk(chunk.data)
           if (errorMessage) streamError = errorMessage
           const content = extractAssistantContentFromChunk(chunk.data)
           if (content) {
-            const idx = messages.value.findIndex(m => m.id === assistantMsgId)
+            const idx = messages.value.findIndex((m) => m.id === assistantMsgId)
             if (idx >= 0) {
               const existing = messages.value[idx]
               const stamped = applyFallbackStamp(existing, modelStore.state)
               const base = stamped ?? existing
               messages.value[idx] = { ...base, content: base.content + content }
               messages.value = [...messages.value] // trigger Vue reactivity
+              persistConversation()
             }
           }
           // Capture resolved model name from chunk (gateway echoes it in every chunk)
@@ -1133,45 +1262,55 @@ export const useChatStore = defineStore('chat', () => {
           const usage = extractUsageFromChunk(chunk.data)
           if (usage) lastChunkUsage = usage
         })
-        const connectionStore = useConnectionStore()
-        const hermesChatStore = useHermesChatStore()
         const baseUrl = connectionStore.currentServer?.url || 'http://localhost:8642'
         const result = await window.api.hermesChat(
           `${baseUrl}/v1/chat/completions`,
           JSON.stringify({
             model: model?.trim() || 'hermes-agent',
             messages: apiMessages,
-            stream: true,
+            stream: true
           }),
           connectionStore.hermesAuthToken || undefined,
-          hermesChatStore.activeId || undefined,
+          conversationId || undefined,
+          requestId
         )
 
         if (!result.ok) {
+          if (result.aborted || hermesRestAbortRequested) {
+            persistConversation(true)
+            setAgentStatusPhase(agentId, 'aborted', {
+              runId: null,
+              detail: byLocale('已停止', 'Stopped', getActiveLocale())
+            })
+            return
+          }
           throw new Error(result.error || 'Chat request failed')
         }
         const finalContent = reconcileFinalAssistantContent(
           messages.value.find((item) => item.id === assistantMsgId)?.content || '',
-          result.finalContent,
+          result.finalContent
         )
         if (finalContent) {
           const idx = messages.value.findIndex((item) => item.id === assistantMsgId)
           if (idx >= 0) {
             messages.value[idx] = { ...messages.value[idx], content: finalContent }
             messages.value = [...messages.value]
+            persistConversation(true)
           }
         }
         if (streamError) {
           throw new Error(streamError)
         }
 
-        const assistantIndex = messages.value.findIndex(m => m.id === assistantMsgId)
+        const assistantIndex = messages.value.findIndex((m) => m.id === assistantMsgId)
         if (assistantIndex >= 0 && !messages.value[assistantIndex]?.content.trim()) {
-          throw new Error(byLocale(
-            'Hermes Agent 没有返回助手内容。请检查服务端模型调用日志，常见原因是模型请求超时、凭据失效或后备模型未配置。',
-            'Hermes Agent returned no assistant content. Check the server model-call logs; common causes are model timeouts, expired credentials, or an unconfigured fallback model.',
-            getActiveLocale(),
-          ))
+          throw new Error(
+            byLocale(
+              'Hermes Agent 没有返回助手内容。请检查服务端模型调用日志，常见原因是模型请求超时、凭据失效或后备模型未配置。',
+              'Hermes Agent returned no assistant content. Check the server model-call logs; common causes are model timeouts, expired credentials, or an unconfigured fallback model.',
+              getActiveLocale()
+            )
+          )
         }
 
         // Accumulate token usage into the conversation.
@@ -1179,15 +1318,16 @@ export const useChatStore = defineStore('chat', () => {
         // cast to escape the `never` narrowing on the closure-mutated variable.
         const finalUsage = lastChunkUsage as { inputTokens: number; outputTokens: number } | null
         const finalModel = lastChunkModel as string | null
-        if (finalUsage && hermesChatStore.activeId) {
+        if (finalUsage && conversationId) {
           hermesChatStore.accumulateTokenUsage(
-            hermesChatStore.activeId,
+            conversationId,
             finalUsage.inputTokens,
             finalUsage.outputTokens,
-            finalModel || undefined,
+            finalModel || undefined
           )
         }
 
+        persistConversation(true)
         setAgentStatusPhase(agentId, 'done', { runId: null, detail: null })
       } catch (error) {
         lastError.value = formatChatRequestError(error)
@@ -1199,16 +1339,31 @@ export const useChatStore = defineStore('chat', () => {
             content: byLocale(
               `发送失败：${lastError.value}`,
               `Send failed: ${lastError.value}`,
-              getActiveLocale(),
-            ),
+              getActiveLocale()
+            )
           }
           messages.value = [...messages.value]
+          persistConversation(true)
         }
         setAgentStatusPhase(agentId, 'error', { runId: null, detail: lastError.value })
         throw error
       } finally {
-        try { stopFallbackWatch?.() } catch { /* */ }
-        try { cleanupChunkListener?.() } catch { /* */ }
+        try {
+          stopFallbackWatch?.()
+        } catch {
+          /* */
+        }
+        try {
+          cleanupChunkListener?.()
+        } catch {
+          /* */
+        }
+        if (persistTimer) {
+          clearTimeout(persistTimer)
+          persistConversation(true)
+        }
+        if (activeHermesRestRequestId === requestId) activeHermesRestRequestId = null
+        hermesRestAbortRequested = false
         sending.value = false
       }
       return
@@ -1220,7 +1375,7 @@ export const useChatStore = defineStore('chat', () => {
         sessionKey: sessionKey.value.trim(),
         message: text,
         model: model?.trim() || undefined,
-        idempotencyKey,
+        idempotencyKey
       })
       const agentStatus = getOrCreateAgentStatus(agentId)
       if (agentStatus.phase === 'sending' && agentStatus.runId === idempotencyKey) {
@@ -1241,7 +1396,9 @@ export const useChatStore = defineStore('chat', () => {
 
   async function abortActiveRun() {
     if (!sessionKey.value.trim()) {
-      throw new Error(byLocale('请先填写会话 Key', 'Please enter the session key', getActiveLocale()))
+      throw new Error(
+        byLocale('请先填写会话 Key', 'Please enter the session key', getActiveLocale())
+      )
     }
 
     // 从 sessionKey 中提取 agentId
@@ -1257,11 +1414,22 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
-    setAgentStatusPhase(agentId, 'aborting', { detail: byLocale('停止中...', 'Stopping...', getActiveLocale()) })
+    setAgentStatusPhase(agentId, 'aborting', {
+      detail: byLocale('停止中...', 'Stopping...', getActiveLocale())
+    })
     try {
       if (isHermesRestMode()) {
-        // Local Hermes REST mode — no WS abort RPC, just mark aborted locally
-        setAgentStatusPhase(agentId, 'aborted', { detail: byLocale('已停止', 'Stopped', getActiveLocale()) })
+        if (!activeHermesRestRequestId || !window.api?.hermesChatAbort) {
+          setAgentStatusPhase(agentId, 'aborted', {
+            detail: byLocale('已停止', 'Stopped', getActiveLocale())
+          })
+          return
+        }
+        hermesRestAbortRequested = true
+        await window.api.hermesChatAbort(activeHermesRestRequestId)
+        setAgentStatusPhase(agentId, 'aborted', {
+          detail: byLocale('已停止', 'Stopped', getActiveLocale())
+        })
         return
       }
       await wsStore.rpc.abortChat(undefined, sessionKey.value.trim())
@@ -1293,6 +1461,6 @@ export const useChatStore = defineStore('chat', () => {
     clearMessages,
     clearLastError,
     sendMessage,
-    abortActiveRun,
+    abortActiveRun
   }
 })

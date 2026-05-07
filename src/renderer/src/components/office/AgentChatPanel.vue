@@ -18,7 +18,7 @@ import {
   NTag,
   NText,
   NTooltip,
-  useMessage,
+  useMessage
 } from 'naive-ui'
 import {
   ContractOutline,
@@ -26,7 +26,7 @@ import {
   ExpandOutline,
   SendOutline,
   StopCircleOutline,
-  TimeOutline,
+  TimeOutline
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useOfficeStore } from '@/stores/office'
@@ -46,7 +46,7 @@ const props = withDefaults(
     title?: string
   }>(),
   {
-    title: '',
+    title: ''
   }
 )
 
@@ -73,16 +73,18 @@ const quickReplyModalMode = ref<'create' | 'edit'>('create')
 const editingQuickReplyId = ref('')
 const quickReplyForm = reactive({
   title: '',
-  content: '',
+  content: ''
 })
 
 const QUICK_REPLY_STORAGE_KEY = 'hermes_chat_quick_replies_v1'
-const quickReplies = ref<Array<{
-  id: string
-  title: string
-  content: string
-  updatedAt: number
-}>>([])
+const quickReplies = ref<
+  Array<{
+    id: string
+    title: string
+    content: string
+    updatedAt: number
+  }>
+>([])
 
 type SessionTokenUsage = {
   input: number
@@ -121,16 +123,14 @@ function createSessionTokenUsage(params: {
   const cacheReadValue = normalizeTokenValue(params.cacheRead)
   const cacheWriteValue = normalizeTokenValue(params.cacheWrite)
   const totalFromParts = inputValue + outputValue + cacheReadValue + cacheWriteValue
-  const totalValue = params.total === undefined
-    ? totalFromParts
-    : normalizeTokenValue(params.total)
+  const totalValue = params.total === undefined ? totalFromParts : normalizeTokenValue(params.total)
 
   return {
     input: inputValue,
     output: outputValue,
     cacheRead: cacheReadValue,
     cacheWrite: cacheWriteValue,
-    total: totalValue,
+    total: totalValue
   }
 }
 
@@ -140,16 +140,18 @@ const sessionTokenUsageFromList = computed<SessionTokenUsage | null>(() => {
   return createSessionTokenUsage({
     input: tokenUsage.totalInput,
     output: tokenUsage.totalOutput,
-    total: tokenUsage.totalInput + tokenUsage.totalOutput,
+    total: tokenUsage.totalInput + tokenUsage.totalOutput
   })
 })
 
-const currentSessionTokenUsage = computed<SessionTokenUsage | null>(() =>
-  sessionTokenUsage.value || sessionTokenUsageFromList.value
+const currentSessionTokenUsage = computed<SessionTokenUsage | null>(
+  () => sessionTokenUsage.value || sessionTokenUsageFromList.value
 )
 
 function formatTokenCount(value: number): string {
-  return new Intl.NumberFormat(locale.value, { maximumFractionDigits: 0 }).format(Math.max(0, value))
+  return new Intl.NumberFormat(locale.value, { maximumFractionDigits: 0 }).format(
+    Math.max(0, value)
+  )
 }
 
 const sessionTokenMetricTags = computed(() => {
@@ -157,11 +159,36 @@ const sessionTokenMetricTags = computed(() => {
   if (!usage) return []
 
   return [
-    { key: 'total', label: t('pages.chat.tokens.total'), value: formatTokenCount(usage.total), highlight: true },
-    { key: 'input', label: t('pages.chat.tokens.input'), value: formatTokenCount(usage.input), highlight: false },
-    { key: 'output', label: t('pages.chat.tokens.output'), value: formatTokenCount(usage.output), highlight: false },
-    { key: 'cacheRead', label: t('pages.chat.tokens.cacheRead'), value: formatTokenCount(usage.cacheRead), highlight: false },
-    { key: 'cacheWrite', label: t('pages.chat.tokens.cacheWrite'), value: formatTokenCount(usage.cacheWrite), highlight: false },
+    {
+      key: 'total',
+      label: t('pages.chat.tokens.total'),
+      value: formatTokenCount(usage.total),
+      highlight: true
+    },
+    {
+      key: 'input',
+      label: t('pages.chat.tokens.input'),
+      value: formatTokenCount(usage.input),
+      highlight: false
+    },
+    {
+      key: 'output',
+      label: t('pages.chat.tokens.output'),
+      value: formatTokenCount(usage.output),
+      highlight: false
+    },
+    {
+      key: 'cacheRead',
+      label: t('pages.chat.tokens.cacheRead'),
+      value: formatTokenCount(usage.cacheRead),
+      highlight: false
+    },
+    {
+      key: 'cacheWrite',
+      label: t('pages.chat.tokens.cacheWrite'),
+      value: formatTokenCount(usage.cacheWrite),
+      highlight: false
+    }
   ]
 })
 
@@ -171,7 +198,10 @@ const sessionTokenStatusText = computed(() =>
     : t('pages.chat.tokens.unavailable')
 )
 
-function resolveUsageSession(sessions: SessionsUsageSession[], key: string): SessionsUsageSession | null {
+function resolveUsageSession(
+  sessions: SessionsUsageSession[],
+  key: string
+): SessionsUsageSession | null {
   if (sessions.length === 0) return null
   const normalized = key.trim()
   return sessions.find((item) => item.key === normalized) || sessions[0] || null
@@ -194,7 +224,7 @@ async function fetchSessionTokenUsage(rawKey: string) {
   try {
     const usageResult = await wsStore.rpc.getSessionsUsage({
       key,
-      limit: 1,
+      limit: 1
     })
     if (requestId !== sessionTokenUsageRequestId) return
 
@@ -210,7 +240,7 @@ async function fetchSessionTokenUsage(rawKey: string) {
       output: usage.output,
       cacheRead: usage.cacheRead,
       cacheWrite: usage.cacheWrite,
-      total: usage.totalTokens,
+      total: usage.totalTokens
     })
   } catch (error) {
     if (requestId !== sessionTokenUsageRequestId) return
@@ -282,14 +312,14 @@ const slashCommandPresets = computed<SlashCommandPreset[]>(() => [
     usage: '[model]',
     description: t('pages.chat.slash.commands.new.description'),
     category: t('pages.chat.slash.categories.session'),
-    expectArgs: true,
+    expectArgs: true
   },
   {
     command: '/skill',
     usage: '<name> [input]',
     description: t('pages.chat.slash.commands.skill.description'),
     category: t('pages.chat.slash.categories.modelAndContext'),
-    expectArgs: true,
+    expectArgs: true
   },
   {
     command: '/model',
@@ -297,57 +327,57 @@ const slashCommandPresets = computed<SlashCommandPreset[]>(() => [
     aliases: ['/models'],
     description: t('pages.chat.slash.commands.model.description'),
     category: t('pages.chat.slash.categories.modelAndContext'),
-    expectArgs: true,
+    expectArgs: true
   },
   {
     command: '/status',
     description: t('pages.chat.slash.commands.status.description'),
-    category: t('pages.chat.slash.categories.common'),
+    category: t('pages.chat.slash.categories.common')
   },
   {
     command: '/subagents',
     usage: 'list|kill|log|info|send|steer|spawn',
     description: t('pages.chat.slash.commands.subagents.description'),
     category: t('pages.chat.slash.categories.session'),
-    expectArgs: true,
-  },
+    expectArgs: true
+  }
 ])
 
 const subagentsSubcommandPresets = computed<SubagentsSubcommandPreset[]>(() => [
   {
     subcommand: 'list',
-    description: t('pages.chat.slash.commands.subagents.subcommands.list'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.list')
   },
   {
     subcommand: 'kill',
     usage: '<runId>',
-    description: t('pages.chat.slash.commands.subagents.subcommands.kill'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.kill')
   },
   {
     subcommand: 'log',
     usage: '<runId>',
-    description: t('pages.chat.slash.commands.subagents.subcommands.log'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.log')
   },
   {
     subcommand: 'info',
     usage: '<runId>',
-    description: t('pages.chat.slash.commands.subagents.subcommands.info'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.info')
   },
   {
     subcommand: 'send',
     usage: '<runId> <message>',
-    description: t('pages.chat.slash.commands.subagents.subcommands.send'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.send')
   },
   {
     subcommand: 'steer',
     usage: '<runId> <message>',
-    description: t('pages.chat.slash.commands.subagents.subcommands.steer'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.steer')
   },
   {
     subcommand: 'spawn',
     usage: '<agentId> <task> [--model <model>] [--thinking <level>]',
-    description: t('pages.chat.slash.commands.subagents.subcommands.spawn'),
-  },
+    description: t('pages.chat.slash.commands.subagents.subcommands.spawn')
+  }
 ])
 
 const slashCommandOptions = computed<SlashCommandPreset[]>(() => {
@@ -396,10 +426,14 @@ const slashSkillOptions = computed<Skill[]>(() => {
   )
 })
 
-const slashSubagentsMode = computed(() => slashMode.value && slashCommandKeyword.value === 'subagents')
+const slashSubagentsMode = computed(
+  () => slashMode.value && slashCommandKeyword.value === 'subagents'
+)
 const slashNewMode = computed(() => slashMode.value && slashCommandKeyword.value === 'new')
-const slashModelMode = computed(() =>
-  slashMode.value && (slashCommandKeyword.value === 'model' || slashCommandKeyword.value === 'models')
+const slashModelMode = computed(
+  () =>
+    slashMode.value &&
+    (slashCommandKeyword.value === 'model' || slashCommandKeyword.value === 'models')
 )
 
 const slashSubagentsArgs = computed(() => {
@@ -415,7 +449,7 @@ function splitFirstToken(text: string): { first: string; rest: string } {
   }
   return {
     first: trimmed.slice(0, spaceIndex),
-    rest: trimmed.slice(spaceIndex + 1).trimStart(),
+    rest: trimmed.slice(spaceIndex + 1).trimStart()
   }
 }
 
@@ -447,7 +481,7 @@ function splitModelRef(value: string): ConfiguredModelOption | null {
   return {
     modelRef: `${providerId}/${modelId}`,
     providerId,
-    modelId,
+    modelId
   }
 }
 
@@ -504,7 +538,12 @@ function collectConfiguredModelRefsFromProviders(input: unknown, refs: Set<strin
     const provider = asRecord(providerValue)
     if (!provider) continue
 
-    const candidates = [provider.models, provider.modelIds, provider.availableModels, provider.whitelist]
+    const candidates = [
+      provider.models,
+      provider.modelIds,
+      provider.availableModels,
+      provider.whitelist
+    ]
     for (const candidate of candidates) {
       const ids = extractProviderModelIds(candidate)
       for (const id of ids) {
@@ -556,10 +595,15 @@ const configuredModelOptions = computed<ConfiguredModelOption[]>(() => {
     .filter((item): item is ConfiguredModelOption => !!item)
 })
 
-function filterConfiguredModels(query: string, list: ConfiguredModelOption[]): ConfiguredModelOption[] {
+function filterConfiguredModels(
+  query: string,
+  list: ConfiguredModelOption[]
+): ConfiguredModelOption[] {
   if (!query) return list
   return list.filter((model) =>
-    [model.modelRef, model.providerId, model.modelId].some((field) => field.toLowerCase().includes(query))
+    [model.modelRef, model.providerId, model.modelId].some((field) =>
+      field.toLowerCase().includes(query)
+    )
   )
 }
 
@@ -593,21 +637,21 @@ const slashSuggestions = computed<SlashSuggestionItem[]>(() => {
     return slashSubagentsSubcommandOptions.value.map((preset) => ({
       kind: 'subagents-subcommand',
       key: `subagents-subcommand-${preset.subcommand}`,
-      subagentsSubcommand: preset,
+      subagentsSubcommand: preset
     }))
   }
   if (slashNewMode.value) {
     const defaults: SlashSuggestionItem[] = [
       {
         kind: 'new-default',
-        key: 'new-default',
-      },
+        key: 'new-default'
+      }
     ]
     const models: SlashSuggestionItem[] = slashNewModelOptions.value.map(
       (model): SlashSuggestionItem => ({
         kind: 'new-model',
         key: `new-model-${model.modelRef}`,
-        model,
+        model
       })
     )
     return [...defaults, ...models]
@@ -616,20 +660,20 @@ const slashSuggestions = computed<SlashSuggestionItem[]>(() => {
     return slashSkillOptions.value.map((skill) => ({
       kind: 'skill',
       key: `skill-${skill.name}`,
-      skill,
+      skill
     }))
   }
   if (slashModelMode.value) {
     return slashModelOptions.value.map((model) => ({
       kind: 'model',
       key: `model-${model.modelRef}`,
-      model,
+      model
     }))
   }
   return slashCommandOptions.value.map((preset) => ({
     kind: 'command',
     key: `cmd-${preset.command}`,
-    preset,
+    preset
   }))
 })
 
@@ -766,16 +810,19 @@ function loadQuickReplies() {
         const title = asString(row.title).trim()
         const content = asString(row.content).trim()
         if (!title || !content) return null
-        const id = asString(row.id).trim() || `quick-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        const id =
+          asString(row.id).trim() || `quick-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         const updatedAt = asNumber(row.updatedAt) || Date.now()
         return {
           id,
           title,
           content,
-          updatedAt,
+          updatedAt
         }
       })
-      .filter((item): item is { id: string; title: string; content: string; updatedAt: number } => !!item)
+      .filter(
+        (item): item is { id: string; title: string; content: string; updatedAt: number } => !!item
+      )
   } catch {
     quickReplies.value = []
   }
@@ -848,9 +895,9 @@ function handleSaveQuickReply() {
         id: `quick-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         title,
         content,
-        updatedAt: Date.now(),
+        updatedAt: Date.now()
       },
-      ...quickReplies.value,
+      ...quickReplies.value
     ]
     message.success(t('pages.chat.quickReplies.messages.created'))
   }
@@ -947,6 +994,10 @@ function getMessageContent(entry: RenderMessage): string {
 
 async function copyMessageContent(entry: RenderMessage) {
   const content = getMessageContent(entry)
+  if (!content.trim()) {
+    message.warning(t('common.noContentToCopy'))
+    return
+  }
   try {
     await writeTextToClipboard(content)
     message.success(t('common.copied'))
@@ -1027,7 +1078,7 @@ function isThinkingOnlyStructuredMessage(structured: StructuredMessageView | nul
 
 function parseToolResultMessage(item: ChatMessage): StructuredMessageView | null {
   const toolResults: ToolResultItemView[] = []
-  
+
   let contentText = ''
   if (item.rawContent && Array.isArray(item.rawContent)) {
     for (const part of item.rawContent) {
@@ -1038,21 +1089,21 @@ function parseToolResultMessage(item: ChatMessage): StructuredMessageView | null
   } else if (item.content) {
     contentText = item.content
   }
-  
+
   toolResults.push({
     id: item.toolCallId,
     name: item.toolName || 'unknown',
     status: item.isError ? 'error' : undefined,
-    content: contentText,
+    content: contentText
   })
-  
+
   return {
     toolCalls: [],
     thinkings: [],
     toolResults,
     validationErrors: [],
     plainTexts: [],
-    images: [],
+    images: []
   }
 }
 
@@ -1063,12 +1114,12 @@ function buildImageUrl(part: ChatMessageContent): string | undefined {
   }
   if (part.mediaPath) {
     let mediaPath = part.mediaPath
-    
+
     // 处理 MEDIA: 前缀
     if (mediaPath.startsWith('MEDIA:')) {
       mediaPath = mediaPath.slice(6)
     }
-    
+
     // 从 file:// URL 中提取相对路径
     // 例如: file:///C:/Users/xxx/.hermes/media/browser/xxx.png -> browser/xxx.png
     if (mediaPath.startsWith('file://')) {
@@ -1084,7 +1135,7 @@ function buildImageUrl(part: ChatMessageContent): string | undefined {
         }
       }
     }
-    
+
     return `/api/media?path=${encodeURIComponent(mediaPath)}`
   }
   return undefined
@@ -1098,7 +1149,7 @@ function normalizeMediaPath(path: string): string {
   if (path.startsWith('MEDIA:')) {
     path = path.slice(6)
   }
-  
+
   // 从 file:// URL 中提取相对路径
   // 例如: file:///C:/Users/xxx/.hermes/media/browser/xxx.png -> browser/xxx.png
   if (path.startsWith('file://')) {
@@ -1112,14 +1163,14 @@ function normalizeMediaPath(path: string): string {
       return `browser/${path.slice(lastSlash + 1)}`
     }
   }
-  
+
   return path
 }
 
 function extractImageFromText(text: string): { images: ImageItemView[]; cleanedText: string } {
   const images: ImageItemView[] = []
   let cleanedText = text
-  
+
   const mdImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g
   let match
   while ((match = mdImageRegex.exec(text)) !== null) {
@@ -1129,12 +1180,12 @@ function extractImageFromText(text: string): { images: ImageItemView[]; cleanedT
       const imageUrl = `/api/media?path=${encodeURIComponent(normalizedPath)}`
       images.push({
         mimeType: `image/${imagePath.split('.').pop()?.toLowerCase() || 'png'}`,
-        url: imageUrl,
+        url: imageUrl
       })
       cleanedText = cleanedText.replace(match[0], '').trim()
     }
   }
-  
+
   const mediaPathRegex = /MEDIA:([^\s\n]+)/g
   while ((match = mediaPathRegex.exec(text)) !== null) {
     const imagePath = match[1]
@@ -1143,12 +1194,12 @@ function extractImageFromText(text: string): { images: ImageItemView[]; cleanedT
       const imageUrl = `/api/media?path=${encodeURIComponent(normalizedPath)}`
       images.push({
         mimeType: `image/${imagePath.split('.').pop()?.toLowerCase() || 'png'}`,
-        url: imageUrl,
+        url: imageUrl
       })
       cleanedText = cleanedText.replace(match[0], '').trim()
     }
   }
-  
+
   return { images, cleanedText }
 }
 
@@ -1163,7 +1214,7 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
     if (part.type === 'text' && part.text) {
       const { images: extractedImages, cleanedText } = extractImageFromText(part.text)
       images.push(...extractedImages)
-      
+
       const trimmedText = cleanedText.trim()
       if (trimmedText.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i)) {
         // Add "browser/" prefix for image filenames without a path
@@ -1171,7 +1222,7 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
         const imageUrl = `/api/media?path=${encodeURIComponent(imagePath)}`
         images.push({
           mimeType: `image/${trimmedText.split('.').pop()?.toLowerCase() || 'png'}`,
-          url: imageUrl,
+          url: imageUrl
         })
         // Also add the image filename to plainTexts to display it as text
         plainTexts.push(cleanedText)
@@ -1179,14 +1230,14 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
         plainTexts.push(cleanedText)
       }
     }
-    
+
     if (part.type === 'thinking' && part.thinking) {
       thinkings.push({
         text: part.thinking,
-        hasEncryptedSignature: false,
+        hasEncryptedSignature: false
       })
     }
-    
+
     if (part.type === 'tool_call') {
       let argumentsJson: string | undefined
       if (part.arguments) {
@@ -1199,10 +1250,10 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
       toolCalls.push({
         id: part.id,
         name: part.name || 'unknown',
-        argumentsJson,
+        argumentsJson
       })
     }
-    
+
     if (part.type === 'tool_result') {
       let contentText: string
       const rawContent = part.content
@@ -1217,12 +1268,12 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
       } else {
         contentText = String(rawContent || '')
       }
-      
+
       toolResults.push({
         id: part.id,
         name: part.name || 'unknown',
         status: part.isError ? 'error' : undefined,
-        content: contentText,
+        content: contentText
       })
     }
 
@@ -1233,12 +1284,18 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
         bytes: part.bytes,
         data: part.data,
         mediaPath: part.mediaPath,
-        url: imageUrl,
+        url: imageUrl
       })
     }
   }
 
-  if (toolCalls.length === 0 && thinkings.length === 0 && toolResults.length === 0 && plainTexts.length === 0 && images.length === 0) {
+  if (
+    toolCalls.length === 0 &&
+    thinkings.length === 0 &&
+    toolResults.length === 0 &&
+    plainTexts.length === 0 &&
+    images.length === 0
+  ) {
     return null
   }
 
@@ -1248,7 +1305,7 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
     toolResults,
     validationErrors: [],
     plainTexts,
-    images,
+    images
   }
 }
 
@@ -1370,7 +1427,7 @@ function splitLeadingJsonValue(line: string): { parsed: unknown; rest: string } 
       const rest = text.slice(i + 1).trim()
       return {
         parsed,
-        rest,
+        rest
       }
     }
   }
@@ -1395,7 +1452,7 @@ function parseJsonItems(content: string): { items: unknown[]; plainLines: string
     }
     return {
       items: rawItems,
-      plainLines,
+      plainLines
     }
   }
 
@@ -1439,7 +1496,7 @@ function parseJsonItems(content: string): { items: unknown[]; plainLines: string
   if (!rawItems.length) return null
   return {
     items: rawItems,
-    plainLines,
+    plainLines
   }
 }
 
@@ -1451,7 +1508,7 @@ function parseThinkingSignature(value: unknown): {
   const row = asRecord(unwrapJsonValue(value))
   if (!row) {
     return {
-      hasEncryptedSignature: false,
+      hasEncryptedSignature: false
     }
   }
   const signatureId = asString(row.id) || undefined
@@ -1468,7 +1525,7 @@ function parseThinkingSignature(value: unknown): {
   return {
     signatureId,
     summaryText: summaryText || undefined,
-    hasEncryptedSignature: !!encrypted,
+    hasEncryptedSignature: !!encrypted
   }
 }
 
@@ -1499,7 +1556,10 @@ function parseToolValidationError(content: string): ToolValidationErrorItemView 
 
   let argumentsText = ''
   if (argsMarkerIndex >= 0) {
-    const rawArguments = lines.slice(argsMarkerIndex + 1).join('\n').trim()
+    const rawArguments = lines
+      .slice(argsMarkerIndex + 1)
+      .join('\n')
+      .trim()
     const normalizedArguments = stripCodeFence(rawArguments).trim()
     if (rawArguments) {
       const parsedArgs = parseSingleJsonValue(normalizedArguments || rawArguments)
@@ -1521,7 +1581,7 @@ function parseToolValidationError(content: string): ToolValidationErrorItemView 
   return {
     toolName,
     issues,
-    argumentsText: argumentsText || undefined,
+    argumentsText: argumentsText || undefined
   }
 }
 
@@ -1536,7 +1596,7 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
       toolResults: [],
       validationErrors: [validationError],
       plainTexts: [],
-      images: [],
+      images: []
     }
   }
   const rawItems = parsed.items
@@ -1550,14 +1610,16 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
     const row = asRecord(unwrapJsonValue(rowValue))
     if (!row) continue
     const typeRaw = asString(row.type).toLowerCase()
-    const type = typeRaw ||
+    const type =
+      typeRaw ||
       ('thinking' in row || 'thinkingSignature' in row
         ? 'thinking'
-        : ('arguments' in row && ('name' in row || 'tool' in row) 
-          ? 'toolcall' 
-          : (('tool_call_id' in row || 'toolCallId' in row || 'call_id' in row) && ('content' in row || 'output' in row || 'result' in row)
+        : 'arguments' in row && ('name' in row || 'tool' in row)
+          ? 'toolcall'
+          : ('tool_call_id' in row || 'toolCallId' in row || 'call_id' in row) &&
+              ('content' in row || 'output' in row || 'result' in row)
             ? 'toolresult'
-            : '')))
+            : '')
 
     if (type === 'toolcall' || type === 'tool_call') {
       const args = asRecord(row.arguments ?? row.args ?? row.params)
@@ -1581,7 +1643,7 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
         workdir: args ? asString(args.workdir || args.cwd || args.dir) || undefined : undefined,
         timeout: args ? asNumber(args.timeout) : undefined,
         partialJson: asString(row.partialJson || row.partial_json) || undefined,
-        argumentsJson,
+        argumentsJson
       })
       recognized += 1
       continue
@@ -1590,7 +1652,8 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
     if (type === 'thinking' || type === 'reasoning') {
       const signature = parseThinkingSignature(row.thinkingSignature ?? row.signature)
       const text = asText(row.thinking ?? row.text ?? row.message).trim()
-      const hasSignature = signature.signatureId || signature.summaryText || signature.hasEncryptedSignature
+      const hasSignature =
+        signature.signatureId || signature.summaryText || signature.hasEncryptedSignature
       if (!text && !hasSignature) continue
       if (!text && hasSignature && parsed.plainLines.length > 0) {
         recognized += 1
@@ -1601,7 +1664,7 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
         text,
         signatureId: signature.signatureId,
         summaryText: signature.summaryText,
-        hasEncryptedSignature: signature.hasEncryptedSignature,
+        hasEncryptedSignature: signature.hasEncryptedSignature
       })
       recognized += 1
       continue
@@ -1610,7 +1673,7 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
     if (type === 'toolresult' || type === 'tool_result') {
       let contentText: string
       const rawContent = row.content ?? row.output ?? row.result ?? row.message ?? row.response
-      
+
       if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
         try {
           contentText = JSON.stringify(rawContent, null, 2)
@@ -1620,13 +1683,13 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
       } else {
         contentText = asText(rawContent)
       }
-      
+
       if (!contentText.trim()) continue
       toolResults.push({
         id: asString(row.id || row.tool_call_id || row.toolCallId || row.call_id) || undefined,
         name: asString(row.name || row.tool || row.toolName || row.tool_name) || undefined,
         status: asString(row.status || row.state || row.error) || undefined,
-        content: contentText,
+        content: contentText
       })
       recognized += 1
       continue
@@ -1640,7 +1703,7 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
     toolResults,
     validationErrors: [],
     plainTexts: parsed.plainLines,
-    images: [],
+    images: []
   }
 }
 
@@ -1653,37 +1716,43 @@ const visibleMessageEntries = computed<RenderMessage[]>(() => {
   for (let idx = 0; idx < list.length; idx += 1) {
     const item = list[idx]
     if (!item) continue
-    
+
     if (item.role === 'tool') {
       const structured = parseToolResultMessage(item)
       if (structured) {
         rendered.push({
           key: item.id || `tool-${idx}`,
           item,
-          structured,
+          structured
         })
       }
       continue
     }
-    
+
     if (item.rawContent && Array.isArray(item.rawContent)) {
       const structured = parseRawContent(item.rawContent)
-      if (structured && (structured.toolCalls.length > 0 || structured.thinkings.length > 0 || structured.toolResults.length > 0 || structured.plainTexts.length > 0)) {
+      if (
+        structured &&
+        (structured.toolCalls.length > 0 ||
+          structured.thinkings.length > 0 ||
+          structured.toolResults.length > 0 ||
+          structured.plainTexts.length > 0)
+      ) {
         rendered.push({
           key: item.id || `${item.role}-${idx}`,
           item,
-          structured,
+          structured
         })
         continue
       }
     }
-    
+
     const structured = parseStructuredMessage(item.content)
     if (isThinkingOnlyStructuredMessage(structured)) continue
     rendered.push({
       key: item.id || `${item.role}-${idx}`,
       item,
-      structured,
+      structured
     })
   }
 
@@ -1764,7 +1833,8 @@ const agentBusyToolName = computed(() => {
 const agentStatusTagType = computed<'default' | 'success' | 'warning' | 'info' | 'error'>(() => {
   if (agentBusyToolName.value) return 'warning'
   const phase = currentAgentStatus.value.phase
-  if (phase === 'replying' || phase === 'sending' || phase === 'waiting' || phase === 'thinking') return 'info'
+  if (phase === 'replying' || phase === 'sending' || phase === 'waiting' || phase === 'thinking')
+    return 'info'
   if (phase === 'tool' || phase === 'aborting' || phase === 'aborted') return 'warning'
   if (phase === 'done') return 'success'
   if (phase === 'error') return 'error'
@@ -1772,11 +1842,13 @@ const agentStatusTagType = computed<'default' | 'success' | 'warning' | 'info' |
 })
 
 const agentStatusText = computed(() => {
-  if (agentBusyToolName.value) return t('pages.chat.agentStatus.toolCall', { name: agentBusyToolName.value })
+  if (agentBusyToolName.value)
+    return t('pages.chat.agentStatus.toolCall', { name: agentBusyToolName.value })
   const status = currentAgentStatus.value
   if (status.phase === 'sending') return t('pages.chat.agentStatus.sending')
   if (status.phase === 'waiting') return t('pages.chat.agentStatus.waiting')
-  if (status.phase === 'thinking') return status.detail ? status.detail : t('pages.chat.agentStatus.thinking')
+  if (status.phase === 'thinking')
+    return status.detail ? status.detail : t('pages.chat.agentStatus.thinking')
   if (status.phase === 'tool') {
     return status.detail
       ? t('pages.chat.agentStatus.toolCall', { name: status.detail })
@@ -1818,7 +1890,7 @@ function formatClock(ts: number): string {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: false,
+    hour12: false
   })
 }
 
@@ -1863,7 +1935,8 @@ function looksLikeMarkdown(value: string): boolean {
   if (/`[^`\n]+`/.test(text)) return true
   if (/\[[^\]]+]\((https?:\/\/[^)\s]+)\)/.test(text)) return true
   if (/\*\*[^*\n]+\*\*/.test(text)) return true
-  if (/(^|[\s(（\[{【'"""'])\*[^*\n]+\*(?=$|[\s)\]）}】'".,!?，。！？：:、"'"])/u.test(text)) return true
+  if (/(^|[\s(（\[{【'"""'])\*[^*\n]+\*(?=$|[\s)\]）}】'".,!?，。！？：:、"'"])/u.test(text))
+    return true
   if (/^\s{0,3}#{1,6}\s+\S+/m.test(text)) return true
   if (/^\s{0,3}>\s+\S+/m.test(text)) return true
   if (/^\s{0,3}[-*+]\s+\S+/m.test(text)) return true
@@ -1942,7 +2015,9 @@ function requestScrollToBottom(options?: { force?: boolean; expanded?: boolean }
 
   pendingScroll = true
   const schedule =
-    typeof queueMicrotask === 'function' ? queueMicrotask : (fn: () => void) => Promise.resolve().then(fn)
+    typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (fn: () => void) => Promise.resolve().then(fn)
   schedule(() => {
     pendingScroll = false
     if (destroyed) return
@@ -1964,7 +2039,8 @@ async function handleSend() {
   if (agentBusy.value) return
 
   try {
-    const sessionKey = selectedSessionKey.value || (selectedAgent.value ? `${selectedAgent.value.id}:main` : 'main')
+    const sessionKey =
+      selectedSessionKey.value || (selectedAgent.value ? `${selectedAgent.value.id}:main` : 'main')
     chatStore.setSessionKey(sessionKey)
     await chatStore.sendMessage(content)
     void fetchSessionTokenUsage(sessionKey)
@@ -2036,13 +2112,14 @@ onMounted(async () => {
         chatStore.handleAgentStatusEvent(eventName, data.payload)
         chatStore.handleRealtimeEvent(data.payload, {
           refreshHistory: false,
-          streaming: isStreamingEvent,
+          streaming: isStreamingEvent
         })
       }
     })
   )
 
-  const sessionKey = selectedSessionKey.value || (selectedAgent.value ? `${selectedAgent.value.id}:main` : null)
+  const sessionKey =
+    selectedSessionKey.value || (selectedAgent.value ? `${selectedAgent.value.id}:main` : null)
   if (sessionKey) {
     chatStore.setSessionKey(sessionKey)
     await chatStore.fetchHistory(sessionKey)
@@ -2093,7 +2170,13 @@ watch(selectedSessionKey, async (newSessionKey) => {
             <span class="chat-token-chip__value">{{ metric.value }}</span>
           </NTag>
         </div>
-        <NTag v-else-if="selectedSessionKey" size="small" :bordered="false" round class="chat-token-chip chat-token-chip--loading">
+        <NTag
+          v-else-if="selectedSessionKey"
+          size="small"
+          :bordered="false"
+          round
+          class="chat-token-chip chat-token-chip--loading"
+        >
           {{ sessionTokenStatusText }}
         </NTag>
         <NTag v-if="executionInProgress" size="small" type="info" :bordered="false" round>
@@ -2106,11 +2189,13 @@ watch(selectedSessionKey, async (newSessionKey) => {
           <template #trigger>
             <NTag size="small" :bordered="false" round class="session-tag">
               <span class="session-tag__text">
-                {{ selectedAgent?.name || 'Agent' }} / {{ selectedSession.label || selectedSession.key.slice(0, 16) }}
+                {{ selectedAgent?.name || 'Agent' }} /
+                {{ selectedSession.label || selectedSession.key.slice(0, 16) }}
               </span>
             </NTag>
           </template>
-          {{ t('pages.office.chat.chattingWith') }}: {{ selectedAgent?.name }} - {{ selectedSession.label || selectedSession.key }}
+          {{ t('pages.office.chat.chattingWith') }}: {{ selectedAgent?.name }} -
+          {{ selectedSession.label || selectedSession.key }}
         </NTooltip>
         <NTooltip>
           <template #trigger>
@@ -2135,7 +2220,7 @@ watch(selectedSessionKey, async (newSessionKey) => {
         <div v-if="activeTasks.length > 0" class="active-tasks-bar">
           <NSpace :size="8" align="center">
             <NIcon :component="TimeOutline" :color="'#2080f0'" />
-            <NText depth="3" style="font-size: 12px;">
+            <NText depth="3" style="font-size: 12px">
               {{ t('pages.office.chat.activeTasks', { count: activeTasks.length }) }}
             </NText>
           </NSpace>
@@ -2157,11 +2242,11 @@ watch(selectedSessionKey, async (newSessionKey) => {
                   <NTag size="small" :type="roleType(entry.item.role)" :bordered="false" round>
                     {{ roleLabel(entry.item.role) }}
                   </NTag>
-                  <NText v-if="entry.item.name" depth="3" style="font-size: 12px;">
+                  <NText v-if="entry.item.name" depth="3" style="font-size: 12px">
                     {{ entry.item.name }}
                   </NText>
                 </NSpace>
-                <NText v-if="entry.item.timestamp" depth="3" style="font-size: 12px;">
+                <NText v-if="entry.item.timestamp" depth="3" style="font-size: 12px">
                   {{ formatDate(entry.item.timestamp) }}
                 </NText>
               </NSpace>
@@ -2175,11 +2260,13 @@ watch(selectedSessionKey, async (newSessionKey) => {
                   >
                     <NSpace align="center" justify="space-between">
                       <NSpace align="center" :size="6">
-                        <NTag size="small" type="warning" :bordered="false" round>{{ t('pages.chat.structured.toolCall') }}</NTag>
+                        <NTag size="small" type="warning" :bordered="false" round>{{
+                          t('pages.chat.structured.toolCall')
+                        }}</NTag>
                         <NText strong>{{ tool.name }}</NText>
                       </NSpace>
                       <NSpace align="center" :size="8">
-                        <NText v-if="tool.timeout" depth="3" style="font-size: 12px;">
+                        <NText v-if="tool.timeout" depth="3" style="font-size: 12px">
                           {{ t('pages.chat.structured.timeout', { seconds: tool.timeout }) }}
                         </NText>
                         <NButton
@@ -2188,17 +2275,31 @@ watch(selectedSessionKey, async (newSessionKey) => {
                           text
                           @click="toggleToolCallExpand(`${entry.key}-tool-${toolIndex}`)"
                         >
-                          {{ expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`) ? t('pages.chat.structured.hideArgs') : t('pages.chat.structured.viewArgs') }}
+                          {{
+                            expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)
+                              ? t('pages.chat.structured.hideArgs')
+                              : t('pages.chat.structured.viewArgs')
+                          }}
                         </NButton>
                       </NSpace>
                     </NSpace>
 
                     <div v-if="tool.command || tool.workdir" class="tool-call-meta">
-                      <code v-if="tool.command" class="tool-call-meta__code">{{ tool.command }}</code>
-                      <code v-if="tool.workdir" class="tool-call-meta__code">{{ tool.workdir }}</code>
+                      <code v-if="tool.command" class="tool-call-meta__code">{{
+                        tool.command
+                      }}</code>
+                      <code v-if="tool.workdir" class="tool-call-meta__code">{{
+                        tool.workdir
+                      }}</code>
                     </div>
 
-                    <div v-if="tool.argumentsJson && expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)" class="tool-call-args">
+                    <div
+                      v-if="
+                        tool.argumentsJson &&
+                        expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)
+                      "
+                      class="tool-call-args"
+                    >
                       <pre class="tool-call-args__content">{{ tool.argumentsJson }}</pre>
                     </div>
 
@@ -2217,11 +2318,13 @@ watch(selectedSessionKey, async (newSessionKey) => {
                   >
                     <NSpace align="center" justify="space-between">
                       <NSpace align="center" :size="6">
-                        <NTag size="small" type="success" :bordered="false" round>{{ t('pages.chat.structured.toolResult') }}</NTag>
+                        <NTag size="small" type="success" :bordered="false" round>{{
+                          t('pages.chat.structured.toolResult')
+                        }}</NTag>
                         <NText strong>{{ result.name || 'unknown' }}</NText>
                       </NSpace>
                       <NSpace align="center" :size="8">
-                        <NText v-if="result.status" depth="3" style="font-size: 12px;">
+                        <NText v-if="result.status" depth="3" style="font-size: 12px">
                           {{ result.status }}
                         </NText>
                         <NButton
@@ -2229,18 +2332,30 @@ watch(selectedSessionKey, async (newSessionKey) => {
                           text
                           @click="toggleToolResultExpand(`${entry.key}-result-${resultIndex}`)"
                         >
-                          {{ expandedToolResults.has(`${entry.key}-result-${resultIndex}`) ? t('pages.chat.structured.hideArgs') : t('pages.chat.structured.viewArgs') }}
+                          {{
+                            expandedToolResults.has(`${entry.key}-result-${resultIndex}`)
+                              ? t('pages.chat.structured.hideArgs')
+                              : t('pages.chat.structured.viewArgs')
+                          }}
                         </NButton>
                       </NSpace>
                     </NSpace>
 
-                    <div v-if="expandedToolResults.has(`${entry.key}-result-${resultIndex}`)" class="tool-call-grid">
+                    <div
+                      v-if="expandedToolResults.has(`${entry.key}-result-${resultIndex}`)"
+                      class="tool-call-grid"
+                    >
                       <span class="tool-call-label">{{ t('pages.chat.structured.callId') }}</span>
                       <div class="tool-call-value-wrapper">
                         <code>{{ result.id || '-' }}</code>
                         <NTooltip>
                           <template #trigger>
-                            <NButton quaternary size="tiny" class="tool-value-copy-btn" @click="copyToClipboard(result.id || '-')">
+                            <NButton
+                              quaternary
+                              size="tiny"
+                              class="tool-value-copy-btn"
+                              @click="copyToClipboard(result.id || '-')"
+                            >
                               <template #icon>
                                 <NIcon :component="CopyOutline" />
                               </template>
@@ -2254,7 +2369,12 @@ watch(selectedSessionKey, async (newSessionKey) => {
                         <pre class="tool-result-content">{{ result.content }}</pre>
                         <NTooltip>
                           <template #trigger>
-                            <NButton quaternary size="tiny" class="tool-value-copy-btn" @click="copyToClipboard(result.content)">
+                            <NButton
+                              quaternary
+                              size="tiny"
+                              class="tool-value-copy-btn"
+                              @click="copyToClipboard(result.content)"
+                            >
                               <template #icon>
                                 <NIcon :component="CopyOutline" />
                               </template>
@@ -2275,11 +2395,17 @@ watch(selectedSessionKey, async (newSessionKey) => {
                   >
                     <NSpace align="center" justify="space-between">
                       <NSpace align="center" :size="6">
-                        <NTag size="small" type="warning" :bordered="false" round>{{ t('pages.chat.structured.validationFailed') }}</NTag>
+                        <NTag size="small" type="warning" :bordered="false" round>{{
+                          t('pages.chat.structured.validationFailed')
+                        }}</NTag>
                         <NText strong>{{ validation.toolName }}</NText>
                       </NSpace>
-                      <NText depth="3" style="font-size: 12px;">
-                        {{ t('pages.chat.structured.issuesCount', { count: validation.issues.length }) }}
+                      <NText depth="3" style="font-size: 12px">
+                        {{
+                          t('pages.chat.structured.issuesCount', {
+                            count: validation.issues.length
+                          })
+                        }}
                       </NText>
                     </NSpace>
 
@@ -2303,7 +2429,9 @@ watch(selectedSessionKey, async (newSessionKey) => {
                 <div v-if="entry.structured.plainTexts.length" class="chat-bubble-content-wrapper">
                   <div
                     class="chat-bubble-content structured-plain-text chat-markdown"
-                    v-html="renderChatMarkdown(entry.structured.plainTexts.join('\n'), entry.item.role)"
+                    v-html="
+                      renderChatMarkdown(entry.structured.plainTexts.join('\n'), entry.item.role)
+                    "
                   ></div>
                   <div class="chat-content-copy-btn">
                     <NTooltip>
@@ -2332,7 +2460,9 @@ watch(selectedSessionKey, async (newSessionKey) => {
                       loading="lazy"
                       @click="openImagePreview(img.url)"
                     />
-                    <span v-else class="chat-image-placeholder">{{ t('pages.chat.image.unavailable') }}</span>
+                    <span v-else class="chat-image-placeholder">{{
+                      t('pages.chat.image.unavailable')
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -2362,7 +2492,9 @@ watch(selectedSessionKey, async (newSessionKey) => {
         <NCollapse class="chat-quick-collapse">
           <NCollapseItem :title="t('pages.chat.quickReplies.title')" name="quick-replies">
             <template #header-extra>
-              <NButton size="tiny" type="primary" secondary @click.stop="openCreateQuickReply">{{ t('pages.chat.quickReplies.add') }}</NButton>
+              <NButton size="tiny" type="primary" secondary @click.stop="openCreateQuickReply">{{
+                t('pages.chat.quickReplies.add')
+              }}</NButton>
             </template>
             <NInput
               v-model:value="quickReplySearch"
@@ -2373,16 +2505,22 @@ watch(selectedSessionKey, async (newSessionKey) => {
             <div v-if="filteredQuickReplies.length" class="chat-quick-list">
               <div v-for="item in filteredQuickReplies" :key="item.id" class="chat-quick-item">
                 <NSpace justify="space-between" align="start" :wrap="false">
-                  <div style="min-width: 0; flex: 1;">
-                    <NText strong style="font-size: 12px;">{{ item.title }}</NText>
-                    <NText depth="3" style="display: block; font-size: 11px; margin-top: 2px;">
+                  <div style="min-width: 0; flex: 1">
+                    <NText strong style="font-size: 12px">{{ item.title }}</NText>
+                    <NText depth="3" style="display: block; font-size: 11px; margin-top: 2px">
                       {{ truncate(item.content, 60) }}
                     </NText>
                   </div>
                   <NSpace :size="2">
-                    <NButton size="tiny" text @click="handleInsertQuickReply(item)">{{ t('pages.chat.quickReplies.insert') }}</NButton>
-                    <NButton size="tiny" text type="primary" @click="handleSendQuickReply(item)">{{ t('pages.chat.actions.send') }}</NButton>
-                    <NButton size="tiny" text @click="openEditQuickReply(item)">{{ t('common.edit') }}</NButton>
+                    <NButton size="tiny" text @click="handleInsertQuickReply(item)">{{
+                      t('pages.chat.quickReplies.insert')
+                    }}</NButton>
+                    <NButton size="tiny" text type="primary" @click="handleSendQuickReply(item)">{{
+                      t('pages.chat.actions.send')
+                    }}</NButton>
+                    <NButton size="tiny" text @click="openEditQuickReply(item)">{{
+                      t('common.edit')
+                    }}</NButton>
                     <NPopconfirm
                       :positive-text="t('common.delete')"
                       :negative-text="t('common.cancel')"
@@ -2397,7 +2535,12 @@ watch(selectedSessionKey, async (newSessionKey) => {
                 </NSpace>
               </div>
             </div>
-            <NEmpty v-else :description="t('pages.chat.quickReplies.empty')" style="padding: 10px 0 6px;" size="small" />
+            <NEmpty
+              v-else
+              :description="t('pages.chat.quickReplies.empty')"
+              style="padding: 10px 0 6px"
+              size="small"
+            />
           </NCollapseItem>
         </NCollapse>
 
@@ -2412,8 +2555,8 @@ watch(selectedSessionKey, async (newSessionKey) => {
 
           <div v-if="slashMode" class="chat-slash-panel">
             <div class="chat-slash-head">
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.slash.title') }}</NText>
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.slash.hint') }}</NText>
+              <NText depth="3" style="font-size: 12px">{{ t('pages.chat.slash.title') }}</NText>
+              <NText depth="3" style="font-size: 12px">{{ t('pages.chat.slash.hint') }}</NText>
             </div>
             <div v-if="slashSuggestions.length" class="chat-slash-list">
               <button
@@ -2429,7 +2572,9 @@ watch(selectedSessionKey, async (newSessionKey) => {
                 <div v-if="item.kind === 'command' && item.preset">
                   <div class="chat-slash-line">
                     <span class="chat-slash-command">{{ item.preset.command }}</span>
-                    <span v-if="item.preset.usage" class="chat-slash-usage">{{ item.preset.usage }}</span>
+                    <span v-if="item.preset.usage" class="chat-slash-usage">{{
+                      item.preset.usage
+                    }}</span>
                     <NTag size="tiny" :bordered="false" round>{{ item.preset.category }}</NTag>
                   </div>
                   <div class="chat-slash-line chat-slash-desc">
@@ -2449,8 +2594,12 @@ watch(selectedSessionKey, async (newSessionKey) => {
                 </div>
                 <div v-else-if="item.kind === 'subagents-subcommand' && item.subagentsSubcommand">
                   <div class="chat-slash-line">
-                    <span class="chat-slash-command">/subagents {{ item.subagentsSubcommand.subcommand }}</span>
-                    <span v-if="item.subagentsSubcommand.usage" class="chat-slash-usage">{{ item.subagentsSubcommand.usage }}</span>
+                    <span class="chat-slash-command"
+                      >/subagents {{ item.subagentsSubcommand.subcommand }}</span
+                    >
+                    <span v-if="item.subagentsSubcommand.usage" class="chat-slash-usage">{{
+                      item.subagentsSubcommand.usage
+                    }}</span>
                   </div>
                   <div class="chat-slash-line chat-slash-desc">
                     <span>{{ item.subagentsSubcommand.description }}</span>
@@ -2486,7 +2635,7 @@ watch(selectedSessionKey, async (newSessionKey) => {
               </button>
             </div>
             <div v-else class="chat-slash-empty">
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.slash.noMatch') }}</NText>
+              <NText depth="3" style="font-size: 12px">{{ t('pages.chat.slash.noMatch') }}</NText>
             </div>
           </div>
           <div class="chat-compose-status-line">
@@ -2505,18 +2654,30 @@ watch(selectedSessionKey, async (newSessionKey) => {
               text
               @click="showAgentDetails = !showAgentDetails"
             >
-              {{ showAgentDetails ? t('pages.chat.agentDetails.hide') : t('pages.chat.agentDetails.show') }}
+              {{
+                showAgentDetails
+                  ? t('pages.chat.agentDetails.hide')
+                  : t('pages.chat.agentDetails.show')
+              }}
             </NButton>
           </div>
 
           <div v-if="showAgentDetails && hasAgentDetails" class="chat-agent-details">
             <NSpace vertical :size="6">
-              <NText depth="3" style="font-size: 12px;">
-                {{ t('pages.chat.agentDetails.phaseDuration', { duration: formatDurationMs(nowMs - currentAgentStatus.sinceMs) }) }}
+              <NText depth="3" style="font-size: 12px">
+                {{
+                  t('pages.chat.agentDetails.phaseDuration', {
+                    duration: formatDurationMs(nowMs - currentAgentStatus.sinceMs)
+                  })
+                }}
               </NText>
 
               <div v-if="chatStore.agentSteps.get(currentAgentId)?.length" class="chat-agent-steps">
-                <div v-for="(step, index) in chatStore.agentSteps.get(currentAgentId)" :key="`step-${step.ts}-${index}`" class="chat-agent-step">
+                <div
+                  v-for="(step, index) in chatStore.agentSteps.get(currentAgentId)"
+                  :key="`step-${step.ts}-${index}`"
+                  class="chat-agent-step"
+                >
                   <span class="chat-agent-step__time">{{ formatClock(step.ts) }}</span>
                   <span class="chat-agent-step__label">{{ step.label }}</span>
                 </div>
@@ -2524,15 +2685,23 @@ watch(selectedSessionKey, async (newSessionKey) => {
 
               <div v-if="currentToolProgress" class="chat-tool-progress">
                 <div class="chat-tool-progress__title">
-                  <span>{{ t('pages.chat.agentDetails.tool', { name: currentToolProgress.name }) }}</span>
-                  <span v-if="currentToolProgress.meta" class="chat-tool-progress__meta">{{ currentToolProgress.meta }}</span>
+                  <span>{{
+                    t('pages.chat.agentDetails.tool', { name: currentToolProgress.name })
+                  }}</span>
+                  <span v-if="currentToolProgress.meta" class="chat-tool-progress__meta">{{
+                    currentToolProgress.meta
+                  }}</span>
                 </div>
                 <div class="chat-tool-progress__kv">
                   <span class="chat-tool-progress__k">{{ t('pages.chat.structured.callId') }}</span>
                   <code class="chat-tool-progress__v">{{ currentToolProgress.toolCallId }}</code>
-                  <span class="chat-tool-progress__k">{{ t('pages.chat.agentDetails.phase') }}</span>
+                  <span class="chat-tool-progress__k">{{
+                    t('pages.chat.agentDetails.phase')
+                  }}</span>
                   <code class="chat-tool-progress__v">{{ currentToolProgress.phase }}</code>
-                  <span class="chat-tool-progress__k">{{ t('pages.chat.agentDetails.elapsed') }}</span>
+                  <span class="chat-tool-progress__k">{{
+                    t('pages.chat.agentDetails.elapsed')
+                  }}</span>
                   <code class="chat-tool-progress__v">
                     {{ formatDurationMs(toolElapsedMs) }}
                   </code>
@@ -2569,7 +2738,13 @@ watch(selectedSessionKey, async (newSessionKey) => {
               <template #icon><NIcon :component="StopCircleOutline" /></template>
               {{ t('pages.chat.actions.stop') }}
             </NButton>
-            <NButton size="small" type="primary" :loading="agentBusy" :disabled="agentBusy || !draft.trim()" @click="handleSend">
+            <NButton
+              size="small"
+              type="primary"
+              :loading="agentBusy"
+              :disabled="agentBusy || !draft.trim()"
+              @click="handleSend"
+            >
               <template #icon><NIcon :component="SendOutline" /></template>
               {{ t('pages.office.chat.send') }}
             </NButton>
@@ -2601,7 +2776,11 @@ watch(selectedSessionKey, async (newSessionKey) => {
       </div>
 
       <template v-else>
-        <NScrollbar ref="expandedScrollRef" class="expanded-chat-messages" @scroll="handleExpandedScroll">
+        <NScrollbar
+          ref="expandedScrollRef"
+          class="expanded-chat-messages"
+          @scroll="handleExpandedScroll"
+        >
           <div v-if="visibleMessageEntries.length === 0" class="chat-empty">
             <NEmpty :description="t('pages.office.chat.noMessages')" />
           </div>
@@ -2617,11 +2796,11 @@ watch(selectedSessionKey, async (newSessionKey) => {
                   <NTag size="small" :type="roleType(entry.item.role)" :bordered="false" round>
                     {{ roleLabel(entry.item.role) }}
                   </NTag>
-                  <NText v-if="entry.item.name" depth="3" style="font-size: 12px;">
+                  <NText v-if="entry.item.name" depth="3" style="font-size: 12px">
                     {{ entry.item.name }}
                   </NText>
                 </NSpace>
-                <NText v-if="entry.item.timestamp" depth="3" style="font-size: 12px;">
+                <NText v-if="entry.item.timestamp" depth="3" style="font-size: 12px">
                   {{ formatDate(entry.item.timestamp) }}
                 </NText>
               </NSpace>
@@ -2635,11 +2814,13 @@ watch(selectedSessionKey, async (newSessionKey) => {
                   >
                     <NSpace align="center" justify="space-between">
                       <NSpace align="center" :size="6">
-                        <NTag size="small" type="warning" :bordered="false" round>{{ t('pages.chat.structured.toolCall') }}</NTag>
+                        <NTag size="small" type="warning" :bordered="false" round>{{
+                          t('pages.chat.structured.toolCall')
+                        }}</NTag>
                         <NText strong>{{ tool.name }}</NText>
                       </NSpace>
                       <NSpace align="center" :size="8">
-                        <NText v-if="tool.timeout" depth="3" style="font-size: 12px;">
+                        <NText v-if="tool.timeout" depth="3" style="font-size: 12px">
                           {{ t('pages.chat.structured.timeout', { seconds: tool.timeout }) }}
                         </NText>
                         <NButton
@@ -2648,17 +2829,31 @@ watch(selectedSessionKey, async (newSessionKey) => {
                           text
                           @click="toggleToolCallExpand(`${entry.key}-tool-${toolIndex}`)"
                         >
-                          {{ expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`) ? t('pages.chat.structured.hideArgs') : t('pages.chat.structured.viewArgs') }}
+                          {{
+                            expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)
+                              ? t('pages.chat.structured.hideArgs')
+                              : t('pages.chat.structured.viewArgs')
+                          }}
                         </NButton>
                       </NSpace>
                     </NSpace>
 
                     <div v-if="tool.command || tool.workdir" class="tool-call-meta">
-                      <code v-if="tool.command" class="tool-call-meta__code">{{ tool.command }}</code>
-                      <code v-if="tool.workdir" class="tool-call-meta__code">{{ tool.workdir }}</code>
+                      <code v-if="tool.command" class="tool-call-meta__code">{{
+                        tool.command
+                      }}</code>
+                      <code v-if="tool.workdir" class="tool-call-meta__code">{{
+                        tool.workdir
+                      }}</code>
                     </div>
 
-                    <div v-if="tool.argumentsJson && expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)" class="tool-call-args">
+                    <div
+                      v-if="
+                        tool.argumentsJson &&
+                        expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)
+                      "
+                      class="tool-call-args"
+                    >
                       <pre class="tool-call-args__content">{{ tool.argumentsJson }}</pre>
                     </div>
                   </div>
@@ -2672,11 +2867,13 @@ watch(selectedSessionKey, async (newSessionKey) => {
                   >
                     <NSpace align="center" justify="space-between">
                       <NSpace align="center" :size="6">
-                        <NTag size="small" type="success" :bordered="false" round>{{ t('pages.chat.structured.toolResult') }}</NTag>
+                        <NTag size="small" type="success" :bordered="false" round>{{
+                          t('pages.chat.structured.toolResult')
+                        }}</NTag>
                         <NText strong>{{ result.name || 'unknown' }}</NText>
                       </NSpace>
                       <NSpace align="center" :size="8">
-                        <NText v-if="result.status" depth="3" style="font-size: 12px;">
+                        <NText v-if="result.status" depth="3" style="font-size: 12px">
                           {{ result.status }}
                         </NText>
                         <NButton
@@ -2684,18 +2881,30 @@ watch(selectedSessionKey, async (newSessionKey) => {
                           text
                           @click="toggleToolResultExpand(`${entry.key}-result-${resultIndex}`)"
                         >
-                          {{ expandedToolResults.has(`${entry.key}-result-${resultIndex}`) ? t('pages.chat.structured.hideArgs') : t('pages.chat.structured.viewArgs') }}
+                          {{
+                            expandedToolResults.has(`${entry.key}-result-${resultIndex}`)
+                              ? t('pages.chat.structured.hideArgs')
+                              : t('pages.chat.structured.viewArgs')
+                          }}
                         </NButton>
                       </NSpace>
                     </NSpace>
 
-                    <div v-if="expandedToolResults.has(`${entry.key}-result-${resultIndex}`)" class="tool-call-grid">
+                    <div
+                      v-if="expandedToolResults.has(`${entry.key}-result-${resultIndex}`)"
+                      class="tool-call-grid"
+                    >
                       <span class="tool-call-label">{{ t('pages.chat.structured.callId') }}</span>
                       <div class="tool-call-value-wrapper">
                         <code>{{ result.id || '-' }}</code>
                         <NTooltip>
                           <template #trigger>
-                            <NButton quaternary size="tiny" class="tool-value-copy-btn" @click="copyToClipboard(result.id || '-')">
+                            <NButton
+                              quaternary
+                              size="tiny"
+                              class="tool-value-copy-btn"
+                              @click="copyToClipboard(result.id || '-')"
+                            >
                               <template #icon>
                                 <NIcon :component="CopyOutline" />
                               </template>
@@ -2709,7 +2918,12 @@ watch(selectedSessionKey, async (newSessionKey) => {
                         <pre class="tool-result-content">{{ result.content }}</pre>
                         <NTooltip>
                           <template #trigger>
-                            <NButton quaternary size="tiny" class="tool-value-copy-btn" @click="copyToClipboard(result.content)">
+                            <NButton
+                              quaternary
+                              size="tiny"
+                              class="tool-value-copy-btn"
+                              @click="copyToClipboard(result.content)"
+                            >
                               <template #icon>
                                 <NIcon :component="CopyOutline" />
                               </template>
@@ -2725,7 +2939,9 @@ watch(selectedSessionKey, async (newSessionKey) => {
                 <div v-if="entry.structured.plainTexts.length" class="chat-bubble-content-wrapper">
                   <div
                     class="chat-bubble-content structured-plain-text chat-markdown"
-                    v-html="renderChatMarkdown(entry.structured.plainTexts.join('\n'), entry.item.role)"
+                    v-html="
+                      renderChatMarkdown(entry.structured.plainTexts.join('\n'), entry.item.role)
+                    "
                   ></div>
                   <div class="chat-content-copy-btn">
                     <NTooltip>
@@ -2754,7 +2970,9 @@ watch(selectedSessionKey, async (newSessionKey) => {
                       loading="lazy"
                       @click="openImagePreview(img.url)"
                     />
-                    <span v-else class="chat-image-placeholder">{{ t('pages.chat.image.unavailable') }}</span>
+                    <span v-else class="chat-image-placeholder">{{
+                      t('pages.chat.image.unavailable')
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -2792,8 +3010,8 @@ watch(selectedSessionKey, async (newSessionKey) => {
 
           <div v-if="slashMode" class="chat-slash-panel">
             <div class="chat-slash-head">
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.slash.title') }}</NText>
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.slash.hint') }}</NText>
+              <NText depth="3" style="font-size: 12px">{{ t('pages.chat.slash.title') }}</NText>
+              <NText depth="3" style="font-size: 12px">{{ t('pages.chat.slash.hint') }}</NText>
             </div>
             <div v-if="slashSuggestions.length" class="chat-slash-list">
               <button
@@ -2809,7 +3027,9 @@ watch(selectedSessionKey, async (newSessionKey) => {
                 <div v-if="item.kind === 'command' && item.preset">
                   <div class="chat-slash-line">
                     <span class="chat-slash-command">{{ item.preset.command }}</span>
-                    <span v-if="item.preset.usage" class="chat-slash-usage">{{ item.preset.usage }}</span>
+                    <span v-if="item.preset.usage" class="chat-slash-usage">{{
+                      item.preset.usage
+                    }}</span>
                     <NTag size="tiny" :bordered="false" round>{{ item.preset.category }}</NTag>
                   </div>
                   <div class="chat-slash-line chat-slash-desc">
@@ -2829,8 +3049,12 @@ watch(selectedSessionKey, async (newSessionKey) => {
                 </div>
                 <div v-else-if="item.kind === 'subagents-subcommand' && item.subagentsSubcommand">
                   <div class="chat-slash-line">
-                    <span class="chat-slash-command">/subagents {{ item.subagentsSubcommand.subcommand }}</span>
-                    <span v-if="item.subagentsSubcommand.usage" class="chat-slash-usage">{{ item.subagentsSubcommand.usage }}</span>
+                    <span class="chat-slash-command"
+                      >/subagents {{ item.subagentsSubcommand.subcommand }}</span
+                    >
+                    <span v-if="item.subagentsSubcommand.usage" class="chat-slash-usage">{{
+                      item.subagentsSubcommand.usage
+                    }}</span>
                   </div>
                   <div class="chat-slash-line chat-slash-desc">
                     <span>{{ item.subagentsSubcommand.description }}</span>
@@ -2866,7 +3090,7 @@ watch(selectedSessionKey, async (newSessionKey) => {
               </button>
             </div>
             <div v-else class="chat-slash-empty">
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.slash.noMatch') }}</NText>
+              <NText depth="3" style="font-size: 12px">{{ t('pages.chat.slash.noMatch') }}</NText>
             </div>
           </div>
           <div class="chat-compose-status-line">
@@ -2885,18 +3109,30 @@ watch(selectedSessionKey, async (newSessionKey) => {
               text
               @click="showAgentDetails = !showAgentDetails"
             >
-              {{ showAgentDetails ? t('pages.chat.agentDetails.hide') : t('pages.chat.agentDetails.show') }}
+              {{
+                showAgentDetails
+                  ? t('pages.chat.agentDetails.hide')
+                  : t('pages.chat.agentDetails.show')
+              }}
             </NButton>
           </div>
 
           <div v-if="showAgentDetails && hasAgentDetails" class="chat-agent-details">
             <NSpace vertical :size="6">
-              <NText depth="3" style="font-size: 12px;">
-                {{ t('pages.chat.agentDetails.phaseDuration', { duration: formatDurationMs(nowMs - currentAgentStatus.sinceMs) }) }}
+              <NText depth="3" style="font-size: 12px">
+                {{
+                  t('pages.chat.agentDetails.phaseDuration', {
+                    duration: formatDurationMs(nowMs - currentAgentStatus.sinceMs)
+                  })
+                }}
               </NText>
 
               <div v-if="chatStore.agentSteps.get(currentAgentId)?.length" class="chat-agent-steps">
-                <div v-for="(step, index) in chatStore.agentSteps.get(currentAgentId)" :key="`step-${step.ts}-${index}`" class="chat-agent-step">
+                <div
+                  v-for="(step, index) in chatStore.agentSteps.get(currentAgentId)"
+                  :key="`step-${step.ts}-${index}`"
+                  class="chat-agent-step"
+                >
                   <span class="chat-agent-step__time">{{ formatClock(step.ts) }}</span>
                   <span class="chat-agent-step__label">{{ step.label }}</span>
                 </div>
@@ -2904,14 +3140,20 @@ watch(selectedSessionKey, async (newSessionKey) => {
 
               <div v-if="currentToolProgress" class="chat-tool-progress">
                 <div class="chat-tool-progress__title">
-                  <span>{{ t('pages.chat.agentDetails.tool', { name: currentToolProgress.name }) }}</span>
+                  <span>{{
+                    t('pages.chat.agentDetails.tool', { name: currentToolProgress.name })
+                  }}</span>
                 </div>
                 <div class="chat-tool-progress__kv">
                   <span class="chat-tool-progress__k">{{ t('pages.chat.structured.callId') }}</span>
                   <code class="chat-tool-progress__v">{{ currentToolProgress.toolCallId }}</code>
-                  <span class="chat-tool-progress__k">{{ t('pages.chat.agentDetails.phase') }}</span>
+                  <span class="chat-tool-progress__k">{{
+                    t('pages.chat.agentDetails.phase')
+                  }}</span>
                   <code class="chat-tool-progress__v">{{ currentToolProgress.phase }}</code>
-                  <span class="chat-tool-progress__k">{{ t('pages.chat.agentDetails.elapsed') }}</span>
+                  <span class="chat-tool-progress__k">{{
+                    t('pages.chat.agentDetails.elapsed')
+                  }}</span>
                   <code class="chat-tool-progress__v">{{ formatDurationMs(toolElapsedMs) }}</code>
                 </div>
 
@@ -2941,7 +3183,13 @@ watch(selectedSessionKey, async (newSessionKey) => {
               <template #icon><NIcon :component="StopCircleOutline" /></template>
               {{ t('pages.chat.actions.stop') }}
             </NButton>
-            <NButton size="small" type="primary" :loading="agentBusy" :disabled="agentBusy || !draft.trim()" @click="handleSend">
+            <NButton
+              size="small"
+              type="primary"
+              :loading="agentBusy"
+              :disabled="agentBusy || !draft.trim()"
+              @click="handleSend"
+            >
               <template #icon><NIcon :component="SendOutline" /></template>
               {{ t('pages.office.chat.send') }}
             </NButton>
@@ -2954,14 +3202,19 @@ watch(selectedSessionKey, async (newSessionKey) => {
   <NModal
     v-model:show="showQuickReplyModal"
     preset="card"
-    :title="quickReplyModalMode === 'edit'
-      ? t('pages.chat.quickReplies.modal.editTitle')
-      : t('pages.chat.quickReplies.modal.createTitle')"
-    style="width: 500px; max-width: calc(100vw - 28px);"
+    :title="
+      quickReplyModalMode === 'edit'
+        ? t('pages.chat.quickReplies.modal.editTitle')
+        : t('pages.chat.quickReplies.modal.createTitle')
+    "
+    style="width: 500px; max-width: calc(100vw - 28px)"
   >
     <NForm label-placement="left" label-width="72">
       <NFormItem :label="t('pages.chat.quickReplies.modal.title')" required>
-        <NInput v-model:value="quickReplyForm.title" :placeholder="t('pages.chat.quickReplies.modal.titlePlaceholder')" />
+        <NInput
+          v-model:value="quickReplyForm.title"
+          :placeholder="t('pages.chat.quickReplies.modal.titlePlaceholder')"
+        />
       </NFormItem>
       <NFormItem :label="t('pages.chat.quickReplies.modal.content')" required>
         <NInput
@@ -2976,9 +3229,11 @@ watch(selectedSessionKey, async (newSessionKey) => {
       <NSpace justify="end">
         <NButton @click="showQuickReplyModal = false">{{ t('common.cancel') }}</NButton>
         <NButton type="primary" @click="handleSaveQuickReply">
-          {{ quickReplyModalMode === 'edit'
-            ? t('pages.chat.quickReplies.modal.saveChanges')
-            : t('pages.chat.quickReplies.add') }}
+          {{
+            quickReplyModalMode === 'edit'
+              ? t('pages.chat.quickReplies.modal.saveChanges')
+              : t('pages.chat.quickReplies.add')
+          }}
         </NButton>
       </NSpace>
     </template>
@@ -2988,9 +3243,13 @@ watch(selectedSessionKey, async (newSessionKey) => {
     v-model:show="showImagePreviewModal"
     preset="card"
     :title="t('pages.chat.image.preview')"
-    style="width: 90vw; max-width: 1200px;"
+    style="width: 90vw; max-width: 1200px"
     :mask-closable="true"
-    @update:show="(val: boolean) => { if (!val) closeImagePreview() }"
+    @update:show="
+      (val: boolean) => {
+        if (!val) closeImagePreview()
+      }
+    "
   >
     <div v-if="imagePreviewUrl" class="image-preview-container">
       <img :src="imagePreviewUrl" class="image-preview-full" />
@@ -3482,9 +3741,15 @@ watch(selectedSessionKey, async (newSessionKey) => {
   letter-spacing: -0.01em;
 }
 
-.chat-markdown :deep(h1) { font-size: 1.25em; }
-.chat-markdown :deep(h2) { font-size: 1.12em; }
-.chat-markdown :deep(h3) { font-size: 1.02em; }
+.chat-markdown :deep(h1) {
+  font-size: 1.25em;
+}
+.chat-markdown :deep(h2) {
+  font-size: 1.12em;
+}
+.chat-markdown :deep(h3) {
+  font-size: 1.02em;
+}
 
 .chat-markdown :deep(p) {
   margin: 4px 0;
@@ -3591,7 +3856,9 @@ watch(selectedSessionKey, async (newSessionKey) => {
   font-weight: 500;
   text-underline-offset: 2px;
   text-decoration-thickness: 1px;
-  transition: color 0.12s ease, text-decoration-color 0.12s ease;
+  transition:
+    color 0.12s ease,
+    text-decoration-color 0.12s ease;
   text-decoration-line: underline;
   text-decoration-color: var(--link-underline);
 }

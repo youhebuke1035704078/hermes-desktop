@@ -2,9 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 const api = {
-  getServers: (): Promise<
-    Array<{ id: string; name: string; url: string; username: string }>
-  > => ipcRenderer.invoke('store:getServers'),
+  getServers: (): Promise<Array<{ id: string; name: string; url: string; username: string }>> =>
+    ipcRenderer.invoke('store:getServers'),
 
   saveServer: (server: {
     id: string
@@ -19,8 +18,7 @@ const api = {
   decryptPassword: (id: string): Promise<string | null> =>
     ipcRenderer.invoke('store:decryptPassword', id),
 
-  isEncryptionAvailable: (): Promise<boolean> =>
-    ipcRenderer.invoke('store:isEncryptionAvailable'),
+  isEncryptionAvailable: (): Promise<boolean> => ipcRenderer.invoke('store:isEncryptionAvailable'),
 
   minimize: (): void => ipcRenderer.send('window:minimize'),
   maximize: (): void => ipcRenderer.send('window:maximize'),
@@ -46,32 +44,48 @@ const api = {
   },
 
   // ── WebSocket bridge (main-process WS with custom Origin) ──
-  wsConnect: (url: string, origin?: string): Promise<void> => ipcRenderer.invoke('ws:connect', url, origin),
-  wsSend: (data: string): void => { ipcRenderer.send('ws:send', data) },
-  wsClose: (code?: number, reason?: string): void => { ipcRenderer.send('ws:close', code, reason) },
+  wsConnect: (url: string, origin?: string): Promise<void> =>
+    ipcRenderer.invoke('ws:connect', url, origin),
+  wsSend: (data: string): void => {
+    ipcRenderer.send('ws:send', data)
+  },
+  wsClose: (code?: number, reason?: string): void => {
+    ipcRenderer.send('ws:close', code, reason)
+  },
   onWsOpen: (cb: () => void): (() => void) => {
     const handler = () => cb()
     ipcRenderer.on('ws:open', handler)
-    return () => { ipcRenderer.removeListener('ws:open', handler) }
+    return () => {
+      ipcRenderer.removeListener('ws:open', handler)
+    }
   },
   onWsMessage: (cb: (data: string) => void): (() => void) => {
     const handler = (_: unknown, data: string) => cb(data)
     ipcRenderer.on('ws:message', handler)
-    return () => { ipcRenderer.removeListener('ws:message', handler) }
+    return () => {
+      ipcRenderer.removeListener('ws:message', handler)
+    }
   },
   onWsClose: (cb: (code: number, reason: string) => void): (() => void) => {
     const handler = (_: unknown, code: number, reason: string) => cb(code, reason)
     ipcRenderer.on('ws:close', handler)
-    return () => { ipcRenderer.removeListener('ws:close', handler) }
+    return () => {
+      ipcRenderer.removeListener('ws:close', handler)
+    }
   },
   onWsError: (cb: (error: string) => void): (() => void) => {
     const handler = (_: unknown, error: string) => cb(error)
     ipcRenderer.on('ws:error', handler)
-    return () => { ipcRenderer.removeListener('ws:error', handler) }
+    return () => {
+      ipcRenderer.removeListener('ws:error', handler)
+    }
   },
 
   // ── HTTP proxy (main-process fetch, no CORS) ──
-  httpFetch: (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; body: string }> =>
+  httpFetch: (
+    url: string,
+    init?: { method?: string; headers?: Record<string, string>; body?: string }
+  ): Promise<{ status: number; ok: boolean; body: string }> =>
     ipcRenderer.invoke('http:fetch', url, init),
 
   clipboardWriteText: (text: string): Promise<{ ok: boolean; error?: string }> =>
@@ -94,10 +108,26 @@ const api = {
   }> => ipcRenderer.invoke('hermes:config'),
 
   // ── Hermes streaming chat (SSE via main-process) ──
-  hermesChat: (url: string, body: string, authToken?: string, sessionId?: string): Promise<{ ok: boolean; error?: string; finalContent?: string }> =>
-    ipcRenderer.invoke('hermes:chat', url, body, authToken, sessionId),
-  onHermesChatChunk: (cb: (chunk: { done: boolean; data?: any }) => void): (() => void) => {
-    const handler = (_: unknown, chunk: { done: boolean; data?: any }) => cb(chunk)
+  hermesChat: (
+    url: string,
+    body: string,
+    authToken?: string,
+    sessionId?: string,
+    requestId?: string
+  ): Promise<{
+    ok: boolean
+    error?: string
+    requestId?: string
+    finalContent?: string
+    aborted?: boolean
+  }> => ipcRenderer.invoke('hermes:chat', url, body, authToken, sessionId, requestId),
+  hermesChatAbort: (requestId: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('hermes:chat:abort', requestId),
+  onHermesChatChunk: (
+    cb: (chunk: { requestId?: string; done: boolean; data?: any }) => void
+  ): (() => void) => {
+    const handler = (_: unknown, chunk: { requestId?: string; done: boolean; data?: any }) =>
+      cb(chunk)
     ipcRenderer.on('hermes:chat:chunk', handler)
     return () => ipcRenderer.removeListener('hermes:chat:chunk', handler)
   },
@@ -106,9 +136,7 @@ const api = {
    * process. The callback receives `{ name, payload }` frames exactly as
    * emitted by hermes-agent's B1 SSE relay.
    */
-  onHermesLifecycle: (
-    cb: (event: { name: string; payload: unknown }) => void
-  ): (() => void) => {
+  onHermesLifecycle: (cb: (event: { name: string; payload: unknown }) => void): (() => void) => {
     const handler = (_: unknown, event: { name: string; payload: unknown }): void => cb(event)
     ipcRenderer.on('hermes:lifecycle', handler)
     return () => ipcRenderer.removeListener('hermes:lifecycle', handler)
@@ -120,8 +148,11 @@ const api = {
     ipcRenderer.invoke('hermes:skills:config', action, payload),
 
   // ── Backup system ──
-  backupList: (): Promise<{ ok: boolean; backups: Array<{ filename: string; size: number; createdAt: string; date: string }>; error?: string }> =>
-    ipcRenderer.invoke('backup:list'),
+  backupList: (): Promise<{
+    ok: boolean
+    backups: Array<{ filename: string; size: number; createdAt: string; date: string }>
+    error?: string
+  }> => ipcRenderer.invoke('backup:list'),
   backupCreate: (): Promise<{ ok: boolean; filename?: string; size?: number; error?: string }> =>
     ipcRenderer.invoke('backup:create'),
   backupDelete: (filename: string): Promise<{ ok: boolean; error?: string }> =>
@@ -132,14 +163,19 @@ const api = {
     ipcRenderer.invoke('backup:restore', filename),
   backupUpload: (): Promise<{ ok: boolean; filename?: string; size?: number; error?: string }> =>
     ipcRenderer.invoke('backup:upload'),
-  onBackupProgress: (cb: (data: { progress: number; message: string; status: string }) => void): (() => void) => {
-    const handler = (_: unknown, data: { progress: number; message: string; status: string }) => cb(data)
+  onBackupProgress: (
+    cb: (data: { progress: number; message: string; status: string }) => void
+  ): (() => void) => {
+    const handler = (_: unknown, data: { progress: number; message: string; status: string }) =>
+      cb(data)
     ipcRenderer.on('backup:progress', handler)
     return () => ipcRenderer.removeListener('backup:progress', handler)
   },
 
   // ── Local filesystem browsing ──
-  fsReaddir: (dirPath: string): Promise<{
+  fsReaddir: (
+    dirPath: string
+  ): Promise<{
     ok: boolean
     entries: Array<{
       name: string
@@ -152,7 +188,10 @@ const api = {
     error?: string
   }> => ipcRenderer.invoke('fs:readdir', dirPath),
 
-  fsReadFile: (filePath: string, encoding?: string): Promise<{
+  fsReadFile: (
+    filePath: string,
+    encoding?: string
+  ): Promise<{
     ok: boolean
     content?: string
     encoding?: string
@@ -161,7 +200,10 @@ const api = {
     error?: string
   }> => ipcRenderer.invoke('fs:readFile', filePath, encoding),
 
-  fsWriteFile: (filePath: string, content: string): Promise<{
+  fsWriteFile: (
+    filePath: string,
+    content: string
+  ): Promise<{
     ok: boolean
     error?: string
   }> => ipcRenderer.invoke('fs:writeFile', filePath, content),
@@ -170,10 +212,14 @@ const api = {
     ipcRenderer.invoke('hermes:restart'),
   hermesVersion: (): Promise<{ ok: boolean; version?: string; date?: string; error?: string }> =>
     ipcRenderer.invoke('hermes:version'),
-  hermesCheckUpdate: (): Promise<{ ok: boolean; current?: string; latest?: string; updateAvailable?: boolean; error?: string }> =>
-    ipcRenderer.invoke('hermes:checkUpdate'),
-  hermesUpdate: (): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('hermes:update'),
+  hermesCheckUpdate: (): Promise<{
+    ok: boolean
+    current?: string
+    latest?: string
+    updateAvailable?: boolean
+    error?: string
+  }> => ipcRenderer.invoke('hermes:checkUpdate'),
+  hermesUpdate: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('hermes:update'),
   onHermesUpdateProgress: (cb: (data: string) => void): (() => void) => {
     const handler = (_: unknown, data: string) => cb(data)
     ipcRenderer.on('hermes:update:progress', handler)
@@ -184,7 +230,9 @@ const api = {
   getHomedir: (): Promise<string> => ipcRenderer.invoke('app:homedir'),
 
   // ── Device identity (private key stays in main process) ──
-  deviceEnsure: (migration?: { publicKey: string; privateKey: string } | null): Promise<{
+  deviceEnsure: (
+    migration?: { publicKey: string; privateKey: string } | null
+  ): Promise<{
     ok: boolean
     deviceId?: string
     publicKey?: string
@@ -199,17 +247,21 @@ const api = {
     ipcRenderer.invoke('updater:check'),
   updaterDownload: (): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('updater:download'),
-  updaterInstall: (): void => { ipcRenderer.invoke('updater:install') },
-  onUpdaterStatus: (cb: (data: {
-    event: 'checking' | 'available' | 'not-available' | 'progress' | 'downloaded' | 'error'
-    version?: string
-    releaseDate?: string
-    percent?: number
-    bytesPerSecond?: number
-    transferred?: number
-    total?: number
-    error?: string
-  }) => void): (() => void) => {
+  updaterInstall: (): void => {
+    ipcRenderer.invoke('updater:install')
+  },
+  onUpdaterStatus: (
+    cb: (data: {
+      event: 'checking' | 'available' | 'not-available' | 'progress' | 'downloaded' | 'error'
+      version?: string
+      releaseDate?: string
+      percent?: number
+      bytesPerSecond?: number
+      transferred?: number
+      total?: number
+      error?: string
+    }) => void
+  ): (() => void) => {
     const handler = (_: unknown, data: any) => cb(data)
     ipcRenderer.on('updater:status', handler)
     return () => ipcRenderer.removeListener('updater:status', handler)

@@ -1,6 +1,6 @@
 export default {
   app: {
-    title: 'Hermes Desktop',
+    title: 'Hermes Desktop'
   },
   routes: {
     connection: '连接服务器',
@@ -22,13 +22,14 @@ export default {
     settings: '系统设置',
     backup: '数据备份',
     logs: '系统日志',
-    insights: '运营洞察',
+    insights: '运营洞察'
   },
   common: {
     all: '全部',
     home: '首页',
     empty: '暂无数据',
-    httpsWsBlocked: '当前页面为 HTTPS，浏览器会拦截 ws:// WebSocket。请改用 wss:// 地址，或使用 SSH 隧道后连接 ws://127.0.0.1:18789。',
+    httpsWsBlocked:
+      '当前页面为 HTTPS，浏览器会拦截 ws:// WebSocket。请改用 wss:// 地址，或使用 SSH 隧道后连接 ws://127.0.0.1:18789。',
     logout: '退出登录',
     refresh: '刷新',
     refreshSuccess: '刷新成功',
@@ -65,7 +66,7 @@ export default {
     switchToNormalWidth: '切换标准宽度',
     toggleLanguage: '切换语言：{target}',
     languageZh: '中文',
-    languageEn: 'English',
+    languageEn: 'English'
   },
   components: {
     connectionStatus: {
@@ -82,14 +83,14 @@ export default {
       installNow: '立即安装',
       installingInShort: '{count}s 后自动安装',
       downloadingInBackground: '正在后台下载新版本...',
-      clickToCheck: '点击检查是否有新版本可用',
+      clickToCheck: '点击检查是否有新版本可用'
     },
     pdfViewer: {
       reset: '重置',
       resetZoom: '重置缩放',
       enterFullscreen: '全屏',
-      exitFullscreen: '退出全屏',
-    },
+      exitFullscreen: '退出全屏'
+    }
   },
   pages: {
     connection: {
@@ -98,7 +99,8 @@ export default {
       localHermes: '本地 Hermes',
       connectLocal: '连接',
       localConnectFailed: '无法连接到本地 Hermes 服务（localhost:8642）',
-      encryptionWarning: '当前系统不支持安全加密存储，密码将以非加密方式保存。建议在支持 Keychain / Credential Manager 的系统上使用。',
+      encryptionWarning:
+        '当前系统不支持安全加密存储，密码将以非加密方式保存。建议在支持 Keychain / Credential Manager 的系统上使用。',
       serverList: '服务器列表',
       refreshStatus: '刷新状态',
       addServer: '添加服务器',
@@ -131,7 +133,8 @@ export default {
       labelToken: '访问\n令牌',
       labelTokenRequired: '(必填，决定能否认证)',
       placeholderToken: 'Hermes REST: API_SERVER_KEY',
-      tokenHint: 'Hermes REST 请填写服务器 ~/.hermes/.env 里的 API_SERVER_KEY；旧 ACP Gateway 才使用 gateway.auth.token',
+      tokenHint:
+        'Hermes REST 请填写服务器 ~/.hermes/.env 里的 API_SERVER_KEY；旧 ACP Gateway 才使用 gateway.auth.token',
       probeButton: '检测服务器',
       probeHermesRest: '检测到 Hermes Agent REST API，无需认证，可直接连接',
       probeHermesRestAuth: '检测到 Hermes Agent REST API，需要填写 API 访问令牌（API_SERVER_KEY）',
@@ -141,7 +144,8 @@ export default {
       httpWarning: '公网使用 HTTP 不安全，建议使用 HTTPS 或仅在局域网内使用',
       localServer: '本机服务器',
       validationNameUrl: '请填写服务器名称和地址',
-      validationCredentials: '请填写用户名和 Gateway 令牌（如果服务器未开启认证，请先点击"检测服务器"）',
+      validationCredentials:
+        '请填写用户名和 Gateway 令牌（如果服务器未开启认证，请先点击"检测服务器"）',
       saveSuccess: '服务器已添加',
       updateSuccess: '服务器已更新',
       saveFailed: '保存失败',
@@ -154,7 +158,7 @@ export default {
       connectFailedNoAuth: '连接失败，请检查服务器地址是否正确、服务是否已启动',
       connectFailedAuth: '连接失败，请检查服务器地址和访问令牌',
       deleted: '已删除',
-      deleteFailed: '删除失败',
+      deleteFailed: '删除失败'
     },
     login: {
       subtitle: '连接到 Hermes Gateway 管理你的 AI 助手',
@@ -181,7 +185,7 @@ export default {
       login: '登录',
       loggingIn: '正在登录...',
       credentialsRequired: '请输入用户名和密码',
-      invalidCredentials: '用户名或密码错误',
+      invalidCredentials: '用户名或密码错误'
     },
     skills: {
       title: 'Skill 管理',
@@ -190,7 +194,7 @@ export default {
         total: '总数',
         enabled: '已启用',
         disabled: '已禁用',
-        configVars: '配置变量',
+        configVars: '配置变量'
       },
       search: '搜索 skill 名称 / 描述 / 标签',
       categoryFilter: '分类',
@@ -203,7 +207,7 @@ export default {
         name: '名称',
         category: '分类',
         platform: '平台',
-        status: '状态',
+        status: '状态'
       },
       detail: {
         empty: '选择一个 skill 查看详情',
@@ -225,12 +229,12 @@ export default {
         configSaved: '配置已保存',
         configFailed: '保存失败',
         relatedSkills: '关联 Skill',
-        homepage: '主页',
+        homepage: '主页'
       },
       toggle: {
         enabled: '已启用 {name}',
         disabled: '已禁用 {name}',
-        failed: '切换失败',
+        failed: '切换失败'
       },
       externalDirs: {
         title: '外部 Skill 目录',
@@ -240,15 +244,15 @@ export default {
         confirmRemove: '确定移除此目录？',
         added: '目录已添加',
         removed: '目录已移除',
-        failed: '操作失败',
+        failed: '操作失败'
       },
       empty: '未发现任何 skill。请检查 ~/.hermes/skills/ 目录。',
       sources: {
         workspace: '用户创建',
         managed: '用户安装',
         extra: '外部插件',
-        bundled: '内置',
-      },
+        bundled: '内置'
+      }
     },
     config: {
       title: 'hermes.json 管理',
@@ -259,13 +263,14 @@ export default {
       applyAndReload: '应用并重载',
       appliedAndReloading: '配置已应用，Gateway 将重新加载',
       applyFailed: '应用失败',
-      channelsMigratedHint: '频道账号、策略、认证配对、凭证更新已迁移到频道管理页集中维护，建议从该入口进行日常运维。',
+      channelsMigratedHint:
+        '频道账号、策略、认证配对、凭证更新已迁移到频道管理页集中维护，建议从该入口进行日常运维。',
       goToChannels: '前往频道管理',
       tabs: {
         general: '基本设置',
         tools: '工具策略',
         sessions: '会话设置',
-        raw: '原始 hermes.json',
+        raw: '原始 hermes.json'
       },
       labels: {
         primaryModel: '默认模型',
@@ -277,28 +282,28 @@ export default {
         resetMode: '重置模式',
         resetHourUtc: '重置时间 (UTC)',
         idleMinutes: '空闲分钟数',
-        queueMode: '队列模式',
+        queueMode: '队列模式'
       },
       placeholders: {
         model: '选择或输入模型',
-        workspacePath: '~/.hermes/workspace',
+        workspacePath: '~/.hermes/workspace'
       },
       toolProfiles: {
         minimal: '最小 (minimal)',
         coding: '编程 (coding)',
-        full: '完整 (full)',
+        full: '完整 (full)'
       },
       resetModes: {
         off: '关闭',
         daily: '每日重置',
-        idle: '空闲重置',
+        idle: '空闲重置'
       },
       queueModes: {
         sequential: '顺序执行',
         concurrent: '并发执行',
-        collect: '批量收集',
+        collect: '批量收集'
       },
-      rawReadonlyHint: '以下为当前 hermes.json 的完整配置内容（只读查看）',
+      rawReadonlyHint: '以下为当前 hermes.json 的完整配置内容（只读查看）'
     },
     channels: {
       title: '渠道管理',
@@ -323,13 +328,13 @@ export default {
         total: '渠道总数',
         connected: '在线',
         errors: '异常',
-        members: '成员总数',
+        members: '成员总数'
       },
       status: {
         connected: '已连接',
         disconnected: '未连接',
         authenticating: '认证中',
-        error: '异常',
+        error: '异常'
       },
       columns: {
         platform: '平台',
@@ -337,14 +342,14 @@ export default {
         status: '状态',
         members: '成员',
         dmPolicy: '私聊策略',
-        actions: '操作',
+        actions: '操作'
       },
       pairingDialog: {
         title: '输入配对码',
         description: '请输入 {id} 返回的配对码以完成认证。',
         codePlaceholder: '如 123-456',
         submit: '提交',
-        cancel: '取消',
+        cancel: '取消'
       },
       detail: {
         platform: '平台',
@@ -354,8 +359,8 @@ export default {
         memberCount: '成员数',
         dmPolicy: '私聊策略',
         groupPolicy: '群聊策略',
-        groups: '群聊 ({count})',
-      },
+        groups: '群聊 ({count})'
+      }
     },
     memory: {
       title: '记忆与文档管理',
@@ -366,14 +371,14 @@ export default {
       stats: {
         docsCount: '{count} 个文档',
         highRiskCount: '高影响 {count} 个',
-        currentDoc: '当前 {name}',
+        currentDoc: '当前 {name}'
       },
       tags: {
         highRisk: '高影响',
-        unsaved: '未保存',
+        unsaved: '未保存'
       },
       nav: {
-        title: '文档目录',
+        title: '文档目录'
       },
       emptyDocs: '暂无可管理文档',
       noDocSelected: '未选择文档',
@@ -382,24 +387,24 @@ export default {
         role: '角色与人格',
         runtime: '运行与策略',
         memory: '记忆与偏好',
-        other: '其他',
+        other: '其他'
       },
       fileState: {
         notLoaded: '未加载',
         notCreated: '未创建',
-        exists: '已存在',
+        exists: '已存在'
       },
       emptyDocHtml: '当前文件为空，点击“编辑文档”开始维护内容。',
       editor: {
         stats: '{lines} 行 · {chars} 字符',
         placeholder: '以 Markdown 维护文档。空内容保存将写入空文件。',
-        saveHint: '保存后将写入当前多智能体工作区文档。',
+        saveHint: '保存后将写入当前多智能体工作区文档。'
       },
       actions: {
         edit: '编辑文档',
         cancelEdit: '取消编辑',
         saveDoc: '保存文档',
-        restore: '恢复',
+        restore: '恢复'
       },
       readonlyHint: '当前为阅读模式，点击“编辑文档”进入可写状态。',
       infoCard: {
@@ -407,7 +412,7 @@ export default {
         workspace: '工作区',
         filePath: '文件路径',
         updatedAt: '更新时间',
-        fileSize: '文件大小',
+        fileSize: '文件大小'
       },
       snippets: {
         title: '模板片段',
@@ -420,8 +425,8 @@ export default {
           items: {
             background: '背景：',
             decision: '决策：',
-            conclusion: '结论：',
-          },
+            conclusion: '结论：'
+          }
         },
         principles: {
           label: '行为原则',
@@ -429,8 +434,8 @@ export default {
           items: {
             goal: '目标：',
             constraints: '约束：',
-            prohibited: '禁止事项：',
-          },
+            prohibited: '禁止事项：'
+          }
         },
         persona: {
           label: '人格设定',
@@ -438,8 +443,8 @@ export default {
           items: {
             tone: '语气：',
             style: '风格：',
-            principles: '行事准则：',
-          },
+            principles: '行事准则：'
+          }
         },
         bootstrap: {
           label: '启动约束',
@@ -447,8 +452,8 @@ export default {
           items: {
             goal: '目标：',
             environment: '当前环境：',
-            firstRun: '首轮执行策略：',
-          },
+            firstRun: '首轮执行策略：'
+          }
         },
         userPreference: {
           label: '用户偏好',
@@ -456,16 +461,16 @@ export default {
           items: {
             output: '偏好输出：',
             taboo: '禁忌：',
-            tone: '语气偏好：',
-          },
+            tone: '语气偏好：'
+          }
         },
         heartbeat: {
           label: '心跳任务',
           heading: 'Tasks',
           items: {
             dailyStatus: '每日检查运行状态',
-            cleanup: '清理异常任务',
-          },
+            cleanup: '清理异常任务'
+          }
         },
         preferenceTemplate: {
           label: '偏好模板',
@@ -473,8 +478,8 @@ export default {
           items: {
             outputStyle: '输出风格：',
             disabled: '禁用项：',
-            pacing: '沟通节奏：',
-          },
+            pacing: '沟通节奏：'
+          }
         },
         projectConventions: {
           label: '项目约定',
@@ -482,9 +487,9 @@ export default {
           items: {
             branching: '分支规范：',
             release: '发布流程：',
-            verification: '验证标准：',
-          },
-        },
+            verification: '验证标准：'
+          }
+        }
       },
       messages: {
         initFailed: '记忆模块初始化失败',
@@ -496,34 +501,34 @@ export default {
         refreshFailed: '刷新失败',
         selectAgentAndDocFirst: '请先选择多智能体与文档',
         saveHighRiskConfirm: '正在保存高影响文档 {name}，确认继续？',
-        saved: '文档已保存',
+        saved: '文档已保存'
       },
       docs: {
         AGENTS: {
-          description: '主行为规则与约束（高影响）',
+          description: '主行为规则与约束（高影响）'
         },
         SOUL: {
-          description: '人格、语气与风格（高影响）',
+          description: '人格、语气与风格（高影响）'
         },
         IDENTITY: {
-          description: '名称、头像、主题等身份',
+          description: '名称、头像、主题等身份'
         },
         USER: {
-          description: '用户偏好与沟通约定',
+          description: '用户偏好与沟通约定'
         },
         TOOLS: {
-          description: '工具使用说明（不控制可用性）',
+          description: '工具使用说明（不控制可用性）'
         },
         HEARTBEAT: {
-          description: '心跳回合任务提示',
+          description: '心跳回合任务提示'
         },
         BOOTSTRAP: {
-          description: '启动注入上下文（高影响）',
+          description: '启动注入上下文（高影响）'
         },
         MEMORY: {
-          description: '长期稳定事实与偏好',
-        },
-      },
+          description: '长期稳定事实与偏好'
+        }
+      }
     },
     cron: {
       title: '任务计划（调度中心）',
@@ -539,17 +544,17 @@ export default {
         enabledJobs: '启用任务',
         disabledJobs: '禁用任务',
         nextRun: '下次执行',
-        nextWake: '下次唤醒',
+        nextWake: '下次唤醒'
       },
       jobs: {
         title: '任务列表',
         count: '{count} 条',
         searchPlaceholder: '搜索名称 / 描述 / 负载内容',
-        emptyHint: '还没有任务。可直接使用上方“快捷模板”或点击“新建任务”。',
+        emptyHint: '还没有任务。可直接使用上方“快捷模板”或点击“新建任务”。'
       },
       jobStatus: {
         enabled: '启用中',
-        disabled: '已禁用',
+        disabled: '已禁用'
       },
       detail: {
         schedule: '调度',
@@ -562,7 +567,7 @@ export default {
         payload: '执行内容',
         delivery: '投递策略',
         lastError: '最近错误：{error}',
-        emptyHint: '从左侧选择任务后，可查看调度详情、最近状态和运行历史。',
+        emptyHint: '从左侧选择任务后，可查看调度详情、最近状态和运行历史。'
       },
       runs: {
         title: '运行历史',
@@ -577,8 +582,8 @@ export default {
           session: '会话',
           error: '错误信息',
           raw: '原始数据',
-          empty: '未选择运行记录',
-        },
+          empty: '未选择运行记录'
+        }
       },
       table: {
         jobs: {
@@ -589,33 +594,33 @@ export default {
           lastRun: '上次运行',
           lastStatus: '运行结果',
           status: '状态',
-          actions: '操作',
+          actions: '操作'
         },
         runs: {
           runAt: '执行时间',
           status: '状态',
           duration: '耗时',
           summary: '摘要',
-          session: '会话',
-        },
+          session: '会话'
+        }
       },
       sessionTargets: {
         main: '主会话',
-        isolated: '隔离会话',
+        isolated: '隔离会话'
       },
       payloadKinds: {
         agentTurn: '多智能体执行',
-        systemEvent: '系统事件',
+        systemEvent: '系统事件'
       },
       scheduleKinds: {
         cron: 'Cron 表达式',
         every: '固定间隔',
-        at: '指定时间',
+        at: '指定时间'
       },
       units: {
         minutes: '分钟',
         hours: '小时',
-        days: '天',
+        days: '天'
       },
       schedule: {
         every: '每 {value} {unit}',
@@ -632,7 +637,7 @@ export default {
         weekdayRange: '{start}至{end}',
         monthlyAt: '每月 {day} 日 {time}',
         yearlyAt: '每年 {month} 月 {day} 日 {time}',
-        at: '在 {time} 执行',
+        at: '在 {time} 执行'
       },
       batchSetModel: '统一模型',
       batchSetModelConfirm: '确认将所有 Cron 任务的模型修改为 {model}？',
@@ -649,8 +654,8 @@ export default {
           wecom: '企业微信',
           wechat: '微信',
           dingtalk: '钉钉',
-          feishu: '飞书',
-        },
+          feishu: '飞书'
+        }
       },
       actions: {
         createJob: '新建任务',
@@ -663,7 +668,7 @@ export default {
         editJob: '编辑任务',
         openSession: '打开',
         refreshRuns: '刷新历史',
-        saveChanges: '保存修改',
+        saveChanges: '保存修改'
       },
       confirmDeleteJob: '确认删除该定时任务？',
       modal: {
@@ -677,8 +682,8 @@ export default {
           schedule: '调度策略',
           payload: '执行内容',
           delivery: '投递策略',
-          preview: '保存预览（发送到网关）',
-        },
+          preview: '保存预览（发送到网关）'
+        }
       },
       form: {
         name: '任务名称',
@@ -701,18 +706,18 @@ export default {
         sessionTarget: '会话目标',
         sessionTargets: {
           isolated: 'isolated（推荐）',
-          main: 'main',
+          main: 'main'
         },
         wakeMode: '唤醒模式',
         wakeModes: {
           nextHeartbeat: 'next-heartbeat',
-          now: 'now',
+          now: 'now'
         },
         payloadKind: '负载类型',
         payloadText: '执行文本',
         payloadTextPlaceholders: {
           agentTurn: '输入给多智能体的执行提示词',
-          systemEvent: '输入 system event 内容',
+          systemEvent: '输入 system event 内容'
         },
         modelOverride: '模型覆盖',
         modelOverridePlaceholder: '选择可用模型，或输入别名（可选）',
@@ -721,22 +726,22 @@ export default {
         deliveryMode: '投递模式',
         deliveryModes: {
           announce: 'announce（摘要投递）',
-          none: 'none（仅内部运行）',
+          none: 'none（仅内部运行）'
         },
         deliveryChannel: '投递频道',
         deliveryTo: '投递目标',
         deliveryToPlaceholders: {
           last: '可选：留空时沿用最近会话路由',
-          specific: '选择已配置目标，或手动输入',
+          specific: '选择已配置目标，或手动输入'
         },
-        bestEffort: 'bestEffort',
+        bestEffort: 'bestEffort'
       },
       validation: {
         cronExprRequired: '请输入 Cron 表达式',
         everyValueInvalid: '间隔数值必须大于 0',
         atTimeRequired: '请选择有效的执行时间',
         payloadRequired: '请输入执行内容',
-        nameRequired: '请输入任务名称',
+        nameRequired: '请输入任务名称'
       },
       previewUnavailable: '// 预览暂不可用：{error}',
       modelConfigLoadFailed: '模型配置读取失败，暂时无法按 hermes.json 过滤：{error}',
@@ -751,24 +756,24 @@ export default {
         deleteFailed: '删除失败',
         jobUpdated: '任务已更新',
         jobCreated: '任务已创建',
-        fetchRunsFailed: '加载运行记录失败',
+        fetchRunsFailed: '加载运行记录失败'
       },
       templates: {
         morningReport: {
           label: '每日晨报',
           description: '每天早上固定时段汇总信息并推送',
-          payloadText: '请汇总今天的重要动态，输出可直接阅读的晨报摘要。',
+          payloadText: '请汇总今天的重要动态，输出可直接阅读的晨报摘要。'
         },
         heartbeatCheck: {
           label: '健康巡检',
           description: '定时执行运行状态检查',
-          payloadText: '检查服务运行状态，若异常请给出简要原因和建议。',
+          payloadText: '检查服务运行状态，若异常请给出简要原因和建议。'
         },
         mainReminder: {
           label: '主会话提醒',
           description: '在主会话推送系统提醒',
-          payloadText: '提醒：请检查今日待办并同步完成进度。',
-        },
+          payloadText: '提醒：请检查今日待办并同步完成进度。'
+        }
       },
       expandedRow: {
         lastRunTime: '上次运行时间',
@@ -776,8 +781,8 @@ export default {
         consecutiveErrors: '连续错误',
         errorDetail: '错误详情',
         nextRunTime: '下次运行时间',
-        noData: '暂无运行数据',
-      },
+        noData: '暂无运行数据'
+      }
     },
     models: {
       overview: {
@@ -789,8 +794,8 @@ export default {
           providers: '渠道总数',
           modelRefs: '模型引用数',
           editing: '当前编辑',
-          primaryModel: '默认模型',
-        },
+          primaryModel: '默认模型'
+        }
       },
       actions: {
         refreshConfig: '刷新配置',
@@ -799,13 +804,13 @@ export default {
         saveChanges: '保存修改',
         prev: '上一步',
         nextToModels: '下一步：模型管理',
-        nextToPreview: '下一步：保存预览',
+        nextToPreview: '下一步：保存预览'
       },
       workbench: {
         title: '渠道工作台',
         searchPlaceholder: '搜索渠道 / Base URL / 模型',
         empty: '未读取到任何已配置渠道',
-        emptyHint: '请检查 models.providers 配置或 Token 权限',
+        emptyHint: '请检查 models.providers 配置或 Token 权限'
       },
       editor: {
         titleEdit: '编辑渠道：{id}',
@@ -813,12 +818,12 @@ export default {
         titleSelect: '请选择已配置渠道',
         empty: '请从左侧选择一个已配置渠道进行编辑',
         modelsCount: '模型 {count}',
-        rawConfigTitle: '查看当前渠道原始配置（Key 已脱敏）',
+        rawConfigTitle: '查看当前渠道原始配置（Key 已脱敏）'
       },
       tabs: {
         basic: '1. 基本信息',
         models: '2. 模型管理',
-        preview: '3. 保存预览',
+        preview: '3. 保存预览'
       },
       form: {
         providerId: '渠道 ID',
@@ -845,13 +850,13 @@ export default {
         isDefault: '默认中',
         pendingDefault: '待默认',
         detectedModels: '已识别',
-        modelsCount: '共 {count} 个模型',
+        modelsCount: '共 {count} 个模型'
       },
       fields: {
         providerId: '渠道 ID',
         baseUrl: 'Base URL',
         models: '模型列表',
-        apiKey: 'API Key',
+        apiKey: 'API Key'
       },
       table: {
         providers: {
@@ -860,16 +865,16 @@ export default {
           baseUrl: 'Base URL',
           models: '模型',
           sources: '来源',
-          actions: '操作',
+          actions: '操作'
         },
         models: {
           modelRef: '模型引用',
-          actions: '操作',
-        },
+          actions: '操作'
+        }
       },
       default: {
         active: '默认中',
-        set: '设默认',
+        set: '设默认'
       },
       preview: {
         modelDiffTitle: '模型变更',
@@ -898,8 +903,8 @@ export default {
           providerIdExists: '该渠道 ID 已存在，请改用其他 ID',
           baseUrlMissing: '未填写 Base URL',
           modelListMissing: '未填写模型列表',
-          apiKeyMissing: '未填写 API Key，当前无法创建渠道',
-        },
+          apiKeyMissing: '未填写 API Key，当前无法创建渠道'
+        }
       },
       confirm: {
         titleEdit: '确认保存渠道修改',
@@ -912,18 +917,19 @@ export default {
         deleteDefaultProviderBlocked: '当前默认渠道不可删除，请先切换默认模型。',
         modelDiffTitle: '模型变更（+{added} / -{removed}）',
         warningPrefix: '请确认下列变更将写入配置文件。确认后会立即调用 ',
-        warningSuffix: '。',
+        warningSuffix: '。'
       },
       createModal: {
         title: '新建渠道',
-        flowHint: '新建流程：填写基础信息 -> 手动填写模型 -> 查看保存预览 -> 创建渠道。',
+        flowHint: '新建流程：填写基础信息 -> 手动填写模型 -> 查看保存预览 -> 创建渠道。'
       },
       messages: {
         primaryModelRequired: '请先选择或输入默认模型',
         primaryModelSaved: '默认模型已保存：{model}',
         noModelsForProvider: '该渠道没有可用模型，无法设置默认模型',
         deleteDefaultProviderBlocked: '当前默认渠道不允许删除，请先切换默认模型',
-        deleteWhitelistProviderBlocked: '该渠道来自模型白名单（如 agents.defaults.models），不支持删除',
+        deleteWhitelistProviderBlocked:
+          '该渠道来自模型白名单（如 agents.defaults.models），不支持删除',
         providerDeleted: '已删除渠道：{id}',
         deleteFailed: '删除失败',
         apiKeyNotReadableForProbe: '当前渠道 Key 已配置但不可读取，请手动输入一次用于探测',
@@ -937,7 +943,7 @@ export default {
         providerSavedKeepKey: '模型渠道已保存（Key 保持不变）',
         providerCreated: '模型渠道已创建',
         createFailed: '创建失败',
-        saveFailed: '保存失败：{reason}',
+        saveFailed: '保存失败：{reason}'
       },
       validation: {
         providerIdRequired: '请填写渠道 ID',
@@ -946,25 +952,26 @@ export default {
         baseUrlRequired: '请填写 Base URL',
         modelsRequired: '请手动填写模型 ID',
         apiKeyRequired: '请填写 API Key',
-        apiKeyRequiredForCreate: '新建渠道必须填写 API Key',
+        apiKeyRequiredForCreate: '新建渠道必须填写 API Key'
       },
       probe: {
         failed: '探测失败',
         fetchFailed: '{url} 请求失败：{reason}',
-        fetchFailedCors: '{url} 请求失败：浏览器跨域限制（CORS）。请先保存渠道后在编辑态探测（走网关）或手动填写模型 ID。',
+        fetchFailedCors:
+          '{url} 请求失败：浏览器跨域限制（CORS）。请先保存渠道后在编辑态探测（走网关）或手动填写模型 ID。',
         noModelsParsed: '未从 {url} 解析到模型列表',
         gatewayNoModels: '网关未返回可用模型，请检查渠道配置并确认网关已应用配置后重试。',
         selectTitle: '选择探测模型',
         selectHint: '探测到 {count} 个模型，请选择一个用于替换当前模型。',
         selectRequired: '请先选择一个模型',
-        confirmSelect: '使用该模型',
+        confirmSelect: '使用该模型'
       },
       index: {
         title: '模型索引',
         hint: '已配置模型（来自 hermes.json）。可在列表中快速将任意模型设为默认。',
         empty: '当前未配置任何模型',
-        emptyHint: '请先在上方渠道工作台中填写模型并保存',
-      },
+        emptyHint: '请先在上方渠道工作台中填写模型并保存'
+      }
     },
     dashboard: {
       title: '仪表盘',
@@ -976,7 +983,7 @@ export default {
         server: '服务器',
         enabled: '已启用',
         online: '在线',
-        offline: '离线',
+        offline: '离线'
       },
       recentConversations: '最近会话',
       recentCronRuns: '最近任务运行',
@@ -991,18 +998,18 @@ export default {
       messagesCount: '{count} 条消息',
       hero: {
         title: 'Hermes 运行总览',
-        subtitle: '用官方 Usage 聚合数据看 token/cost、活跃会话、错误分布，再进入具体会话处理。',
+        subtitle: '用官方 Usage 聚合数据看 token/cost、活跃会话、错误分布，再进入具体会话处理。'
       },
       connection: {
         connected: '网关已连接',
         connecting: '网关连接中',
         reconnecting: '网关重连中',
         failed: '网关连接失败',
-        disconnected: '网关未连接',
+        disconnected: '网关未连接'
       },
       lastUpdated: {
         none: '尚未同步',
-        text: '上次同步 {time}',
+        text: '上次同步 {time}'
       },
       range: {
         today: '今天',
@@ -1011,19 +1018,19 @@ export default {
         last15d: '近 15 天',
         last30d: '近 30 天',
         all: '全部',
-        to: '到',
+        to: '到'
       },
       usageMode: {
         tokens: 'Tokens',
         cost: 'Cost',
         tokensShort: 'tokens',
-        costShort: 'cost',
+        costShort: 'cost'
       },
       usage: {
         error: 'Usage 接口读取失败：{error}',
         coverage: {
           none: '当前范围暂无 usage 会话',
-          text: '有 usage 数据 {withUsage}/{total} 个会话',
+          text: '有 usage 数据 {withUsage}/{total} 个会话'
         },
         totalTokens: '总 Token',
         totalCost: '总 Cost',
@@ -1037,8 +1044,8 @@ export default {
           inputCost: '输入成本',
           outputCost: '输出成本',
           cacheReadCost: '缓存读成本',
-          cacheWriteCost: '缓存写成本',
-        },
+          cacheWriteCost: '缓存写成本'
+        }
       },
       stats: {
         sessions: '总会话数',
@@ -1046,7 +1053,7 @@ export default {
         models: '已配置模型',
         skills: '已安装技能',
         totalTokens: '总 Token',
-        modelsSeen: '见过的模型数',
+        modelsSeen: '见过的模型数'
       },
       cards: {
         kpis: 'Usage 关键指标',
@@ -1054,53 +1061,53 @@ export default {
         structure: 'Usage 结构',
         top: 'Top 分布',
         sessions: '会话概览（带用量）',
-        events: '实时事件流',
+        events: '实时事件流'
       },
       kpis: {
         messages: {
           label: '消息总量',
           hint: '范围内 {days} 天',
-          emptyHint: '暂无消息数据',
+          emptyHint: '暂无消息数据'
         },
         toolCalls: {
           label: '工具调用',
           hint: 'Top 工具 {tool}',
-          emptyHint: '暂无工具调用',
+          emptyHint: '暂无工具调用'
         },
         errorRate: {
           label: '错误率',
-          hint: '{errors} 错误 / {messages} 消息',
+          hint: '{errors} 错误 / {messages} 消息'
         },
         avgTokens: {
           label: '平均每条消息 Token',
-          hint: '用总 Token / 消息总量计算',
+          hint: '用总 Token / 消息总量计算'
         },
         cacheReadRatio: {
           label: '缓存读取占比',
-          hint: '{cacheRead} / {input} 输入',
+          hint: '{cacheRead} / {input} 输入'
         },
         activeDays: {
           label: '活跃天数',
-          hint: '已选范围内 {days} 天有记录',
+          hint: '已选范围内 {days} 天有记录'
         },
         totalTokens: {
           label: '总 Token',
-          hint: '范围内累计 token 消耗',
+          hint: '范围内累计 token 消耗'
         },
         lastUsed: {
           label: '最近使用',
           hint: '最近一次产生 token 的时间',
-          never: '尚未使用',
-        },
+          never: '尚未使用'
+        }
       },
       trend: {
         empty: '当前范围暂无趋势数据',
-        pointTitle: '{date} · {value} · 消息 {messages} · 错误 {errors}',
+        pointTitle: '{date} · {value} · 消息 {messages} · 错误 {errors}'
       },
       top: {
         models: 'Top Models',
         providers: 'Top Providers',
-        tools: 'Top Tools',
+        tools: 'Top Tools'
       },
       sessions: {
         columns: {
@@ -1108,16 +1115,16 @@ export default {
           peer: '对话方',
           messages: '消息数',
           usage: '用量',
-          lastActivity: '最近活动',
+          lastActivity: '最近活动'
         },
         summary: '模型：{model}，消息：{messages}，最近：{last}',
-        usageLabel: '用量（{mode}）',
+        usageLabel: '用量（{mode}）'
       },
       events: {
         placeholder: '筛选事件名，如 chat / agent / tool',
         empty: '等待事件...',
-        payloadUnserializable: '[payload 无法序列化]',
-      },
+        payloadUnserializable: '[payload 无法序列化]'
+      }
     },
     chat: {
       title: '在线对话（工作台）',
@@ -1127,13 +1134,13 @@ export default {
         untitled: '新对话',
         msgCount: '条消息',
         renameConversation: '重命名',
-        remoteModelHint: '仅本地服务器显示实际模型名',
+        remoteModelHint: '仅本地服务器显示实际模型名'
       },
       actions: {
         refreshChat: '刷新聊天数据',
         send: '发送',
         stop: '停止',
-        clearInput: '清空输入',
+        clearInput: '清空输入'
       },
       tokens: {
         total: '总',
@@ -1142,23 +1149,23 @@ export default {
         cacheRead: '缓读',
         cacheWrite: '缓写',
         loading: 'Token 读取中...',
-        unavailable: 'Token -',
+        unavailable: 'Token -'
       },
       stats: {
         total: '总消息',
         assistant: '助手回复',
         lastMessage: '最近消息',
-        breakdown: '用户 {user} / 助手 {assistant} / 系统 {system}',
+        breakdown: '用户 {user} / 助手 {assistant} / 系统 {system}'
       },
       sessionKey: '会话 Key',
       sessionKeyPlaceholder: '输入或选择会话 Key（选中后自动加载）',
       sessionTag: '会话 {key}',
       session: {
         label: '标签',
-        model: '模型',
+        model: '模型'
       },
       preferences: {
-        autoFollow: '自动跟随最新消息',
+        autoFollow: '自动跟随最新消息'
       },
       filters: {
         title: '消息筛选',
@@ -1166,32 +1173,33 @@ export default {
           all: '全部角色',
           user: '仅用户',
           assistant: '仅助手',
-          system: '仅系统',
-        },
+          system: '仅系统'
+        }
       },
       roles: {
         user: '用户',
         assistant: '助手',
         tool: '工具',
-        system: '系统',
+        system: '系统'
       },
       image: {
         preview: '图片预览',
-        unavailable: '图片不可用',
+        unavailable: '图片不可用'
       },
       sync: {
         syncing: '实时同步中...',
         syncedAt: '已同步 {time}',
-        notSynced: '未同步',
+        notSynced: '未同步'
       },
       messages: {
         abortRequested: '已发送停止请求',
         abortFailed: '停止失败：{reason}',
-        emptyFiltered: '当前筛选下无消息',
+        waitForCurrentResponse: '请等待当前回复结束或先停止回复',
+        emptyFiltered: '当前筛选下无消息'
       },
       input: {
         placeholder: '输入消息（输入 / 可查看 Hermes 命令，Enter 发送，Shift+Enter 换行）',
-        sendHint: '当前发送到：{key} ｜ Enter 发送，Shift+Enter 换行，Ctrl/Cmd+Enter 发送',
+        sendHint: '当前发送到：{key} ｜ Enter 发送，Shift+Enter 换行，Ctrl/Cmd+Enter 发送'
       },
       quickReplies: {
         title: '常用对话',
@@ -1211,7 +1219,7 @@ export default {
           deleted: '已删除常用对话',
           inserted: '已插入：{title}',
           dirCopied: '已复制 workspace 建议目录',
-          dirCopyFailed: '复制失败，请手动复制目录路径',
+          dirCopyFailed: '复制失败，请手动复制目录路径'
         },
         modal: {
           createTitle: '新增常用对话',
@@ -1220,8 +1228,8 @@ export default {
           titlePlaceholder: '例如：确认需求澄清',
           content: '内容',
           contentPlaceholder: '输入常用对话正文',
-          saveChanges: '保存修改',
-        },
+          saveChanges: '保存修改'
+        }
       },
       slash: {
         title: 'Hermes 斜杠命令',
@@ -1230,22 +1238,22 @@ export default {
         categories: {
           common: '常用',
           session: '会话',
-          modelAndContext: '模型与上下文',
+          modelAndContext: '模型与上下文'
         },
         commands: {
           new: {
             description: '重置并启动新会话，可选指定模型',
             defaultLabel: '不指定模型',
-            defaultDesc: '使用默认模型启动新会话',
+            defaultDesc: '使用默认模型启动新会话'
           },
           skill: {
-            description: '执行技能（自动提示你的技能列表）',
+            description: '执行技能（自动提示你的技能列表）'
           },
           model: {
-            description: '查看或切换模型',
+            description: '查看或切换模型'
           },
           status: {
-            description: '查看当前会话与系统状态',
+            description: '查看当前会话与系统状态'
           },
           subagents: {
             description: '查看/控制子代理运行（支持 list/kill/log/info/send/steer/spawn）',
@@ -1256,26 +1264,26 @@ export default {
               info: '查看指定子代理详情',
               send: '向子代理发送消息',
               steer: '引导子代理（追加指令）',
-              spawn: '确定性启动子代理并分配任务（自动提示 agentId）',
-            },
+              spawn: '确定性启动子代理并分配任务（自动提示 agentId）'
+            }
           },
-          noMatch: '没有匹配命令，仅支持 /new、/skill、/model、/status、/subagents。',
+          noMatch: '没有匹配命令，仅支持 /new、/skill、/model、/status、/subagents。'
         },
         requiresFlag: '需 {flag}',
         fromConfig: '来自配置',
         skills: {
           loading: '正在加载技能列表...',
-          noMatch: '没有匹配技能（可在技能管理开启“Chat 显示内置”，或在技能卡片上打开 Chat 开关）。',
+          noMatch: '没有匹配技能（可在技能管理开启“Chat 显示内置”，或在技能卡片上打开 Chat 开关）。'
         },
         models: {
           loading: '正在读取配置模型...',
-          noMatch: '没有匹配模型，或当前未配置模型。',
+          noMatch: '没有匹配模型，或当前未配置模型。'
         },
         subagents: {
           loading: '正在读取多智能体配置...',
           noMatch: '没有匹配的多智能体 ID，或当前未配置 agents.list。',
-          agentTag: '多智能体',
-        },
+          agentTag: '多智能体'
+        }
       },
       agentStatus: {
         sending: '消息发送中...',
@@ -1289,7 +1297,7 @@ export default {
         aborted: '已停止',
         error: '错误',
         errorWithDetail: '错误：{detail}',
-        idle: '空闲',
+        idle: '空闲'
       },
       agentDetails: {
         show: '展开详情',
@@ -1300,7 +1308,7 @@ export default {
         elapsed: '耗时',
         viewPartialResult: '查看 partialResult',
         viewResult: '查看 result',
-        toolFailed: '工具执行失败（已返回错误结果）',
+        toolFailed: '工具执行失败（已返回错误结果）'
       },
       structured: {
         thinking: '思考',
@@ -1308,7 +1316,7 @@ export default {
         signature: {
           details: '查看签名信息',
           id: '签名 ID',
-          summary: '摘要',
+          summary: '摘要'
         },
         toolCall: '工具调用',
         timeout: '超时 {seconds}s',
@@ -1322,8 +1330,8 @@ export default {
         issuesCount: '{count} 项问题',
         issues: '问题',
         viewArgs: '查看参数',
-        hideArgs: '收起参数',
-      },
+        hideArgs: '收起参数'
+      }
     },
     sessions: {
       hermesRest: {
@@ -1333,13 +1341,13 @@ export default {
         exportJson: '导出 JSON',
         untitled: '无标题',
         notFound: '会话未找到',
-        notFoundHint: '该会话可能已被删除。',
+        notFoundHint: '该会话可能已被删除。'
       },
       roles: {
         user: '用户',
         assistant: 'AI',
         tool: '工具',
-        system: '系统',
+        system: '系统'
       },
       list: {
         title: '会话管理',
@@ -1348,21 +1356,21 @@ export default {
           totalSessions: '会话总数',
           active24h: '24h 活跃',
           totalMessages: '消息总量',
-          uniqueChannels: '渠道数',
+          uniqueChannels: '渠道数'
         },
         units: {
           messages: '条',
-          channels: '个',
+          channels: '个'
         },
         searchPlaceholder: '搜索 key / agent / 渠道 / 对话方 / 模型',
         clearFilters: '清空筛选',
         sort: {
           recent: '按最近活动',
-          messages: '按消息数量',
+          messages: '按消息数量'
         },
         filters: {
           allChannels: '全部渠道',
-          allModels: '全部模型',
+          allModels: '全部模型'
         },
         columns: {
           session: '会话',
@@ -1370,11 +1378,11 @@ export default {
           model: '模型',
           tokenTotal: 'Token 总量',
           lastActivity: '最近活动',
-          actions: '操作',
+          actions: '操作'
         },
         badges: {
           active24h: '24h 活跃',
-          inactive: '非活跃',
+          inactive: '非活跃'
         },
         listTitle: '会话列表',
         listCount: '当前 {current} / 共 {total}',
@@ -1383,7 +1391,7 @@ export default {
           peer: '对话方',
           messageCount: '消息数',
           model: '模型',
-          lastActivity: '最近活动',
+          lastActivity: '最近活动'
         },
         activeTime: '活动时间：{time}',
         viewDetail: '查看详情',
@@ -1408,13 +1416,13 @@ export default {
           peer: '对话方',
           peerPlaceholder: '可选，默认自动生成',
           label: '标签',
-          labelPlaceholder: '可选，会话标签',
+          labelPlaceholder: '可选，会话标签'
         },
         confirmReset: '确认重置该会话？',
         summary: '当前会话摘要：{text}',
         emptySide: '从左侧选择会话后，可进行查看详情、导出、重置或删除。',
         deleteSuccess: '会话已删除',
-        deleteFailed: '删除失败',
+        deleteFailed: '删除失败'
       },
       detail: {
         title: '会话详情',
@@ -1427,7 +1435,7 @@ export default {
           label: '标签',
           messages: '消息数',
           tokens: 'Token 用量',
-          lastActivity: '最近活动',
+          lastActivity: '最近活动'
         },
         confirmReset: '确认重置此会话？',
         confirmDelete: '确认删除此会话？此操作不可撤销。',
@@ -1438,39 +1446,39 @@ export default {
         exportSuccess: '导出成功',
         exportFailed: '导出失败',
         labelSaved: '标签已保存',
-        labelFailed: '标签保存失败',
-      },
+        labelFailed: '标签保存失败'
+      }
     },
     monitor: {
       actions: {
-        refreshAll: '全量刷新',
+        refreshAll: '全量刷新'
       },
       subtitle: '统一查看实例在线、日志尾流、审批策略与更新执行结果。',
       summary: {
         presence: '实例 {online}/{total}',
         logs: '日志 {count} 条',
         lastSync: '最近同步：{time}',
-        neverSynced: '尚未同步',
+        neverSynced: '尚未同步'
       },
       connection: {
         connected: '网关已连接',
         connecting: '网关连接中',
         reconnecting: '网关重连中',
         failed: '网关连接失败',
-        disconnected: '网关未连接',
+        disconnected: '网关未连接'
       },
       tabs: {
         presence: '实例状态（system-presence）',
         logs: '实时日志（logs.tail）',
         approvals: '审批策略（exec.approvals.*）',
-        update: '更新与重启（update.run）',
+        update: '更新与重启（update.run）'
       },
       methodNotSupported: '当前 Gateway 不支持 {method}',
       errors: {
         healthFailed: '获取 health 失败',
         statusFailed: '获取 status 失败',
         presenceFailed: '获取实例状态失败',
-        logsFailed: '获取日志失败',
+        logsFailed: '获取日志失败'
       },
       presence: {
         title: '实例状态',
@@ -1478,7 +1486,7 @@ export default {
         notSupported: '当前 Gateway 不支持 system-presence，请升级后重试。',
         hint: '来源于 system-presence，用于观察网关与客户端在线情况。',
         empty: '暂无实例上报',
-        updatedAt: '更新于 {time}',
+        updatedAt: '更新于 {time}'
       },
       diag: {
         title: '健康 / 状态诊断（health + status）',
@@ -1492,7 +1500,7 @@ export default {
         enabled: '已启用',
         healthUpdatedAt: 'health 更新时间：{time}',
         diagUpdatedAt: '诊断更新时间：{time}',
-        lastProbeAt: ' · 最近 Probe：{time}',
+        lastProbeAt: ' · 最近 Probe：{time}'
       },
       logs: {
         title: '实时日志',
@@ -1506,7 +1514,7 @@ export default {
         notSupportedPrefix: '当前 Gateway 不支持 ',
         notSupportedSuffix: '，请升级后重试。',
         hintPrefix: '来源于 ',
-        hintSuffix: '，支持增量游标与级别过滤。',
+        hintSuffix: '，支持增量游标与级别过滤。'
       },
       approvals: {
         title: '审批策略',
@@ -1524,12 +1532,12 @@ export default {
           file: '文件：',
           status: '状态：',
           exists: '已存在',
-          created: '首次创建',
+          created: '首次创建'
         },
         defaults: {
           security: '默认 security',
           ask: '默认 ask',
-          askFallback: '默认 askFallback',
+          askFallback: '默认 askFallback'
         },
         agent: {
           current: '当前多智能体',
@@ -1538,14 +1546,14 @@ export default {
           newPlaceholder: '输入多智能体 ID',
           actions: '操作',
           add: '新增',
-          remove: '移除',
+          remove: '移除'
         },
         allowlist: {
           count: '{count} 条 allowlist',
           newPlaceholder: '输入 allowlist pattern',
           rulePlaceholder: 'pattern，例如：**/*.md',
           add: '新增规则',
-          empty: '暂无 allowlist 规则',
+          empty: '暂无 allowlist 规则'
         },
         empty: '未加载审批策略',
         errors: {
@@ -1557,8 +1565,8 @@ export default {
           agentIdRequired: '请输入多智能体 ID',
           agentExists: '多智能体 {id} 已存在',
           cannotDeleteMain: 'main 多智能体不支持删除',
-          allowlistPatternRequired: '请输入 allowlist pattern',
-        },
+          allowlistPatternRequired: '请输入 allowlist pattern'
+        }
       },
       update: {
         title: '更新与重启',
@@ -1566,7 +1574,7 @@ export default {
         notSupportedSuffix: '，请升级后重试。',
         restartWarning: '该操作会触发 Gateway 重启，页面连接短暂断开属于预期行为。',
         actions: {
-          run: '执行更新',
+          run: '执行更新'
         },
         confirm: {
           title: '确认执行更新？',
@@ -1575,8 +1583,8 @@ export default {
             action: '操作：执行 update.run（更新与重启）',
             scope: '范围：Gateway',
             risk: '风险：会触发 Gateway 重启，短暂断线属于预期行为',
-            confirm: '确认继续？',
-          },
+            confirm: '确认继续？'
+          }
         },
         params: {
           title: '执行参数',
@@ -1586,16 +1594,16 @@ export default {
           note: '更新备注 note（可选）',
           notePlaceholder: '例如：运维中心手动触发更新',
           restartDelayMs: '重启延迟 restartDelayMs（毫秒）',
-          timeoutMs: '执行超时 timeoutMs（毫秒）',
+          timeoutMs: '执行超时 timeoutMs（毫秒）'
         },
         messages: {
           ok: '更新任务已执行，网关将按计划重启',
           skipped: '更新任务已执行，但被跳过',
           failed: '更新任务失败：{reason}',
-          unknownReason: '未知原因',
+          unknownReason: '未知原因'
         },
         errors: {
-          runFailed: '执行更新失败',
+          runFailed: '执行更新失败'
         },
         statusUnknown: '未知',
         triggeredAt: '触发时间：{time}',
@@ -1604,11 +1612,11 @@ export default {
           mode: '更新模式',
           restart: '重启调度',
           noResponse: '未返回',
-          reason: '失败原因',
+          reason: '失败原因'
         },
         sentinel: '哨兵文件：{path}',
-        stepsTitle: '步骤回显（{count}）',
-      },
+        stepsTitle: '步骤回显（{count}）'
+      }
     },
     settings: {
       statusConnected: '已连接',
@@ -1651,18 +1659,21 @@ export default {
       serverInfo: '服务器信息',
       serverPlatform: '平台',
       serverModel: '模型',
-      serverLocalOnly: '版本更新、配置编辑、重启等功能需要远程主机上运行 Hermes 管理服务（端口 8643）',
+      serverLocalOnly:
+        '版本更新、配置编辑、重启等功能需要远程主机上运行 Hermes 管理服务（端口 8643）',
       mgmtProbing: '正在检测管理接口...',
       mgmtNotAvailable: '未检测到远程管理接口',
       mgmtRetryProbe: '重新检测',
-      mgmtInstallHint: '在远程 Hermes 主机上运行 npm run mgmt-server:install 后点击重新检测（当前仅支持 macOS）',
+      mgmtInstallHint:
+        '在远程 Hermes 主机上运行 npm run mgmt-server:install 后点击重新检测（当前仅支持 macOS）',
       mgmtError: {
         'empty-url': '管理接口地址为空，请确认已正确填写服务器 URL。',
         network: '无法连接到 {url}，可能管理服务未运行或端口 8643 被防火墙拦截。',
         timeout: '连接 {url} 超时（5 秒），请检查网络或服务是否存活。',
         http: '{url} 返回了异常 HTTP 状态码，可能端口 8643 被其他服务占用。',
         parse: '{url} 返回的响应不是 JSON，可能端口 8643 被其他服务占用。',
-        'wrong-platform': '{url} 响应了 /health，但 platform 字段不是 hermes-mgmt，可能端口 8643 被其他服务占用。',
+        'wrong-platform':
+          '{url} 响应了 /health，但 platform 字段不是 hermes-mgmt，可能端口 8643 被其他服务占用。'
       },
       hermesVersion: 'Hermes Agent 版本',
       currentVersion: '当前版本',
@@ -1677,7 +1688,7 @@ export default {
       updateFailed: '更新失败',
       checkUpdateFailed: '检查更新失败',
       updateRetryHint: '网络偶有不稳定，失败时可稍后重试',
-      versionTag: '版本标签',
+      versionTag: '版本标签'
     },
     tools: {
       title: '工具管理',
@@ -1686,8 +1697,8 @@ export default {
         name: '工具名称',
         category: '分类',
         description: '描述',
-        status: '状态',
-      },
+        status: '状态'
+      }
     },
     nodes: {
       title: '节点管理',
@@ -1699,7 +1710,7 @@ export default {
       pairCodePlaceholder: '输入配对码',
       pairCodeRequired: '请输入配对码',
       pairSuccess: '配对成功',
-      pairFailed: '配对失败',
+      pairFailed: '配对失败'
     },
     system: {
       subtitle: '管理和查看 Gateway 各项服务的运行状态',
@@ -1732,8 +1743,8 @@ export default {
         delayUnit: '秒',
         scheduled: '网关将在 {delay} 秒后重启',
         failed: '重启请求失败',
-        unknownError: '未知错误',
-      },
+        unknownError: '未知错误'
+      }
     },
     alerts: {
       subtitle: '查看和管理系统告警信息',
@@ -1755,7 +1766,7 @@ export default {
       consecutiveFailures: '次连续失败',
       lastRunFailed: '上次运行失败',
       schedulerPaused: '定时调度器已暂停',
-      schedulerPausedMsg: '定时调度器当前处于禁用状态，所有 Cron 任务已暂停执行',
+      schedulerPausedMsg: '定时调度器当前处于禁用状态，所有 Cron 任务已暂停执行'
     },
     files: {
       subtitle: '浏览和管理多智能体工作区文件',
@@ -1810,19 +1821,19 @@ export default {
         unorderedList: '无序列表',
         orderedList: '有序列表',
         horizontalRule: '分隔线',
-        table: '表格',
+        table: '表格'
       },
       columns: {
         name: '名称',
         size: '大小',
         modified: '修改时间',
         type: '类型',
-        actions: '操作',
+        actions: '操作'
       },
       types: {
         directory: '目录',
         file: '文件',
-        symlink: '符号链接',
+        symlink: '符号链接'
       },
       actions: {
         view: '查看',
@@ -1836,13 +1847,13 @@ export default {
         edit: '编辑',
         rename: '重命名',
         fullscreen: '全屏',
-        exitFullscreen: '退出全屏',
-      },
+        exitFullscreen: '退出全屏'
+      }
     },
     agents: {
       tabs: {
         list: '列表管理',
-        world: '虚拟公司',
+        world: '虚拟公司'
       },
       subtitle: '管理所有多智能体，查看会话统计和 Token 使用情况',
       notSupported: '当前 Gateway 不支持多智能体列表功能',
@@ -1854,15 +1865,15 @@ export default {
         totalAgents: '多智能体总数',
         totalSessions: '会话总数',
         totalTokens: 'Token 总数',
-        configuredModels: '已配置模型',
+        configuredModels: '已配置模型'
       },
       units: {
-        tokens: 'K',
+        tokens: 'K'
       },
       status: {
         active: '活跃',
         idle: '空闲',
-        offline: '离线',
+        offline: '离线'
       },
       columns: {
         agent: '多智能体',
@@ -1872,13 +1883,13 @@ export default {
         theme: '主题',
         model: '模型',
         tools: '工具',
-        actions: '操作',
+        actions: '操作'
       },
       stats: {
         total: '多智能体总数',
         sessions: '会话总数',
         tokens: 'Token 总量',
-        default: '默认多智能体',
+        default: '默认多智能体'
       },
       lastUpdated: '最后更新：{time}',
       actions: {
@@ -1886,7 +1897,7 @@ export default {
         detail: '详情',
         identity: '身份',
         model: '模型',
-        tools: '工具',
+        tools: '工具'
       },
       confirmDelete: '确认删除该多智能体？此操作不可撤销。',
       modal: {
@@ -1894,7 +1905,7 @@ export default {
         detailTitle: '多智能体详情',
         identityTitle: '设置身份',
         modelTitle: '设置模型',
-        toolsTitle: '设置工具权限',
+        toolsTitle: '设置工具权限'
       },
       form: {
         id: '多智能体 ID',
@@ -1931,8 +1942,8 @@ export default {
           automation: '自动化',
           nodes: '节点',
           agents: '智能体',
-          media: '媒体',
-        },
+          media: '媒体'
+        }
       },
       detail: {
         id: 'ID',
@@ -1941,7 +1952,7 @@ export default {
         emoji: 'Emoji',
         avatar: '头像',
         sessions: '会话数',
-        tokens: 'Token 数',
+        tokens: 'Token 数'
       },
       messages: {
         created: '多智能体创建成功',
@@ -1953,8 +1964,8 @@ export default {
         modelSaved: '模型设置已保存',
         modelFailed: '保存模型设置失败',
         toolsSaved: '工具权限已保存',
-        toolsFailed: '保存工具权限失败',
-      },
+        toolsFailed: '保存工具权限失败'
+      }
     },
     office: {
       subtitle: '多智能体协作办公空间，支持场景创建、任务委派、Agent间通信，智能体和会话创建和删除',
@@ -1986,7 +1997,7 @@ export default {
         working: '工作中',
         communicating: '通信中',
         idle: '空闲',
-        offline: '离线',
+        offline: '离线'
       },
       wizard: {
         title: '场景创建向导',
@@ -2002,7 +2013,7 @@ export default {
           confirm: '确认配置',
           confirmDesc: '确认所有配置',
           execution: '执行任务',
-          executionDesc: '执行创建和配置',
+          executionDesc: '执行创建和配置'
         },
         scenarioName: '场景名称',
         scenarioNamePlaceholder: '例如：产品开发协作',
@@ -2075,7 +2086,7 @@ export default {
         startWorking: '开始工作',
         startExecution: '开始执行',
         executing: '正在执行...',
-        executionComplete: '执行完成',
+        executionComplete: '执行完成'
       },
       chat: {
         title: '智能体通信',
@@ -2091,7 +2102,7 @@ export default {
         executing: '执行中',
         activeTasks: '{count} 个任务进行中',
         processing: '正在处理...',
-        expandedTitle: '智能体协作详情',
+        expandedTitle: '智能体协作详情'
       },
       sessions: {
         title: '{name} 的会话',
@@ -2103,7 +2114,7 @@ export default {
         lastActivity: '最后活动时间',
         messages: '条消息',
         messageCount: '消息数量',
-        tokenUsage: 'Token 使用量',
+        tokenUsage: 'Token 使用量'
       },
       status: {
         thinking: '思考中...',
@@ -2112,7 +2123,7 @@ export default {
         replying: '回复中...',
         done: '完成',
         error: '错误',
-        idle: '空闲',
+        idle: '空闲'
       },
       tasks: {
         title: '任务管理',
@@ -2124,14 +2135,14 @@ export default {
         priority: {
           low: '低优先级',
           medium: '中优先级',
-          high: '高优先级',
+          high: '高优先级'
         },
         status: {
           pending: '待执行',
           inProgress: '进行中',
           in_progress: '进行中',
           completed: '已完成',
-          failed: '已失败',
+          failed: '已失败'
         },
         unassigned: '未分配',
         start: '开始',
@@ -2153,7 +2164,7 @@ export default {
           default: '默认模式',
           sessionsSeed: '会话种子模式',
           broadcast: '广播模式',
-          sequential: '顺序执行模式',
+          sequential: '顺序执行模式'
         },
         detailLabels: {
           status: '状态',
@@ -2161,7 +2172,7 @@ export default {
           mode: '执行模式',
           createdAt: '创建时间',
           description: '描述',
-          assignedAgents: '分配智能体',
+          assignedAgents: '分配智能体'
         },
         detail: {
           status: '状态',
@@ -2170,12 +2181,12 @@ export default {
           description: '描述',
           createdAt: '创建时间',
           assignedAgents: '分配智能体',
-          conversations: '执行记录',
-        },
+          conversations: '执行记录'
+        }
       },
       '3d': {
         resetView: '重置视角',
-        hint: '拖拽旋转，滚轮缩放',
+        hint: '拖拽旋转，滚轮缩放'
       },
       scenarios: {
         title: '团队管理',
@@ -2189,19 +2200,19 @@ export default {
           confirmed: '已确认',
           executing: '执行中',
           completed: '已完成',
-          archived: '已归档',
+          archived: '已归档'
         },
         detail: {
           status: '状态',
           description: '描述',
-          createdAt: '创建时间',
+          createdAt: '创建时间'
         },
         agentExists: '已存在',
         agentNotExists: '未创建',
         deleteTitle: '删除团队',
         deleteConfirm: '确定要删除团队 "{name}" 吗？',
         deleteAgents: '同时删除关联的智能体',
-        deleteBindings: '同时清除绑定配置',
+        deleteBindings: '同时清除绑定配置'
       },
       teamManagement: {
         title: '团队管理',
@@ -2219,7 +2230,7 @@ export default {
           confirmed: '已确认',
           executing: '执行中',
           completed: '已完成',
-          archived: '已归档',
+          archived: '已归档'
         },
         detail: {
           status: '状态',
@@ -2228,7 +2239,7 @@ export default {
           agents: '智能体列表',
           bindings: '绑定配置',
           noAgents: '暂无智能体',
-          noBindings: '暂无绑定配置',
+          noBindings: '暂无绑定配置'
         },
         agentDetail: {
           title: '智能体详情',
@@ -2238,15 +2249,15 @@ export default {
           emoji: 'Emoji',
           skills: '技能列表',
           status: '状态',
-          noSkills: '暂无技能',
+          noSkills: '暂无技能'
         },
         bindingDetail: {
           title: '绑定配置详情',
           agentId: '智能体 ID',
           channelType: '渠道类型',
           peerId: 'Peer ID',
-          peerKind: 'Peer Kind',
-        },
+          peerKind: 'Peer Kind'
+        }
       },
       teamTaskPanel: {
         title: '团队任务管理',
@@ -2325,7 +2336,8 @@ export default {
         aiCreateWait: '正在等待 AI 响应，请稍候...',
         aiCreateTimeout: 'AI 响应超时，请重试',
         aiTeamDescription: 'AI 需要生成的团队描述',
-        aiTeamDescriptionPlaceholder: '例如：创建一个内容创作团队，包含内容策划、文案撰写、图片设计三个智能体...',
+        aiTeamDescriptionPlaceholder:
+          '例如：创建一个内容创作团队，包含内容策划、文案撰写、图片设计三个智能体...',
         confirmAgents: '确认智能体列表',
         agentName: '智能体名称',
         agentId: '智能体 ID',
@@ -2341,8 +2353,8 @@ export default {
         totalAgents: '总数',
         deletedAgents: '已删除',
         failedAgents: '失败',
-        currentlyDeleting: '正在删除',
-      },
+        currentlyDeleting: '正在删除'
+      }
     },
     backup: {
       title: '数据备份',
@@ -2371,14 +2383,14 @@ export default {
       metrics: {
         total: '备份总数',
         totalSize: '占用空间',
-        latest: '最近备份',
+        latest: '最近备份'
       },
       columns: {
         filename: '文件名',
         size: '大小',
         date: '日期',
-        actions: '操作',
-      },
+        actions: '操作'
+      }
     },
     logs: {
       title: '系统日志',
@@ -2404,8 +2416,8 @@ export default {
         total: '日志总数',
         errors: '错误',
         warns: '警告',
-        fileSize: '文件大小',
-      },
+        fileSize: '文件大小'
+      }
     },
     insights: {
       title: '运营洞察',
@@ -2430,9 +2442,9 @@ export default {
         totalTokens: '总 Token',
         totalCost: '总费用',
         sessions: '会话数',
-        errorRate: '错误率',
-      },
-    },
+        errorRate: '错误率'
+      }
+    }
   },
   myworld: {
     title: '虚拟公司',
@@ -2493,14 +2505,14 @@ export default {
       automation: '自动化',
       nodes: '节点',
       agents: '智能体',
-      media: '媒体',
+      media: '媒体'
     },
     characterStatus: {
       idle: '空闲',
       walking: '移动中',
       working: '工作中',
       talking: '交谈中',
-      resting: '休息中',
+      resting: '休息中'
     },
     areas: {
       reception: '接待区',
@@ -2528,20 +2540,20 @@ export default {
       restroomF: '女卫生间',
       storage: '储物间',
       pantry: '茶水间',
-      openDesk: '开放办公区',
+      openDesk: '开放办公区'
     },
     entrance: '入口',
     areaActions: {
       moveTo: '移动到',
       workAt: '在此工作',
       restAt: '在此休息',
-      meetAt: '在此开会',
+      meetAt: '在此开会'
     },
     controls: {
       hint: '滚轮缩放，拖拽平移',
       zoom: '缩放',
       pan: '平移',
-      reset: '重置',
+      reset: '重置'
     },
     chat: {
       title: '员工对话',
@@ -2550,24 +2562,24 @@ export default {
       close: '关闭',
       noMessages: '暂无消息',
       you: '你',
-      agent: '{name}',
+      agent: '{name}'
     },
     status: {
       loading: '加载中...',
       connected: '已连接',
-      disconnected: '已断开',
+      disconnected: '已断开'
     },
     popup: {
       sessions: '会话列表',
       noSessions: '暂无会话',
-      close: '关闭',
+      close: '关闭'
     },
     hints: {
       clickToSelect: '单击选中小人',
       doubleClickToChat: '双击打开会话列表',
       clickToMove: '点击空白处移动小人',
       dragToPan: '拖拽平移画布',
-      scrollToZoom: '滚轮缩放',
-    },
-  },
+      scrollToZoom: '滚轮缩放'
+    }
+  }
 } as const

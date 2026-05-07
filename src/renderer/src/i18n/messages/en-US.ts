@@ -1,6 +1,6 @@
 export default {
   app: {
-    title: 'Hermes Desktop',
+    title: 'Hermes Desktop'
   },
   routes: {
     connection: 'Connect to Server',
@@ -22,13 +22,14 @@ export default {
     settings: 'Settings',
     backup: 'Data Backup',
     logs: 'Logs',
-    insights: 'Insights',
+    insights: 'Insights'
   },
   common: {
     all: 'All',
     home: 'Home',
     empty: 'No data',
-    httpsWsBlocked: 'This page is HTTPS. Browsers block ws:// WebSocket. Use wss://, or connect via an SSH tunnel to ws://127.0.0.1:18789.',
+    httpsWsBlocked:
+      'This page is HTTPS. Browsers block ws:// WebSocket. Use wss://, or connect via an SSH tunnel to ws://127.0.0.1:18789.',
     logout: 'Log out',
     refresh: 'Refresh',
     refreshSuccess: 'Refreshed successfully',
@@ -65,7 +66,7 @@ export default {
     switchToNormalWidth: 'Switch to normal width',
     toggleLanguage: 'Switch language: {target}',
     languageZh: '中文',
-    languageEn: 'English',
+    languageEn: 'English'
   },
   components: {
     connectionStatus: {
@@ -82,14 +83,14 @@ export default {
       installNow: 'Install now',
       installingInShort: '{count}s until auto install',
       downloadingInBackground: 'Downloading new version in background...',
-      clickToCheck: 'Click to check for updates',
+      clickToCheck: 'Click to check for updates'
     },
     pdfViewer: {
       reset: 'Reset',
       resetZoom: 'Reset zoom',
       enterFullscreen: 'Fullscreen',
-      exitFullscreen: 'Exit fullscreen',
-    },
+      exitFullscreen: 'Exit fullscreen'
+    }
   },
   pages: {
     connection: {
@@ -98,7 +99,8 @@ export default {
       localHermes: 'Local Hermes',
       connectLocal: 'Connect',
       localConnectFailed: 'Cannot connect to local Hermes (localhost:8642)',
-      encryptionWarning: 'Secure storage is not available on this system. Passwords will be stored without encryption. Use a system with Keychain / Credential Manager support.',
+      encryptionWarning:
+        'Secure storage is not available on this system. Passwords will be stored without encryption. Use a system with Keychain / Credential Manager support.',
       serverList: 'Server List',
       refreshStatus: 'Refresh Status',
       addServer: 'Add Server',
@@ -115,7 +117,8 @@ export default {
       healthChecking: 'Checking...',
       healthUnknown: 'Unknown',
       supportedPlatforms: 'Supported Platforms',
-      platformHint: 'Deploy the Hermes service on the target host, then use this client to connect and manage remotely',
+      platformHint:
+        'Deploy the Hermes service on the target host, then use this client to connect and manage remotely',
       modalTitleAdd: 'Add Server',
       modalTitleEdit: 'Edit Server',
       labelAddress: 'Address',
@@ -131,17 +134,23 @@ export default {
       labelToken: 'Access\nToken',
       labelTokenRequired: '(required, determines authentication)',
       placeholderToken: 'Hermes REST: API_SERVER_KEY',
-      tokenHint: 'For Hermes REST, enter API_SERVER_KEY from the server ~/.hermes/.env. Legacy ACP Gateway uses gateway.auth.token.',
+      tokenHint:
+        'For Hermes REST, enter API_SERVER_KEY from the server ~/.hermes/.env. Legacy ACP Gateway uses gateway.auth.token.',
       probeButton: 'Probe Server',
-      probeHermesRest: 'Hermes Agent REST API detected — no authentication needed, ready to connect.',
-      probeHermesRestAuth: 'Hermes Agent REST API detected — please enter the API access token (API_SERVER_KEY).',
+      probeHermesRest:
+        'Hermes Agent REST API detected — no authentication needed, ready to connect.',
+      probeHermesRestAuth:
+        'Hermes Agent REST API detected — please enter the API access token (API_SERVER_KEY).',
       probeNoAuth: 'Server is reachable. Authentication is disabled — no credentials needed.',
       probeAuth: 'Server is reachable. Please enter the Gateway access token.',
-      probeUnreachable: 'Cannot reach this address. Check: 1) Service is running 2) Port is correct 3) Firewall settings',
-      httpWarning: 'Using HTTP over public networks is insecure. Use HTTPS or restrict to local network.',
+      probeUnreachable:
+        'Cannot reach this address. Check: 1) Service is running 2) Port is correct 3) Firewall settings',
+      httpWarning:
+        'Using HTTP over public networks is insecure. Use HTTPS or restrict to local network.',
       localServer: 'Local Server',
       validationNameUrl: 'Please fill in server name and address',
-      validationCredentials: 'Please enter username and Gateway token (if the server has no auth, click "Probe Server" first)',
+      validationCredentials:
+        'Please enter username and Gateway token (if the server has no auth, click "Probe Server" first)',
       saveSuccess: 'Server added',
       updateSuccess: 'Server updated',
       saveFailed: 'Save failed',
@@ -151,10 +160,11 @@ export default {
       authFailed: 'Authentication failed',
       serverError: 'Server error',
       connectFailed: 'Connection failed',
-      connectFailedNoAuth: 'Connection failed. Check if the server address is correct and the service is running.',
+      connectFailedNoAuth:
+        'Connection failed. Check if the server address is correct and the service is running.',
       connectFailedAuth: 'Connection failed. Check the server address and access token.',
       deleted: 'Deleted',
-      deleteFailed: 'Delete failed',
+      deleteFailed: 'Delete failed'
     },
     login: {
       subtitle: 'Connect to Hermes Gateway to manage your AI assistant',
@@ -181,7 +191,7 @@ export default {
       login: 'Login',
       loggingIn: 'Logging in...',
       credentialsRequired: 'Please enter username and password',
-      invalidCredentials: 'Invalid username or password',
+      invalidCredentials: 'Invalid username or password'
     },
     skills: {
       title: 'Skill Management',
@@ -190,7 +200,7 @@ export default {
         total: 'Total',
         enabled: 'Enabled',
         disabled: 'Disabled',
-        configVars: 'Config Vars',
+        configVars: 'Config Vars'
       },
       search: 'Search by name / description / tags',
       categoryFilter: 'Category',
@@ -203,7 +213,7 @@ export default {
         name: 'Name',
         category: 'Category',
         platform: 'Platform',
-        status: 'Status',
+        status: 'Status'
       },
       detail: {
         empty: 'Select a skill to view details',
@@ -225,12 +235,12 @@ export default {
         configSaved: 'Config saved',
         configFailed: 'Save failed',
         relatedSkills: 'Related Skills',
-        homepage: 'Homepage',
+        homepage: 'Homepage'
       },
       toggle: {
         enabled: 'Enabled {name}',
         disabled: 'Disabled {name}',
-        failed: 'Toggle failed',
+        failed: 'Toggle failed'
       },
       externalDirs: {
         title: 'External Skill Directories',
@@ -240,15 +250,15 @@ export default {
         confirmRemove: 'Remove this directory?',
         added: 'Directory added',
         removed: 'Directory removed',
-        failed: 'Operation failed',
+        failed: 'Operation failed'
       },
       empty: 'No skills found. Check ~/.hermes/skills/ directory.',
       sources: {
         workspace: 'Created',
         managed: 'Installed',
         extra: 'External',
-        bundled: 'Bundled',
-      },
+        bundled: 'Bundled'
+      }
     },
     config: {
       title: 'hermes.json',
@@ -259,13 +269,14 @@ export default {
       applyAndReload: 'Apply & reload',
       appliedAndReloading: 'Config applied. Gateway will reload',
       applyFailed: 'Apply failed',
-      channelsMigratedHint: 'Channel accounts, policies, auth pairing, and credential updates have been migrated to Channels. Use that page for daily operations.',
+      channelsMigratedHint:
+        'Channel accounts, policies, auth pairing, and credential updates have been migrated to Channels. Use that page for daily operations.',
       goToChannels: 'Go to Channels',
       tabs: {
         general: 'General',
         tools: 'Tools policy',
         sessions: 'Sessions',
-        raw: 'Raw hermes.json',
+        raw: 'Raw hermes.json'
       },
       labels: {
         primaryModel: 'Primary model',
@@ -277,35 +288,36 @@ export default {
         resetMode: 'Reset mode',
         resetHourUtc: 'Reset hour (UTC)',
         idleMinutes: 'Idle minutes',
-        queueMode: 'Queue mode',
+        queueMode: 'Queue mode'
       },
       placeholders: {
         model: 'Select or enter a model',
-        workspacePath: '~/.hermes/workspace',
+        workspacePath: '~/.hermes/workspace'
       },
       toolProfiles: {
         minimal: 'Minimal',
         coding: 'Coding',
-        full: 'Full',
+        full: 'Full'
       },
       resetModes: {
         off: 'Off',
         daily: 'Daily reset',
-        idle: 'Idle reset',
+        idle: 'Idle reset'
       },
       queueModes: {
         sequential: 'Sequential',
         concurrent: 'Concurrent',
-        collect: 'Collect',
+        collect: 'Collect'
       },
-      rawReadonlyHint: 'Full hermes.json config (read-only)',
+      rawReadonlyHint: 'Full hermes.json config (read-only)'
     },
     channels: {
       title: 'Channels',
       refresh: 'Refresh',
       manageSettings: 'Open settings',
       empty: 'No channels configured. Visit Settings to add channel credentials.',
-      unavailableHermesRest: 'Channel management is not supported in Hermes REST mode. Connect to an ACP Gateway to view channels.',
+      unavailableHermesRest:
+        'Channel management is not supported in Hermes REST mode. Connect to an ACP Gateway to view channels.',
       searchPlaceholder: 'Search by ID or account name',
       platformAll: 'All platforms',
       statusAll: 'All statuses',
@@ -323,13 +335,13 @@ export default {
         total: 'Total channels',
         connected: 'Connected',
         errors: 'Errors',
-        members: 'Total members',
+        members: 'Total members'
       },
       status: {
         connected: 'Connected',
         disconnected: 'Disconnected',
         authenticating: 'Authenticating',
-        error: 'Error',
+        error: 'Error'
       },
       columns: {
         platform: 'Platform',
@@ -337,14 +349,14 @@ export default {
         status: 'Status',
         members: 'Members',
         dmPolicy: 'DM Policy',
-        actions: 'Actions',
+        actions: 'Actions'
       },
       pairingDialog: {
         title: 'Enter pairing code',
         description: 'Enter the pairing code returned by {id} to complete authentication.',
         codePlaceholder: 'e.g. 123-456',
         submit: 'Submit',
-        cancel: 'Cancel',
+        cancel: 'Cancel'
       },
       detail: {
         platform: 'Platform',
@@ -354,26 +366,27 @@ export default {
         memberCount: 'Members',
         dmPolicy: 'DM policy',
         groupPolicy: 'Group policy',
-        groups: 'Groups ({count})',
-      },
+        groups: 'Groups ({count})'
+      }
     },
     memory: {
       title: 'Memory & Docs',
       coveredDocsPrefix: 'Covers Hermes managed docs: ',
       coveredDocsSuffix: '.',
-      gatewayLimited: 'This Gateway may not support agents.files.* or permission is restricted: {error}',
+      gatewayLimited:
+        'This Gateway may not support agents.files.* or permission is restricted: {error}',
       agentPlaceholder: 'Select agent',
       stats: {
         docsCount: '{count} docs',
         highRiskCount: 'High risk {count}',
-        currentDoc: 'Current {name}',
+        currentDoc: 'Current {name}'
       },
       tags: {
         highRisk: 'High risk',
-        unsaved: 'Unsaved',
+        unsaved: 'Unsaved'
       },
       nav: {
-        title: 'Documents',
+        title: 'Documents'
       },
       emptyDocs: 'No manageable documents',
       noDocSelected: 'No document selected',
@@ -382,24 +395,24 @@ export default {
         role: 'Role & persona',
         runtime: 'Runtime & policy',
         memory: 'Memory & preferences',
-        other: 'Other',
+        other: 'Other'
       },
       fileState: {
         notLoaded: 'Not loaded',
         notCreated: 'Not created',
-        exists: 'Exists',
+        exists: 'Exists'
       },
       emptyDocHtml: 'This file is empty. Click \"Edit\" to start.',
       editor: {
         stats: '{lines} lines · {chars} chars',
         placeholder: 'Maintain docs in Markdown. Saving empty content will write an empty file.',
-        saveHint: 'Saved content will be written to the current agent workspace document.',
+        saveHint: 'Saved content will be written to the current agent workspace document.'
       },
       actions: {
         edit: 'Edit',
         cancelEdit: 'Cancel edit',
         saveDoc: 'Save',
-        restore: 'Restore',
+        restore: 'Restore'
       },
       readonlyHint: 'Read-only mode. Click \"Edit\" to enable editing.',
       infoCard: {
@@ -407,7 +420,7 @@ export default {
         workspace: 'Workspace',
         filePath: 'File path',
         updatedAt: 'Updated',
-        fileSize: 'Size',
+        fileSize: 'Size'
       },
       snippets: {
         title: 'Snippets',
@@ -420,8 +433,8 @@ export default {
           items: {
             background: 'Background:',
             decision: 'Decision:',
-            conclusion: 'Conclusion:',
-          },
+            conclusion: 'Conclusion:'
+          }
         },
         principles: {
           label: 'Principles',
@@ -429,8 +442,8 @@ export default {
           items: {
             goal: 'Goal:',
             constraints: 'Constraints:',
-            prohibited: 'Prohibited:',
-          },
+            prohibited: 'Prohibited:'
+          }
         },
         persona: {
           label: 'Persona',
@@ -438,8 +451,8 @@ export default {
           items: {
             tone: 'Tone:',
             style: 'Style:',
-            principles: 'Principles:',
-          },
+            principles: 'Principles:'
+          }
         },
         bootstrap: {
           label: 'Bootstrap',
@@ -447,8 +460,8 @@ export default {
           items: {
             goal: 'Goal:',
             environment: 'Environment:',
-            firstRun: 'First-run strategy:',
-          },
+            firstRun: 'First-run strategy:'
+          }
         },
         userPreference: {
           label: 'User preferences',
@@ -456,16 +469,16 @@ export default {
           items: {
             output: 'Preferred outputs:',
             taboo: 'Taboos:',
-            tone: 'Tone preference:',
-          },
+            tone: 'Tone preference:'
+          }
         },
         heartbeat: {
           label: 'Heartbeat',
           heading: 'Tasks',
           items: {
             dailyStatus: 'Daily status check',
-            cleanup: 'Clean up failed tasks',
-          },
+            cleanup: 'Clean up failed tasks'
+          }
         },
         preferenceTemplate: {
           label: 'Preference template',
@@ -473,8 +486,8 @@ export default {
           items: {
             outputStyle: 'Output style:',
             disabled: 'Disabled:',
-            pacing: 'Pacing:',
-          },
+            pacing: 'Pacing:'
+          }
         },
         projectConventions: {
           label: 'Project conventions',
@@ -482,9 +495,9 @@ export default {
           items: {
             branching: 'Branching:',
             release: 'Release:',
-            verification: 'Verification:',
-          },
-        },
+            verification: 'Verification:'
+          }
+        }
       },
       messages: {
         initFailed: 'Failed to initialize memory module',
@@ -496,34 +509,34 @@ export default {
         refreshFailed: 'Refresh failed',
         selectAgentAndDocFirst: 'Please select an agent and a document first',
         saveHighRiskConfirm: 'You are saving a high-impact document {name}. Continue?',
-        saved: 'Document saved',
+        saved: 'Document saved'
       },
       docs: {
         AGENTS: {
-          description: 'Core behavior rules and constraints (high impact)',
+          description: 'Core behavior rules and constraints (high impact)'
         },
         SOUL: {
-          description: 'Persona, tone, and style (high impact)',
+          description: 'Persona, tone, and style (high impact)'
         },
         IDENTITY: {
-          description: 'Identity such as name, avatar, and theme',
+          description: 'Identity such as name, avatar, and theme'
         },
         USER: {
-          description: 'User preferences and communication conventions',
+          description: 'User preferences and communication conventions'
         },
         TOOLS: {
-          description: 'Tool usage notes (does not control availability)',
+          description: 'Tool usage notes (does not control availability)'
         },
         HEARTBEAT: {
-          description: 'Heartbeat turn tasks',
+          description: 'Heartbeat turn tasks'
         },
         BOOTSTRAP: {
-          description: 'Bootstrap injected context (high impact)',
+          description: 'Bootstrap injected context (high impact)'
         },
         MEMORY: {
-          description: 'Long-lived stable facts and preferences',
-        },
-      },
+          description: 'Long-lived stable facts and preferences'
+        }
+      }
     },
     cron: {
       title: 'Cron (Scheduler)',
@@ -539,17 +552,17 @@ export default {
         enabledJobs: 'Enabled jobs',
         disabledJobs: 'Disabled jobs',
         nextRun: 'Next Run',
-        nextWake: 'Next wake',
+        nextWake: 'Next wake'
       },
       jobs: {
         title: 'Jobs',
         count: '{count} jobs',
         searchPlaceholder: 'Search name / description / payload',
-        emptyHint: 'No jobs yet. Use a template above or click \"Create job\".',
+        emptyHint: 'No jobs yet. Use a template above or click \"Create job\".'
       },
       jobStatus: {
         enabled: 'Enabled',
-        disabled: 'Disabled',
+        disabled: 'Disabled'
       },
       detail: {
         schedule: 'Schedule',
@@ -562,7 +575,7 @@ export default {
         payload: 'Payload',
         delivery: 'Delivery',
         lastError: 'Last error: {error}',
-        emptyHint: 'Select a job to view details',
+        emptyHint: 'Select a job to view details'
       },
       runs: {
         title: 'Runs',
@@ -577,8 +590,8 @@ export default {
           session: 'Session',
           error: 'Error',
           raw: 'Raw payload',
-          empty: 'No run selected',
-        },
+          empty: 'No run selected'
+        }
       },
       table: {
         jobs: {
@@ -589,33 +602,33 @@ export default {
           lastRun: 'Last Run',
           lastStatus: 'Result',
           status: 'Status',
-          actions: 'Actions',
+          actions: 'Actions'
         },
         runs: {
           runAt: 'Run at',
           status: 'Status',
           duration: 'Duration',
           summary: 'Summary',
-          session: 'Session',
-        },
+          session: 'Session'
+        }
       },
       sessionTargets: {
         main: 'Main session',
-        isolated: 'Isolated session',
+        isolated: 'Isolated session'
       },
       payloadKinds: {
         agentTurn: 'Agent turn',
-        systemEvent: 'System event',
+        systemEvent: 'System event'
       },
       scheduleKinds: {
         cron: 'Cron expression',
         every: 'Fixed interval',
-        at: 'At time',
+        at: 'At time'
       },
       units: {
         minutes: 'minutes',
         hours: 'hours',
-        days: 'days',
+        days: 'days'
       },
       schedule: {
         every: 'Every {value} {unit}',
@@ -632,7 +645,7 @@ export default {
         weekdayRange: '{start} to {end}',
         monthlyAt: 'Monthly on day {day} at {time}',
         yearlyAt: 'Yearly {month}/{day} at {time}',
-        at: 'At {time}',
+        at: 'At {time}'
       },
       batchSetModel: 'Set All Models',
       batchSetModelConfirm: 'Set all cron jobs model to {model}?',
@@ -649,8 +662,8 @@ export default {
           wecom: 'WeCom',
           wechat: 'WeChat',
           dingtalk: 'DingTalk',
-          feishu: 'Feishu',
-        },
+          feishu: 'Feishu'
+        }
       },
       actions: {
         createJob: 'Create job',
@@ -663,7 +676,7 @@ export default {
         editJob: 'Edit job',
         openSession: 'Open',
         refreshRuns: 'Refresh runs',
-        saveChanges: 'Save changes',
+        saveChanges: 'Save changes'
       },
       confirmDeleteJob: 'Delete this job?',
       modal: {
@@ -671,14 +684,15 @@ export default {
         editTitle: 'Edit job',
         detailTitle: 'Job details',
         runDetailTitle: 'Run details',
-        footerHint: 'Jobs are written to Gateway cron storage and scheduled by the Gateway process.',
+        footerHint:
+          'Jobs are written to Gateway cron storage and scheduled by the Gateway process.',
         sections: {
           basic: 'Basic',
           schedule: 'Schedule',
           payload: 'Payload',
           delivery: 'Delivery',
-          preview: 'Preview',
-        },
+          preview: 'Preview'
+        }
       },
       form: {
         name: 'Name',
@@ -701,18 +715,18 @@ export default {
         sessionTarget: 'Session target',
         sessionTargets: {
           isolated: 'isolated (recommended)',
-          main: 'main',
+          main: 'main'
         },
         wakeMode: 'Wake mode',
         wakeModes: {
           nextHeartbeat: 'next-heartbeat',
-          now: 'now',
+          now: 'now'
         },
         payloadKind: 'Payload kind',
         payloadText: 'Payload text',
         payloadTextPlaceholders: {
           agentTurn: 'Prompt for the agent',
-          systemEvent: 'System event content',
+          systemEvent: 'System event content'
         },
         modelOverride: 'Model override',
         modelOverridePlaceholder: 'Select a model or input an alias (optional)',
@@ -721,22 +735,22 @@ export default {
         deliveryMode: 'Delivery mode',
         deliveryModes: {
           announce: 'announce (post summary)',
-          none: 'none (run internally)',
+          none: 'none (run internally)'
         },
         deliveryChannel: 'Delivery channel',
         deliveryTo: 'Delivery target',
         deliveryToPlaceholders: {
           last: 'Optional: leave empty to reuse latest routing',
-          specific: 'Select a configured target or input manually',
+          specific: 'Select a configured target or input manually'
         },
-        bestEffort: 'bestEffort',
+        bestEffort: 'bestEffort'
       },
       validation: {
         cronExprRequired: 'Please enter a Cron expression',
         everyValueInvalid: 'Interval value must be greater than 0',
         atTimeRequired: 'Please select a valid time',
         payloadRequired: 'Please enter payload text',
-        nameRequired: 'Please enter a job name',
+        nameRequired: 'Please enter a job name'
       },
       previewUnavailable: '// Preview unavailable: {error}',
       modelConfigLoadFailed: 'Failed to read model config; cannot filter by hermes.json: {error}',
@@ -751,24 +765,24 @@ export default {
         deleteFailed: 'Delete failed',
         jobUpdated: 'Job updated',
         jobCreated: 'Job created',
-        fetchRunsFailed: 'Failed to load run history',
+        fetchRunsFailed: 'Failed to load run history'
       },
       templates: {
         morningReport: {
           label: 'Morning report',
           description: 'Summarize key updates every morning and deliver',
-          payloadText: 'Please summarize today’s key updates and output a readable morning brief.',
+          payloadText: 'Please summarize today’s key updates and output a readable morning brief.'
         },
         heartbeatCheck: {
           label: 'Health check',
           description: 'Run periodic health checks',
-          payloadText: 'Check service health. If abnormal, give a brief reason and suggestion.',
+          payloadText: 'Check service health. If abnormal, give a brief reason and suggestion.'
         },
         mainReminder: {
           label: 'Main reminder',
           description: 'Post a system reminder in the main session',
-          payloadText: 'Reminder: review today’s TODOs and sync progress.',
-        },
+          payloadText: 'Reminder: review today’s TODOs and sync progress.'
+        }
       },
       expandedRow: {
         lastRunTime: 'Last Run Time',
@@ -776,8 +790,8 @@ export default {
         consecutiveErrors: 'Consecutive Errors',
         errorDetail: 'Error Detail',
         nextRunTime: 'Next Run Time',
-        noData: 'No run data yet',
-      },
+        noData: 'No run data yet'
+      }
     },
     models: {
       overview: {
@@ -789,8 +803,8 @@ export default {
           providers: 'Providers',
           modelRefs: 'Model refs',
           editing: 'Editing',
-          primaryModel: 'Primary model',
-        },
+          primaryModel: 'Primary model'
+        }
       },
       actions: {
         refreshConfig: 'Refresh config',
@@ -799,13 +813,13 @@ export default {
         saveChanges: 'Save changes',
         prev: 'Previous',
         nextToModels: 'Next: Models',
-        nextToPreview: 'Next: Preview',
+        nextToPreview: 'Next: Preview'
       },
       workbench: {
         title: 'Provider workbench',
         searchPlaceholder: 'Search provider / Base URL / models',
         empty: 'No providers configured',
-        emptyHint: 'Please check models.providers config or token permissions',
+        emptyHint: 'Please check models.providers config or token permissions'
       },
       editor: {
         titleEdit: 'Edit provider: {id}',
@@ -813,12 +827,12 @@ export default {
         titleSelect: 'Select a provider to edit',
         empty: 'Select a provider from the left to edit',
         modelsCount: '{count} models',
-        rawConfigTitle: 'View raw provider config (API key masked)',
+        rawConfigTitle: 'View raw provider config (API key masked)'
       },
       tabs: {
         basic: '1. Basic',
         models: '2. Models',
-        preview: '3. Preview',
+        preview: '3. Preview'
       },
       form: {
         providerId: 'Provider ID',
@@ -838,20 +852,21 @@ export default {
         modelInputTypesPlaceholder: 'Select supported input types',
         models: 'Models',
         modelsPlaceholder: 'Enter model ID and press Enter to add',
-        modelsHint: 'Click "Add model" button to add models. Each model can have its own input types.',
+        modelsHint:
+          'Click "Add model" button to add models. Each model can have its own input types.',
         addModel: 'Add model',
         modelIdPlaceholder: 'Model ID',
         setAsDefault: 'Set Default',
         isDefault: 'Default',
         pendingDefault: 'Pending',
         detectedModels: 'Detected',
-        modelsCount: '{count} models',
+        modelsCount: '{count} models'
       },
       fields: {
         providerId: 'Provider ID',
         baseUrl: 'Base URL',
         models: 'Models',
-        apiKey: 'API key',
+        apiKey: 'API key'
       },
       table: {
         providers: {
@@ -860,16 +875,16 @@ export default {
           baseUrl: 'Base URL',
           models: 'Model',
           sources: 'Sources',
-          actions: 'Actions',
+          actions: 'Actions'
         },
         models: {
           modelRef: 'Model ref',
-          actions: 'Actions',
-        },
+          actions: 'Actions'
+        }
       },
       default: {
         active: 'Active',
-        set: 'Set primary',
+        set: 'Set primary'
       },
       preview: {
         modelDiffTitle: 'Model changes',
@@ -891,15 +906,18 @@ export default {
         missingRequired: 'Missing required fields: {fields}.',
         noChangesHint: 'No config diff detected. Save is disabled.',
         warnings: {
-          overwriteApiKey: 'A new API key will be written. The plaintext key will not be shown after saving.',
-          migrateLegacyPath: 'Legacy provider path will be migrated (models.<id> -> models.providers.<id>).',
-          removeModels: 'Some configured models will be removed. Ensure this won’t impact primary model or routing rules.',
+          overwriteApiKey:
+            'A new API key will be written. The plaintext key will not be shown after saving.',
+          migrateLegacyPath:
+            'Legacy provider path will be migrated (models.<id> -> models.providers.<id>).',
+          removeModels:
+            'Some configured models will be removed. Ensure this won’t impact primary model or routing rules.',
           providerIdMissing: 'Provider ID is missing',
           providerIdExists: 'Provider ID already exists; use another ID',
           baseUrlMissing: 'Base URL is missing',
           modelListMissing: 'Model list is missing',
-          apiKeyMissing: 'API key is missing; cannot create provider',
-        },
+          apiKeyMissing: 'API key is missing; cannot create provider'
+        }
       },
       confirm: {
         titleEdit: 'Confirm provider update',
@@ -909,21 +927,24 @@ export default {
         editProvider: 'Edit provider',
         createProvider: 'Create provider',
         deleteProvider: 'Delete provider {id}?',
-        deleteDefaultProviderBlocked: 'Cannot delete the primary provider. Please switch the primary model first.',
+        deleteDefaultProviderBlocked:
+          'Cannot delete the primary provider. Please switch the primary model first.',
         modelDiffTitle: 'Model changes (+{added} / -{removed})',
         warningPrefix: 'The changes below will be written to config. On confirm it will call ',
-        warningSuffix: '.',
+        warningSuffix: '.'
       },
       createModal: {
         title: 'Create provider',
-        flowHint: 'Flow: fill basic -> manually enter model -> preview -> create provider.',
+        flowHint: 'Flow: fill basic -> manually enter model -> preview -> create provider.'
       },
       messages: {
         primaryModelRequired: 'Please select or enter a primary model first',
         primaryModelSaved: 'Primary model saved: {model}',
         noModelsForProvider: 'This provider has no models; cannot set as primary',
-        deleteDefaultProviderBlocked: 'Cannot delete the primary provider. Please switch the primary model first.',
-        deleteWhitelistProviderBlocked: 'This provider comes from a model allowlist (e.g. agents.defaults.models) and cannot be deleted',
+        deleteDefaultProviderBlocked:
+          'Cannot delete the primary provider. Please switch the primary model first.',
+        deleteWhitelistProviderBlocked:
+          'This provider comes from a model allowlist (e.g. agents.defaults.models) and cannot be deleted',
         providerDeleted: 'Provider deleted: {id}',
         deleteFailed: 'Delete failed',
         apiKeyNotReadableForProbe: 'API key is not readable for probing',
@@ -937,7 +958,7 @@ export default {
         providerSavedKeepKey: 'Provider saved (kept existing API key)',
         providerCreated: 'Provider created',
         createFailed: 'Create failed',
-        saveFailed: 'Save failed: {reason}',
+        saveFailed: 'Save failed: {reason}'
       },
       validation: {
         providerIdRequired: 'Provider ID is required',
@@ -946,25 +967,26 @@ export default {
         baseUrlRequired: 'Base URL is required',
         modelsRequired: 'Models are required',
         apiKeyRequired: 'API key is required',
-        apiKeyRequiredForCreate: 'API key is required when creating a provider',
+        apiKeyRequiredForCreate: 'API key is required when creating a provider'
       },
       probe: {
         failed: 'Probe failed',
         fetchFailed: 'Failed to fetch {url}: {reason}',
         fetchFailedCors: 'Failed to fetch {url} (CORS blocked). Try probing via Gateway instead.',
         noModelsParsed: 'No models parsed from {url}',
-        gatewayNoModels: 'Gateway returned no available models. Check provider config and ensure config has been applied.',
+        gatewayNoModels:
+          'Gateway returned no available models. Check provider config and ensure config has been applied.',
         selectTitle: 'Select probed model',
         selectHint: '{count} models were detected. Please choose one to replace the current model.',
         selectRequired: 'Please choose a model first',
-        confirmSelect: 'Use this model',
+        confirmSelect: 'Use this model'
       },
       index: {
         title: 'Model index',
         hint: 'Configured models from hermes.json. Quickly set any model as primary in the list.',
         empty: 'No models configured',
-        emptyHint: 'Add models in the workbench above, then save.',
-      },
+        emptyHint: 'Add models in the workbench above, then save.'
+      }
     },
     dashboard: {
       title: 'Dashboard',
@@ -976,7 +998,7 @@ export default {
         server: 'Server',
         enabled: 'enabled',
         online: 'Online',
-        offline: 'Offline',
+        offline: 'Offline'
       },
       recentConversations: 'Recent Conversations',
       recentCronRuns: 'Recent Cron Runs',
@@ -991,18 +1013,19 @@ export default {
       messagesCount: '{count} messages',
       hero: {
         title: 'Hermes overview',
-        subtitle: 'Use official Usage aggregates to track tokens/cost, active sessions, and error distribution, then drill down into sessions.',
+        subtitle:
+          'Use official Usage aggregates to track tokens/cost, active sessions, and error distribution, then drill down into sessions.'
       },
       connection: {
         connected: 'Gateway connected',
         connecting: 'Gateway connecting',
         reconnecting: 'Gateway reconnecting',
         failed: 'Gateway connection failed',
-        disconnected: 'Gateway disconnected',
+        disconnected: 'Gateway disconnected'
       },
       lastUpdated: {
         none: 'Not synced yet',
-        text: 'Last synced {time}',
+        text: 'Last synced {time}'
       },
       range: {
         today: 'Today',
@@ -1011,24 +1034,25 @@ export default {
         last15d: 'Last 15d',
         last30d: 'Last 30d',
         all: 'All',
-        to: 'to',
+        to: 'to'
       },
       usageMode: {
         tokens: 'Tokens',
         cost: 'Cost',
         tokensShort: 'tokens',
-        costShort: 'cost',
+        costShort: 'cost'
       },
       usage: {
         error: 'Failed to fetch usage: {error}',
         coverage: {
           none: 'No usage sessions in this range',
-          text: 'Usage coverage {withUsage}/{total} sessions',
+          text: 'Usage coverage {withUsage}/{total} sessions'
         },
         totalTokens: 'Total tokens',
         totalCost: 'Total cost',
         missingCostEntries: 'Missing cost entries: {count}',
-        unavailableHermesRest: 'Token usage statistics are not supported in Hermes REST mode. Connect to an ACP Gateway to view usage.',
+        unavailableHermesRest:
+          'Token usage statistics are not supported in Hermes REST mode. Connect to an ACP Gateway to view usage.',
         segments: {
           input: 'Input',
           output: 'Output',
@@ -1037,8 +1061,8 @@ export default {
           inputCost: 'Input cost',
           outputCost: 'Output cost',
           cacheReadCost: 'Cache read cost',
-          cacheWriteCost: 'Cache write cost',
-        },
+          cacheWriteCost: 'Cache write cost'
+        }
       },
       stats: {
         sessions: 'Sessions',
@@ -1046,7 +1070,7 @@ export default {
         models: 'Models configured',
         skills: 'Skills installed',
         totalTokens: 'Total tokens',
-        modelsSeen: 'Models Seen',
+        modelsSeen: 'Models Seen'
       },
       cards: {
         kpis: 'Usage KPIs',
@@ -1054,53 +1078,53 @@ export default {
         structure: 'Usage breakdown',
         top: 'Top distribution',
         sessions: 'Sessions overview (with usage)',
-        events: 'Live event stream',
+        events: 'Live event stream'
       },
       kpis: {
         messages: {
           label: 'Messages',
           hint: '{days} days in range',
-          emptyHint: 'No message data',
+          emptyHint: 'No message data'
         },
         toolCalls: {
           label: 'Tool calls',
           hint: 'Top tool {tool}',
-          emptyHint: 'No tool calls',
+          emptyHint: 'No tool calls'
         },
         errorRate: {
           label: 'Error rate',
-          hint: '{errors} errors / {messages} messages',
+          hint: '{errors} errors / {messages} messages'
         },
         avgTokens: {
           label: 'Avg tokens / message',
-          hint: 'Computed as total tokens / total messages',
+          hint: 'Computed as total tokens / total messages'
         },
         cacheReadRatio: {
           label: 'Cache read ratio',
-          hint: '{cacheRead} / {input} input',
+          hint: '{cacheRead} / {input} input'
         },
         activeDays: {
           label: 'Active days',
-          hint: '{days} days with activity in range',
+          hint: '{days} days with activity in range'
         },
         totalTokens: {
           label: 'Total Tokens',
-          hint: 'Cumulative tokens in range',
+          hint: 'Cumulative tokens in range'
         },
         lastUsed: {
           label: 'Last Used',
           hint: 'Most recent token-consuming turn',
-          never: 'Never',
-        },
+          never: 'Never'
+        }
       },
       trend: {
         empty: 'No trend data in this range',
-        pointTitle: '{date} · {value} · Messages {messages} · Errors {errors}',
+        pointTitle: '{date} · {value} · Messages {messages} · Errors {errors}'
       },
       top: {
         models: 'Top Models',
         providers: 'Top Providers',
-        tools: 'Top Tools',
+        tools: 'Top Tools'
       },
       sessions: {
         columns: {
@@ -1108,16 +1132,16 @@ export default {
           peer: 'Peer',
           messages: 'Messages',
           usage: 'Usage',
-          lastActivity: 'Last active',
+          lastActivity: 'Last active'
         },
         summary: 'Model: {model}, messages: {messages}, last: {last}',
-        usageLabel: 'Usage ({mode})',
+        usageLabel: 'Usage ({mode})'
       },
       events: {
         placeholder: 'Filter events, e.g. chat / agent / tool',
         empty: 'Waiting for events...',
-        payloadUnserializable: '[payload not serializable]',
-      },
+        payloadUnserializable: '[payload not serializable]'
+      }
     },
     chat: {
       title: 'Live Chat (Workbench)',
@@ -1127,13 +1151,13 @@ export default {
         untitled: 'New Chat',
         msgCount: 'messages',
         renameConversation: 'Rename',
-        remoteModelHint: 'Actual model shown for local servers only',
+        remoteModelHint: 'Actual model shown for local servers only'
       },
       actions: {
         refreshChat: 'Refresh',
         send: 'Send',
         stop: 'Stop',
-        clearInput: 'Clear input',
+        clearInput: 'Clear input'
       },
       tokens: {
         total: 'Total',
@@ -1142,23 +1166,23 @@ export default {
         cacheRead: 'Cache read',
         cacheWrite: 'Cache write',
         loading: 'Loading tokens...',
-        unavailable: 'Tokens -',
+        unavailable: 'Tokens -'
       },
       stats: {
         total: 'Total messages',
         assistant: 'Assistant replies',
         lastMessage: 'Last message',
-        breakdown: 'User {user} · Assistant {assistant} · System {system}',
+        breakdown: 'User {user} · Assistant {assistant} · System {system}'
       },
       sessionKey: 'Session key',
       sessionKeyPlaceholder: 'Enter or select session key (auto loads on select)',
       sessionTag: 'Session {key}',
       session: {
         label: 'Label',
-        model: 'Model',
+        model: 'Model'
       },
       preferences: {
-        autoFollow: 'Auto follow newest messages',
+        autoFollow: 'Auto follow newest messages'
       },
       filters: {
         title: 'Message filter',
@@ -1166,32 +1190,34 @@ export default {
           all: 'All roles',
           user: 'User only',
           assistant: 'Assistant only',
-          system: 'System only',
-        },
+          system: 'System only'
+        }
       },
       roles: {
         user: 'User',
         assistant: 'Assistant',
         tool: 'Tool',
-        system: 'System',
+        system: 'System'
       },
       image: {
         preview: 'Image Preview',
-        unavailable: 'Image Unavailable',
+        unavailable: 'Image Unavailable'
       },
       sync: {
         syncing: 'Syncing...',
         syncedAt: 'Synced {time}',
-        notSynced: 'Not synced',
+        notSynced: 'Not synced'
       },
       messages: {
         abortRequested: 'Stop requested',
         abortFailed: 'Stop failed: {reason}',
-        emptyFiltered: 'No messages for current filter',
+        waitForCurrentResponse: 'Wait for the current response to finish or stop it first',
+        emptyFiltered: 'No messages for current filter'
       },
       input: {
-        placeholder: 'Type a message (type / for Hermes commands, Enter to send, Shift+Enter for new line)',
-        sendHint: 'Sending to: {key} | Enter send, Shift+Enter newline, Ctrl/Cmd+Enter send',
+        placeholder:
+          'Type a message (type / for Hermes commands, Enter to send, Shift+Enter for new line)',
+        sendHint: 'Sending to: {key} | Enter send, Shift+Enter newline, Ctrl/Cmd+Enter send'
       },
       quickReplies: {
         title: 'Quick replies',
@@ -1200,7 +1226,8 @@ export default {
         empty: 'No quick replies',
         confirmDelete: 'Delete this quick reply?',
         searchPlaceholder: 'Search quick replies...',
-        storageHint: 'Stored in this browser. For long-term content, consider putting it in workspace.',
+        storageHint:
+          'Stored in this browser. For long-term content, consider putting it in workspace.',
         dirLabel: 'Suggested dir: ',
         copyDir: 'Copy directory',
         messages: {
@@ -1211,7 +1238,7 @@ export default {
           deleted: 'Deleted',
           inserted: 'Inserted: {title}',
           dirCopied: 'Workspace dir copied',
-          dirCopyFailed: 'Copy failed. Please copy the path manually.',
+          dirCopyFailed: 'Copy failed. Please copy the path manually.'
         },
         modal: {
           createTitle: 'Create quick reply',
@@ -1220,8 +1247,8 @@ export default {
           titlePlaceholder: 'Enter title',
           content: 'Content',
           contentPlaceholder: 'Enter content',
-          saveChanges: 'Save changes',
-        },
+          saveChanges: 'Save changes'
+        }
       },
       slash: {
         title: 'Hermes slash commands',
@@ -1230,22 +1257,22 @@ export default {
         categories: {
           common: 'Common',
           session: 'Session',
-          modelAndContext: 'Model & context',
+          modelAndContext: 'Model & context'
         },
         commands: {
           new: {
             description: 'Reset and start a new session; optionally specify model',
             defaultLabel: 'Default model',
-            defaultDesc: 'Start a new session with the default model',
+            defaultDesc: 'Start a new session with the default model'
           },
           skill: {
-            description: 'Run a skill (auto suggests your skills)',
+            description: 'Run a skill (auto suggests your skills)'
           },
           model: {
-            description: 'View or switch model',
+            description: 'View or switch model'
           },
           status: {
-            description: 'View session and system status',
+            description: 'View session and system status'
           },
           subagents: {
             description: 'Inspect/control sub-agent runs (list/kill/log/info/send/steer/spawn)',
@@ -1256,26 +1283,26 @@ export default {
               info: 'View sub-agent run details',
               send: 'Send a message to a sub-agent',
               steer: 'Steer a sub-agent run (append instructions)',
-              spawn: 'Spawn a sub-agent deterministically (auto suggests agentId)',
-            },
+              spawn: 'Spawn a sub-agent deterministically (auto suggests agentId)'
+            }
           },
-          noMatch: 'No matching command. Supported: /new, /skill, /model, /status, /subagents.',
+          noMatch: 'No matching command. Supported: /new, /skill, /model, /status, /subagents.'
         },
         requiresFlag: 'Requires {flag}',
         fromConfig: 'From config',
         skills: {
           loading: 'Loading skills...',
-          noMatch: 'No skills available',
+          noMatch: 'No skills available'
         },
         models: {
           loading: 'Loading models...',
-          noMatch: 'No models available',
+          noMatch: 'No models available'
         },
         subagents: {
           loading: 'Loading agents...',
           noMatch: 'No matching agentId, or no agents.list configured.',
-          agentTag: 'Agent',
-        },
+          agentTag: 'Agent'
+        }
       },
       agentStatus: {
         sending: 'Sending...',
@@ -1289,7 +1316,7 @@ export default {
         aborted: 'Stopped',
         error: 'Error',
         errorWithDetail: 'Error: {detail}',
-        idle: 'Idle',
+        idle: 'Idle'
       },
       agentDetails: {
         show: 'Show details',
@@ -1300,7 +1327,7 @@ export default {
         elapsed: 'Elapsed',
         viewPartialResult: 'View partialResult',
         viewResult: 'View result',
-        toolFailed: 'Tool execution failed (error result returned)',
+        toolFailed: 'Tool execution failed (error result returned)'
       },
       structured: {
         thinking: 'Thinking',
@@ -1308,7 +1335,7 @@ export default {
         signature: {
           details: 'View signature',
           id: 'Signature ID',
-          summary: 'Summary',
+          summary: 'Summary'
         },
         toolCall: 'Tool call',
         timeout: 'Timeout {seconds}s',
@@ -1322,8 +1349,8 @@ export default {
         issuesCount: '{count} issues',
         issues: 'Issues',
         viewArgs: 'View args',
-        hideArgs: 'Hide args',
-      },
+        hideArgs: 'Hide args'
+      }
     },
     sessions: {
       hermesRest: {
@@ -1333,13 +1360,13 @@ export default {
         exportJson: 'Export JSON',
         untitled: 'Untitled',
         notFound: 'Conversation not found',
-        notFoundHint: 'This conversation may have been deleted.',
+        notFoundHint: 'This conversation may have been deleted.'
       },
       roles: {
         user: 'User',
         assistant: 'AI',
         tool: 'Tool',
-        system: 'System',
+        system: 'System'
       },
       list: {
         title: 'Sessions',
@@ -1348,21 +1375,21 @@ export default {
           totalSessions: 'Total sessions',
           active24h: 'Active (24h)',
           totalMessages: 'Total messages',
-          uniqueChannels: 'Channels',
+          uniqueChannels: 'Channels'
         },
         units: {
           messages: 'msgs',
-          channels: 'chs',
+          channels: 'chs'
         },
         searchPlaceholder: 'Search key / agent / channel / peer / model',
         clearFilters: 'Reset filters',
         sort: {
           recent: 'Sort by recent activity',
-          messages: 'Sort by message count',
+          messages: 'Sort by message count'
         },
         filters: {
           allChannels: 'All channels',
-          allModels: 'All models',
+          allModels: 'All models'
         },
         columns: {
           session: 'Session',
@@ -1370,11 +1397,11 @@ export default {
           model: 'Model',
           tokenTotal: 'Token total',
           lastActivity: 'Last active',
-          actions: 'Actions',
+          actions: 'Actions'
         },
         badges: {
           active24h: 'Active (24h)',
-          inactive: 'Inactive',
+          inactive: 'Inactive'
         },
         listTitle: 'Session list',
         listCount: '{current} / {total}',
@@ -1383,7 +1410,7 @@ export default {
           peer: 'Peer',
           messageCount: 'Messages',
           model: 'Model',
-          lastActivity: 'Last active',
+          lastActivity: 'Last active'
         },
         activeTime: 'Last active: {time}',
         viewDetail: 'View detail',
@@ -1408,13 +1435,13 @@ export default {
           peer: 'Peer',
           peerPlaceholder: 'Optional, auto-generated by default',
           label: 'Label',
-          labelPlaceholder: 'Optional, session label',
+          labelPlaceholder: 'Optional, session label'
         },
         confirmReset: 'Reset this session?',
         summary: 'Summary: {text}',
         emptySide: 'Select a session on the left to view/export/reset/delete.',
         deleteSuccess: 'Session deleted',
-        deleteFailed: 'Delete failed',
+        deleteFailed: 'Delete failed'
       },
       detail: {
         title: 'Session Detail',
@@ -1427,7 +1454,7 @@ export default {
           label: 'Label',
           messages: 'Messages',
           tokens: 'Token Usage',
-          lastActivity: 'Last Activity',
+          lastActivity: 'Last Activity'
         },
         confirmReset: 'Reset this session?',
         confirmDelete: 'Delete this session? This action cannot be undone.',
@@ -1438,39 +1465,40 @@ export default {
         exportSuccess: 'Exported',
         exportFailed: 'Export failed',
         labelSaved: 'Label saved',
-        labelFailed: 'Failed to save label',
-      },
+        labelFailed: 'Failed to save label'
+      }
     },
     monitor: {
       actions: {
-        refreshAll: 'Refresh all',
+        refreshAll: 'Refresh all'
       },
-      subtitle: 'Unified view of presence, logs tailing, approvals policies, and update run results.',
+      subtitle:
+        'Unified view of presence, logs tailing, approvals policies, and update run results.',
       summary: {
         presence: 'Presence {online}/{total}',
         logs: 'Logs {count}',
         lastSync: 'Last sync: {time}',
-        neverSynced: 'Never synced',
+        neverSynced: 'Never synced'
       },
       connection: {
         connected: 'Gateway connected',
         connecting: 'Gateway connecting',
         reconnecting: 'Gateway reconnecting',
         failed: 'Gateway connection failed',
-        disconnected: 'Gateway disconnected',
+        disconnected: 'Gateway disconnected'
       },
       tabs: {
         presence: 'Presence (system-presence)',
         logs: 'Live logs (logs.tail)',
         approvals: 'Approvals (exec.approvals.*)',
-        update: 'Update & restart (update.run)',
+        update: 'Update & restart (update.run)'
       },
       methodNotSupported: 'This Gateway does not support {method}',
       errors: {
         healthFailed: 'Failed to fetch health',
         statusFailed: 'Failed to fetch status',
         presenceFailed: 'Failed to fetch presence',
-        logsFailed: 'Failed to fetch logs',
+        logsFailed: 'Failed to fetch logs'
       },
       presence: {
         title: 'Presence',
@@ -1478,7 +1506,7 @@ export default {
         notSupported: 'This Gateway does not support system-presence. Please upgrade and retry.',
         hint: 'From system-presence. Observe Gateway and clients online status.',
         empty: 'No presence reported',
-        updatedAt: 'Updated at {time}',
+        updatedAt: 'Updated at {time}'
       },
       diag: {
         title: 'Health / status diagnostics',
@@ -1492,7 +1520,7 @@ export default {
         enabled: 'Enabled',
         healthUpdatedAt: 'Health updated {time}',
         diagUpdatedAt: 'Diag updated {time}',
-        lastProbeAt: ' · Last probe {time}',
+        lastProbeAt: ' · Last probe {time}'
       },
       logs: {
         title: 'Live logs',
@@ -1502,11 +1530,12 @@ export default {
         autoFollow: 'Auto follow',
         file: 'File: {file}',
         empty: 'No logs',
-        truncatedHint: 'Logs response is truncated. Only showing the latest part (increase maxBytes).',
+        truncatedHint:
+          'Logs response is truncated. Only showing the latest part (increase maxBytes).',
         notSupportedPrefix: 'This Gateway does not support ',
         notSupportedSuffix: '. Please upgrade and retry.',
         hintPrefix: 'From ',
-        hintSuffix: '. Supports cursor and level filtering.',
+        hintSuffix: '. Supports cursor and level filtering.'
       },
       approvals: {
         title: 'Approvals policy',
@@ -1524,12 +1553,12 @@ export default {
           file: 'File: ',
           status: 'Status: ',
           exists: 'Exists',
-          created: 'Created',
+          created: 'Created'
         },
         defaults: {
           security: 'Default security',
           ask: 'Default ask',
-          askFallback: 'Default askFallback',
+          askFallback: 'Default askFallback'
         },
         agent: {
           current: 'Current agent',
@@ -1538,14 +1567,14 @@ export default {
           newPlaceholder: 'Enter agent ID',
           actions: 'Actions',
           add: 'Add',
-          remove: 'Remove',
+          remove: 'Remove'
         },
         allowlist: {
           count: '{count} allowlist rules',
           newPlaceholder: 'Enter allowlist pattern',
           rulePlaceholder: 'Pattern, e.g. **/*.md',
           add: 'Add rule',
-          empty: 'No allowlist rules',
+          empty: 'No allowlist rules'
         },
         empty: 'No policy loaded',
         errors: {
@@ -1557,16 +1586,17 @@ export default {
           agentIdRequired: 'Agent ID is required',
           agentExists: 'Agent {id} already exists',
           cannotDeleteMain: 'main agent cannot be deleted',
-          allowlistPatternRequired: 'allowlist pattern is required',
-        },
+          allowlistPatternRequired: 'allowlist pattern is required'
+        }
       },
       update: {
         title: 'Update & restart',
         notSupportedPrefix: 'This Gateway does not support ',
         notSupportedSuffix: '. Please upgrade and retry.',
-        restartWarning: 'This operation will restart the Gateway. A brief disconnection is expected.',
+        restartWarning:
+          'This operation will restart the Gateway. A brief disconnection is expected.',
         actions: {
-          run: 'Run update',
+          run: 'Run update'
         },
         confirm: {
           title: 'Run update?',
@@ -1575,8 +1605,8 @@ export default {
             action: 'Action: run update.run (update & restart)',
             scope: 'Scope: Gateway',
             risk: 'Risk: triggers restart and disconnect',
-            confirm: 'Continue?',
-          },
+            confirm: 'Continue?'
+          }
         },
         params: {
           title: 'Parameters',
@@ -1586,16 +1616,16 @@ export default {
           note: 'note (optional)',
           notePlaceholder: 'e.g. triggered from Ops center',
           restartDelayMs: 'restartDelayMs (ms)',
-          timeoutMs: 'timeoutMs (ms)',
+          timeoutMs: 'timeoutMs (ms)'
         },
         messages: {
           ok: 'Update completed',
           skipped: 'Update skipped',
           failed: 'Update failed: {reason}',
-          unknownReason: 'Unknown reason',
+          unknownReason: 'Unknown reason'
         },
         errors: {
-          runFailed: 'Run update failed',
+          runFailed: 'Run update failed'
         },
         statusUnknown: 'Unknown',
         triggeredAt: 'Triggered at: {time}',
@@ -1604,11 +1634,11 @@ export default {
           mode: 'Mode',
           restart: 'Restart scheduling',
           noResponse: 'No response',
-          reason: 'Failure reason',
+          reason: 'Failure reason'
         },
         sentinel: 'Sentinel file: {path}',
-        stepsTitle: 'Steps ({count})',
-      },
+        stepsTitle: 'Steps ({count})'
+      }
     },
     settings: {
       statusConnected: 'Connected',
@@ -1621,7 +1651,8 @@ export default {
       themeLight: 'Light',
       themeDark: 'Dark',
       about: 'About',
-      aboutLine1: 'Hermes remote management terminal for connecting and managing your Hermes AI instances',
+      aboutLine1:
+        'Hermes remote management terminal for connecting and managing your Hermes AI instances',
       aboutLine2: 'Built with Electron + Vue 3 + Naive UI',
       currentConnection: 'Current connection',
       serverName: 'Server name',
@@ -1651,18 +1682,23 @@ export default {
       serverInfo: 'Server Info',
       serverPlatform: 'Platform',
       serverModel: 'Model',
-      serverLocalOnly: 'Version updates, config editing, and restart require the Hermes Management service running on the remote host (port 8643).',
+      serverLocalOnly:
+        'Version updates, config editing, and restart require the Hermes Management service running on the remote host (port 8643).',
       mgmtProbing: 'Probing management API...',
       mgmtNotAvailable: 'Remote management API not detected',
       mgmtRetryProbe: 'Retry probe',
-      mgmtInstallHint: 'Run `npm run mgmt-server:install` on the remote Hermes host, then click Retry (macOS only for now).',
+      mgmtInstallHint:
+        'Run `npm run mgmt-server:install` on the remote Hermes host, then click Retry (macOS only for now).',
       mgmtError: {
         'empty-url': 'Management API URL is empty — please ensure a valid server URL has been set.',
-        network: 'Cannot reach {url}. The management service may not be running or port 8643 may be blocked by a firewall.',
-        timeout: 'Connection to {url} timed out (5s). Check network connectivity and whether the service is alive.',
+        network:
+          'Cannot reach {url}. The management service may not be running or port 8643 may be blocked by a firewall.',
+        timeout:
+          'Connection to {url} timed out (5s). Check network connectivity and whether the service is alive.',
         http: '{url} returned an unexpected HTTP status — port 8643 may be occupied by another service.',
         parse: '{url} response was not JSON — port 8643 may be occupied by another service.',
-        'wrong-platform': '{url} responded to /health but reported a platform other than hermes-mgmt — port 8643 may be occupied by another service.',
+        'wrong-platform':
+          '{url} responded to /health but reported a platform other than hermes-mgmt — port 8643 may be occupied by another service.'
       },
       hermesVersion: 'Hermes Agent Version',
       currentVersion: 'Current version',
@@ -1677,7 +1713,7 @@ export default {
       updateFailed: 'Update failed',
       checkUpdateFailed: 'Update check failed',
       updateRetryHint: 'The network may be intermittent — you can retry later.',
-      versionTag: 'Version tag',
+      versionTag: 'Version tag'
     },
     tools: {
       title: 'Tools',
@@ -1686,8 +1722,8 @@ export default {
         name: 'Name',
         category: 'Category',
         description: 'Description',
-        status: 'Status',
-      },
+        status: 'Status'
+      }
     },
     nodes: {
       title: 'Nodes',
@@ -1699,7 +1735,7 @@ export default {
       pairCodePlaceholder: 'Enter pairing code',
       pairCodeRequired: 'Please enter the pairing code',
       pairSuccess: 'Paired successfully',
-      pairFailed: 'Pairing failed',
+      pairFailed: 'Pairing failed'
     },
     system: {
       subtitle: 'Manage and monitor the running status of all Gateway services',
@@ -1722,18 +1758,20 @@ export default {
       lastUpdated: 'Last updated: {time}',
       restart: {
         title: 'Gateway Control',
-        warning: 'Restarting the gateway will briefly disconnect all active connections. Running tasks may be affected.',
+        warning:
+          'Restarting the gateway will briefly disconnect all active connections. Running tasks may be affected.',
         description: 'Restart the Hermes Gateway process',
         action: 'Restart Gateway',
         confirmTitle: 'Confirm Gateway Restart',
-        confirmMessage: 'All WebSocket connections will be disconnected after restart. Clients will auto-reconnect. Continue?',
+        confirmMessage:
+          'All WebSocket connections will be disconnected after restart. Clients will auto-reconnect. Continue?',
         confirm: 'Confirm Restart',
         delayLabel: 'Delay',
         delayUnit: 'seconds',
         scheduled: 'Gateway will restart in {delay} seconds',
         failed: 'Restart request failed',
-        unknownError: 'Unknown error',
-      },
+        unknownError: 'Unknown error'
+      }
     },
     alerts: {
       subtitle: 'View and manage system alerts',
@@ -1755,7 +1793,7 @@ export default {
       consecutiveFailures: 'consecutive failures',
       lastRunFailed: 'Last run failed',
       schedulerPaused: 'Scheduler paused',
-      schedulerPausedMsg: 'The cron scheduler is currently disabled. All cron jobs are paused.',
+      schedulerPausedMsg: 'The cron scheduler is currently disabled. All cron jobs are paused.'
     },
     files: {
       subtitle: 'Browse and manage agent workspace files',
@@ -1810,19 +1848,19 @@ export default {
         unorderedList: 'Unordered List',
         orderedList: 'Ordered List',
         horizontalRule: 'Horizontal Rule',
-        table: 'Table',
+        table: 'Table'
       },
       columns: {
         name: 'Name',
         size: 'Size',
         modified: 'Modified',
         type: 'Type',
-        actions: 'Actions',
+        actions: 'Actions'
       },
       types: {
         directory: 'Directory',
         file: 'File',
-        symlink: 'Symlink',
+        symlink: 'Symlink'
       },
       actions: {
         view: 'View',
@@ -1836,13 +1874,13 @@ export default {
         edit: 'Edit',
         rename: 'Rename',
         fullscreen: 'Fullscreen',
-        exitFullscreen: 'Exit Fullscreen',
-      },
+        exitFullscreen: 'Exit Fullscreen'
+      }
     },
     agents: {
       tabs: {
         list: 'Agent List',
-        world: 'Virtual Company',
+        world: 'Virtual Company'
       },
       subtitle: 'Manage all agent instances, view session statistics and token usage',
       notSupported: 'Agent listing is not supported by current Gateway',
@@ -1854,15 +1892,15 @@ export default {
         totalAgents: 'Total Agents',
         totalSessions: 'Total Sessions',
         totalTokens: 'Total Tokens',
-        configuredModels: 'Configured Models',
+        configuredModels: 'Configured Models'
       },
       units: {
-        tokens: 'K',
+        tokens: 'K'
       },
       status: {
         active: 'Active',
         idle: 'Idle',
-        offline: 'Offline',
+        offline: 'Offline'
       },
       columns: {
         agent: 'Agent',
@@ -1872,13 +1910,13 @@ export default {
         theme: 'Theme',
         model: 'Model',
         tools: 'Tools',
-        actions: 'Actions',
+        actions: 'Actions'
       },
       stats: {
         total: 'Total Agents',
         sessions: 'Total Sessions',
         tokens: 'Total Tokens',
-        default: 'Default Agent',
+        default: 'Default Agent'
       },
       lastUpdated: 'Last updated: {time}',
       actions: {
@@ -1886,7 +1924,7 @@ export default {
         detail: 'Detail',
         identity: 'Identity',
         model: 'Model',
-        tools: 'Tools',
+        tools: 'Tools'
       },
       confirmDelete: 'Delete this agent? This action cannot be undone.',
       modal: {
@@ -1894,7 +1932,7 @@ export default {
         detailTitle: 'Agent Detail',
         identityTitle: 'Set Identity',
         modelTitle: 'Set Model',
-        toolsTitle: 'Set Tool Permissions',
+        toolsTitle: 'Set Tool Permissions'
       },
       form: {
         id: 'Agent ID',
@@ -1915,7 +1953,8 @@ export default {
         modelPlaceholder: 'Select model',
         toolsAllow: 'Allowed Tools (Allow)',
         toolsDeny: 'Denied Tools (Deny)',
-        toolsAllowPlaceholder: 'Enter tool names, comma-separated, e.g.: sessions_list, read, write',
+        toolsAllowPlaceholder:
+          'Enter tool names, comma-separated, e.g.: sessions_list, read, write',
         toolsDenyPlaceholder: 'Enter tool names, comma-separated, e.g.: exec, bash, apply_patch',
         addTool: 'Add tool',
         commonTools: 'Common tools (click to add to allow list)',
@@ -1931,8 +1970,8 @@ export default {
           automation: 'Automation',
           nodes: 'Nodes',
           agents: 'Agents',
-          media: 'Media',
-        },
+          media: 'Media'
+        }
       },
       detail: {
         id: 'ID',
@@ -1941,7 +1980,7 @@ export default {
         emoji: 'Emoji',
         avatar: 'Avatar',
         sessions: 'Sessions',
-        tokens: 'Tokens',
+        tokens: 'Tokens'
       },
       messages: {
         created: 'Agent created',
@@ -1953,11 +1992,12 @@ export default {
         modelSaved: 'Model saved',
         modelFailed: 'Failed to save model',
         toolsSaved: 'Tool permissions saved',
-        toolsFailed: 'Failed to save tool permissions',
-      },
+        toolsFailed: 'Failed to save tool permissions'
+      }
     },
     office: {
-      subtitle: 'Multi-agent collaborative workspace with scenario creation, task delegation, agent communication',
+      subtitle:
+        'Multi-agent collaborative workspace with scenario creation, task delegation, agent communication',
       loadFailed: 'Failed to load data',
       floor: 'Office Floor',
       view3d: '3D View',
@@ -1986,7 +2026,7 @@ export default {
         working: 'Working',
         communicating: 'Communicating',
         idle: 'Idle',
-        offline: 'Offline',
+        offline: 'Offline'
       },
       wizard: {
         title: 'Scenario Creation Wizard',
@@ -2002,28 +2042,34 @@ export default {
           confirm: 'Confirm Config',
           confirmDesc: 'Confirm all settings',
           execution: 'Execute Tasks',
-          executionDesc: 'Execute creation and config',
+          executionDesc: 'Execute creation and config'
         },
         scenarioName: 'Scenario Name',
         scenarioNamePlaceholder: 'e.g., Product Development Collaboration',
         scenarioDescription: 'Description',
         scenarioDescriptionPlaceholder: 'Describe the goals and expected outcomes...',
-        scenarioHint: 'A scenario is a context where agents collaborate to achieve specific goals, containing multiple tasks and role assignments.',
-        selectAgentsHint: 'Select agents to participate in this scenario. They will collaborate to complete the tasks.',
+        scenarioHint:
+          'A scenario is a context where agents collaborate to achieve specific goals, containing multiple tasks and role assignments.',
+        selectAgentsHint:
+          'Select agents to participate in this scenario. They will collaborate to complete the tasks.',
         selectExisting: 'Select Existing Agents',
         aiCreateAgents: 'AI Auto-Create Agents',
-        aiCreateHint: 'Describe your scenario requirements and AI will automatically create suitable agent roles with configuration files.',
+        aiCreateHint:
+          'Describe your scenario requirements and AI will automatically create suitable agent roles with configuration files.',
         workspaceMode: 'Workspace Mode',
         workspaceIndependent: 'Independent Workspace',
         workspaceIndependentHint: 'Each agent has its own independent workspace directory',
         workspaceShared: 'Shared Workspace',
-        workspaceSharedHint: 'All agents share the team leader\'s workspace directory',
-        aiPromptPlaceholder: 'e.g., I need a development team to build a web application, including frontend, backend, and testing...',
+        workspaceSharedHint: "All agents share the team leader's workspace directory",
+        aiPromptPlaceholder:
+          'e.g., I need a development team to build a web application, including frontend, backend, and testing...',
         aiPromptRequired: 'Please describe your scenario requirements',
         generateAgents: 'Generate Agents',
-        generatingHint: 'Calling AI to generate agent list, please wait patiently and do not perform other operations...',
+        generatingHint:
+          'Calling AI to generate agent list, please wait patiently and do not perform other operations...',
         agentsGenerated: '{count} new agents generated',
-        agentsGeneratedWithExisting: '{newCount} new agents generated, {existingCount} already exist',
+        agentsGeneratedWithExisting:
+          '{newCount} new agents generated, {existingCount} already exist',
         allAgentsExist: 'All {count} agents already exist, will use existing agents',
         agentGenerationFailed: 'AI agent generation failed, using default config',
         generatedAgents: 'Generated Agents',
@@ -2053,7 +2099,8 @@ export default {
         taskTitle: 'Task Title',
         taskDescription: 'Task Description',
         taskPriority: 'Priority',
-        bindingsHint: 'Configure bindings between agents and external channels like Feishu groups, WeChat groups, etc.',
+        bindingsHint:
+          'Configure bindings between agents and external channels like Feishu groups, WeChat groups, etc.',
         addBinding: 'Add Binding',
         noBindingsHint: 'No bindings configured. Click the button above to add.',
         selectAgent: 'Select Agent',
@@ -2075,7 +2122,7 @@ export default {
         startWorking: 'Start Working',
         startExecution: 'Start Execution',
         executing: 'Executing...',
-        executionComplete: 'Execution Complete',
+        executionComplete: 'Execution Complete'
       },
       chat: {
         title: 'Agent Communication',
@@ -2091,7 +2138,7 @@ export default {
         executing: 'Executing',
         activeTasks: '{count} tasks in progress',
         processing: 'Processing...',
-        expandedTitle: 'Agent Collaboration Details',
+        expandedTitle: 'Agent Collaboration Details'
       },
       sessions: {
         title: "{name}'s Sessions",
@@ -2103,7 +2150,7 @@ export default {
         lastActivity: 'Last activity',
         messages: 'messages',
         messageCount: 'Message count',
-        tokenUsage: 'Token usage',
+        tokenUsage: 'Token usage'
       },
       status: {
         thinking: 'Thinking...',
@@ -2112,7 +2159,7 @@ export default {
         replying: 'Replying...',
         done: 'Done',
         error: 'Error',
-        idle: 'Idle',
+        idle: 'Idle'
       },
       tasks: {
         title: 'Task Management',
@@ -2124,14 +2171,14 @@ export default {
         priority: {
           low: 'Low Priority',
           medium: 'Medium Priority',
-          high: 'High Priority',
+          high: 'High Priority'
         },
         status: {
           pending: 'Pending',
           inProgress: 'In Progress',
           in_progress: 'In Progress',
           completed: 'Completed',
-          failed: 'Failed',
+          failed: 'Failed'
         },
         unassigned: 'Unassigned',
         start: 'Start',
@@ -2153,7 +2200,7 @@ export default {
           default: 'Default Mode',
           sessionsSeed: 'Sessions Seed Mode',
           broadcast: 'Broadcast Mode',
-          sequential: 'Sequential Mode',
+          sequential: 'Sequential Mode'
         },
         detailLabels: {
           status: 'Status',
@@ -2161,7 +2208,7 @@ export default {
           mode: 'Execution Mode',
           createdAt: 'Created At',
           description: 'Description',
-          assignedAgents: 'Assigned Agents',
+          assignedAgents: 'Assigned Agents'
         },
         detail: {
           status: 'Status',
@@ -2170,12 +2217,12 @@ export default {
           description: 'Description',
           createdAt: 'Created At',
           assignedAgents: 'Assigned Agents',
-          conversations: 'Execution Records',
-        },
+          conversations: 'Execution Records'
+        }
       },
       '3d': {
         resetView: 'Reset View',
-        hint: 'Drag to rotate, scroll to zoom',
+        hint: 'Drag to rotate, scroll to zoom'
       },
       scenarios: {
         title: 'Team Management',
@@ -2189,19 +2236,19 @@ export default {
           confirmed: 'Confirmed',
           executing: 'Executing',
           completed: 'Completed',
-          archived: 'Archived',
+          archived: 'Archived'
         },
         detail: {
           status: 'Status',
           description: 'Description',
-          createdAt: 'Created At',
+          createdAt: 'Created At'
         },
         agentExists: 'Exists',
         agentNotExists: 'Not Created',
         deleteTitle: 'Delete Team',
         deleteConfirm: 'Are you sure you want to delete team "{name}"?',
         deleteAgents: 'Also delete associated agents',
-        deleteBindings: 'Also clear binding configurations',
+        deleteBindings: 'Also clear binding configurations'
       },
       teamManagement: {
         title: 'Team Management',
@@ -2219,7 +2266,7 @@ export default {
           confirmed: 'Confirmed',
           executing: 'Executing',
           completed: 'Completed',
-          archived: 'Archived',
+          archived: 'Archived'
         },
         detail: {
           status: 'Status',
@@ -2228,7 +2275,7 @@ export default {
           agents: 'Agent List',
           bindings: 'Binding Configurations',
           noAgents: 'No agents',
-          noBindings: 'No binding configurations',
+          noBindings: 'No binding configurations'
         },
         agentDetail: {
           title: 'Agent Details',
@@ -2238,15 +2285,15 @@ export default {
           emoji: 'Emoji',
           skills: 'Skills',
           status: 'Status',
-          noSkills: 'No skills',
+          noSkills: 'No skills'
         },
         bindingDetail: {
           title: 'Binding Details',
           agentId: 'Agent ID',
           channelType: 'Channel Type',
           peerId: 'Peer ID',
-          peerKind: 'Peer Kind',
-        },
+          peerKind: 'Peer Kind'
+        }
       },
       teamTaskPanel: {
         title: 'Team Task Management',
@@ -2325,7 +2372,8 @@ export default {
         aiCreateWait: 'Waiting for AI response, please wait...',
         aiCreateTimeout: 'AI response timeout, please retry',
         aiTeamDescription: 'Team description for AI to generate',
-        aiTeamDescriptionPlaceholder: 'e.g., Create a content creation team with content planning, copywriting, and graphic design agents...',
+        aiTeamDescriptionPlaceholder:
+          'e.g., Create a content creation team with content planning, copywriting, and graphic design agents...',
         confirmAgents: 'Confirm Agent List',
         agentName: 'Agent Name',
         agentId: 'Agent ID',
@@ -2341,8 +2389,8 @@ export default {
         totalAgents: 'Total',
         deletedAgents: 'Deleted',
         failedAgents: 'Failed',
-        currentlyDeleting: 'Currently deleting',
-      },
+        currentlyDeleting: 'Currently deleting'
+      }
     },
     backup: {
       title: 'Data Backup',
@@ -2365,20 +2413,21 @@ export default {
       uploadSuccess: 'Backup uploaded: {filename}',
       uploadFailed: 'Failed to upload backup: {error}',
       restoreConfirmTitle: 'Confirm restore',
-      restoreConfirmContent: 'Restoring {filename} will overwrite current data. This cannot be undone. Continue?',
+      restoreConfirmContent:
+        'Restoring {filename} will overwrite current data. This cannot be undone. Continue?',
       restoreConfirmOk: 'Confirm restore',
       restoreConfirmCancel: 'Cancel',
       metrics: {
         total: 'Total backups',
         totalSize: 'Disk space',
-        latest: 'Latest backup',
+        latest: 'Latest backup'
       },
       columns: {
         filename: 'Filename',
         size: 'Size',
         date: 'Date',
-        actions: 'Actions',
-      },
+        actions: 'Actions'
+      }
     },
     logs: {
       title: 'System Logs',
@@ -2389,7 +2438,8 @@ export default {
       loading: 'Loading logs...',
       empty: 'No logs',
       cleared: 'Buffer cleared',
-      unavailableHermesRest: 'Live logs are not supported in Hermes REST mode. Connect to an ACP Gateway to view logs.',
+      unavailableHermesRest:
+        'Live logs are not supported in Hermes REST mode. Connect to an ACP Gateway to view logs.',
       searchPlaceholder: 'Search log content',
       levelFilter: 'Filter by level',
       subsystemFilter: 'Filter by subsystem',
@@ -2404,13 +2454,14 @@ export default {
         total: 'Total entries',
         errors: 'Errors',
         warns: 'Warnings',
-        fileSize: 'File size',
-      },
+        fileSize: 'File size'
+      }
     },
     insights: {
       title: 'Insights',
       refresh: 'Refresh',
-      unavailableHermesRest: 'Usage insights are not supported in Hermes REST mode. Connect to an ACP Gateway to view insights.',
+      unavailableHermesRest:
+        'Usage insights are not supported in Hermes REST mode. Connect to an ACP Gateway to view insights.',
       empty: 'No data',
       unknown: 'Unknown',
       calls: 'calls',
@@ -2430,13 +2481,14 @@ export default {
         totalTokens: 'Total tokens',
         totalCost: 'Total cost',
         sessions: 'Sessions',
-        errorRate: 'Error rate',
-      },
-    },
+        errorRate: 'Error rate'
+      }
+    }
   },
   myworld: {
     title: 'Virtual Company',
-    subtitle: 'Agent collaboration space with character movement, area interaction, real-time communication and visualization',
+    subtitle:
+      'Agent collaboration space with character movement, area interaction, real-time communication and visualization',
     loadFailed: 'Failed to load data',
     zoomIn: 'Zoom In',
     zoomOut: 'Zoom Out',
@@ -2493,14 +2545,14 @@ export default {
       automation: 'Automation',
       nodes: 'Nodes',
       agents: 'Agents',
-      media: 'Media',
+      media: 'Media'
     },
     characterStatus: {
       idle: 'Idle',
       walking: 'Walking',
       working: 'Working',
       talking: 'Talking',
-      resting: 'Resting',
+      resting: 'Resting'
     },
     areas: {
       reception: 'Reception',
@@ -2524,24 +2576,24 @@ export default {
       meetingSmall4: 'Meeting Room 4',
       manager1: 'Manager Office 1',
       manager2: 'Manager Office 2',
-      restroomM: 'Men\'s Room',
-      restroomF: 'Ladies\' Room',
+      restroomM: "Men's Room",
+      restroomF: "Ladies' Room",
       storage: 'Storage',
       pantry: 'Pantry',
-      openDesk: 'Open Office',
+      openDesk: 'Open Office'
     },
     entrance: 'Entrance',
     areaActions: {
       moveTo: 'Move to',
       workAt: 'Work here',
       restAt: 'Rest here',
-      meetAt: 'Meet here',
+      meetAt: 'Meet here'
     },
     controls: {
       hint: 'Scroll to zoom, drag to pan',
       zoom: 'Zoom',
       pan: 'Pan',
-      reset: 'Reset',
+      reset: 'Reset'
     },
     chat: {
       title: 'Employee Chat',
@@ -2550,24 +2602,24 @@ export default {
       close: 'Close',
       noMessages: 'No messages',
       you: 'You',
-      agent: '{name}',
+      agent: '{name}'
     },
     status: {
       loading: 'Loading...',
       connected: 'Connected',
-      disconnected: 'Disconnected',
+      disconnected: 'Disconnected'
     },
     popup: {
       sessions: 'Sessions',
       noSessions: 'No sessions',
-      close: 'Close',
+      close: 'Close'
     },
     hints: {
       clickToSelect: 'Click to select character',
       doubleClickToChat: 'Double-click to open sessions',
       clickToMove: 'Click empty area to move character',
       dragToPan: 'Drag to pan canvas',
-      scrollToZoom: 'Scroll to zoom',
-    },
-  },
+      scrollToZoom: 'Scroll to zoom'
+    }
+  }
 } as const

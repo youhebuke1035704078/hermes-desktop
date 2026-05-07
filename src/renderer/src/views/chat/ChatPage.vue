@@ -17,10 +17,20 @@ import {
   NTag,
   NText,
   NTooltip,
-  useMessage,
+  useMessage
 } from 'naive-ui'
 import type { SelectOption } from 'naive-ui'
-import { AddOutline, CopyOutline, CreateOutline, RefreshOutline, SendOutline, StopCircleOutline, TrashOutline, ChevronBackOutline, ChevronForwardOutline } from '@vicons/ionicons5'
+import {
+  AddOutline,
+  CopyOutline,
+  CreateOutline,
+  RefreshOutline,
+  SendOutline,
+  StopCircleOutline,
+  TrashOutline,
+  ChevronBackOutline,
+  ChevronForwardOutline
+} from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
@@ -34,7 +44,13 @@ import { formatDate, formatRelativeTime, parseSessionKey } from '@/utils/format'
 import { renderSimpleMarkdown } from '@/utils/markdown'
 import { writeTextToClipboard } from '@/utils/clipboard'
 import { collectStructuredMessageContent } from '@/utils/chat-copy'
-import type { AgentInstance, ChatMessage, ChatMessageContent, SessionsUsageSession, Skill } from '@/api/types'
+import type {
+  AgentInstance,
+  ChatMessage,
+  ChatMessageContent,
+  SessionsUsageSession,
+  Skill
+} from '@/api/types'
 import FallbackChip from '@/components/chat/FallbackChip.vue'
 
 const message = useMessage()
@@ -57,7 +73,9 @@ const isLocalServer = computed(() => {
   try {
     const host = new URL(url).hostname
     return host === 'localhost' || host === '127.0.0.1' || host === '::1'
-  } catch { return false }
+  } catch {
+    return false
+  }
 })
 
 /** Hermes REST mode — model name */
@@ -89,7 +107,9 @@ async function refreshNativeModelChain(): Promise<void> {
   try {
     const res = await window.api?.hermesConfig?.()
     nativeModelChain.value = Array.isArray(res?.fallback_chain_full)
-      ? res!.fallback_chain_full.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      ? res!.fallback_chain_full.filter(
+          (x): x is string => typeof x === 'string' && x.trim().length > 0
+        )
       : []
   } catch (err) {
     console.warn('[ChatPage] hermesConfig fetch failed (nativeModelChain stays empty):', err)
@@ -101,7 +121,7 @@ const roleFilterOptions = computed<SelectOption[]>(() => [
   { label: t('pages.chat.filters.roles.all'), value: 'all' },
   { label: t('pages.chat.filters.roles.user'), value: 'user' },
   { label: t('pages.chat.filters.roles.assistant'), value: 'assistant' },
-  { label: t('pages.chat.filters.roles.system'), value: 'system' },
+  { label: t('pages.chat.filters.roles.system'), value: 'system' }
 ])
 
 const BOTTOM_GAP = 32
@@ -142,6 +162,10 @@ function getMessageContent(entry: RenderMessage): string {
 
 async function copyMessageContent(entry: RenderMessage) {
   const content = getMessageContent(entry)
+  if (!content.trim()) {
+    message.warning(t('common.noContentToCopy'))
+    return
+  }
   try {
     await writeTextToClipboard(content)
     message.success(t('common.copied'))
@@ -179,7 +203,7 @@ const sessionOptions = computed(() => {
       const key = session.key.trim()
       return {
         key,
-        label: session.label,
+        label: session.label
       }
     })
     .filter((item) => {
@@ -189,7 +213,7 @@ const sessionOptions = computed(() => {
     })
     .map((item) => ({
       label: item.label ? `${item.label} (${item.key})` : item.key,
-      value: item.key,
+      value: item.key
     }))
 
   return options
@@ -201,8 +225,8 @@ const normalizedSessionKey = computed(() => {
   const firstSession = sessionStore.sessions[0]
   return firstSession?.key || ''
 })
-const selectedSession = computed(() =>
-  sessionStore.sessions.find((session) => session.key === normalizedSessionKey.value) || null
+const selectedSession = computed(
+  () => sessionStore.sessions.find((session) => session.key === normalizedSessionKey.value) || null
 )
 type SessionTokenUsage = {
   input: number
@@ -241,16 +265,14 @@ function createSessionTokenUsage(params: {
   const cacheReadValue = normalizeTokenValue(params.cacheRead)
   const cacheWriteValue = normalizeTokenValue(params.cacheWrite)
   const totalFromParts = inputValue + outputValue + cacheReadValue + cacheWriteValue
-  const totalValue = params.total === undefined
-    ? totalFromParts
-    : normalizeTokenValue(params.total)
+  const totalValue = params.total === undefined ? totalFromParts : normalizeTokenValue(params.total)
 
   return {
     input: inputValue,
     output: outputValue,
     cacheRead: cacheReadValue,
     cacheWrite: cacheWriteValue,
-    total: totalValue,
+    total: totalValue
   }
 }
 
@@ -260,7 +282,7 @@ const sessionTokenUsageFromList = computed<SessionTokenUsage | null>(() => {
   return createSessionTokenUsage({
     input: tokenUsage.totalInput,
     output: tokenUsage.totalOutput,
-    total: tokenUsage.totalInput + tokenUsage.totalOutput,
+    total: tokenUsage.totalInput + tokenUsage.totalOutput
   })
 })
 
@@ -271,16 +293,18 @@ const hermesTokenUsage = computed<SessionTokenUsage | null>(() => {
   if (!conv?.tokenUsage) return null
   return createSessionTokenUsage({
     input: conv.tokenUsage.totalInput,
-    output: conv.tokenUsage.totalOutput,
+    output: conv.tokenUsage.totalOutput
   })
 })
 
-const currentSessionTokenUsage = computed<SessionTokenUsage | null>(() =>
-  sessionTokenUsage.value || sessionTokenUsageFromList.value || hermesTokenUsage.value
+const currentSessionTokenUsage = computed<SessionTokenUsage | null>(
+  () => sessionTokenUsage.value || sessionTokenUsageFromList.value || hermesTokenUsage.value
 )
 
 function formatTokenCount(value: number): string {
-  return new Intl.NumberFormat(locale.value, { maximumFractionDigits: 0 }).format(Math.max(0, value))
+  return new Intl.NumberFormat(locale.value, { maximumFractionDigits: 0 }).format(
+    Math.max(0, value)
+  )
 }
 
 const sessionTokenMetricTags = computed(() => {
@@ -288,16 +312,41 @@ const sessionTokenMetricTags = computed(() => {
   if (!usage) return []
 
   const tags = [
-    { key: 'total', label: t('pages.chat.tokens.total'), value: formatTokenCount(usage.total), highlight: true },
-    { key: 'input', label: t('pages.chat.tokens.input'), value: formatTokenCount(usage.input), highlight: false },
-    { key: 'output', label: t('pages.chat.tokens.output'), value: formatTokenCount(usage.output), highlight: false },
+    {
+      key: 'total',
+      label: t('pages.chat.tokens.total'),
+      value: formatTokenCount(usage.total),
+      highlight: true
+    },
+    {
+      key: 'input',
+      label: t('pages.chat.tokens.input'),
+      value: formatTokenCount(usage.input),
+      highlight: false
+    },
+    {
+      key: 'output',
+      label: t('pages.chat.tokens.output'),
+      value: formatTokenCount(usage.output),
+      highlight: false
+    }
   ]
   // Only show cache metrics when they have non-zero values (REST API doesn't report them)
   if (usage.cacheRead > 0) {
-    tags.push({ key: 'cacheRead', label: t('pages.chat.tokens.cacheRead'), value: formatTokenCount(usage.cacheRead), highlight: false })
+    tags.push({
+      key: 'cacheRead',
+      label: t('pages.chat.tokens.cacheRead'),
+      value: formatTokenCount(usage.cacheRead),
+      highlight: false
+    })
   }
   if (usage.cacheWrite > 0) {
-    tags.push({ key: 'cacheWrite', label: t('pages.chat.tokens.cacheWrite'), value: formatTokenCount(usage.cacheWrite), highlight: false })
+    tags.push({
+      key: 'cacheWrite',
+      label: t('pages.chat.tokens.cacheWrite'),
+      value: formatTokenCount(usage.cacheWrite),
+      highlight: false
+    })
   }
   return tags
 })
@@ -308,7 +357,10 @@ const sessionTokenStatusText = computed(() =>
     : t('pages.chat.tokens.unavailable')
 )
 
-function resolveUsageSession(sessions: SessionsUsageSession[], key: string): SessionsUsageSession | null {
+function resolveUsageSession(
+  sessions: SessionsUsageSession[],
+  key: string
+): SessionsUsageSession | null {
   if (sessions.length === 0) return null
   const normalized = key.trim()
   return sessions.find((item) => item.key === normalized) || sessions[0] || null
@@ -334,7 +386,7 @@ async function fetchSessionTokenUsage(rawKey: string) {
   try {
     const usageResult = await wsStore.rpc.getSessionsUsage({
       key,
-      limit: 1,
+      limit: 1
     })
     if (requestId !== sessionTokenUsageRequestId) return
 
@@ -349,7 +401,7 @@ async function fetchSessionTokenUsage(rawKey: string) {
       output: usageSession.usage.output,
       cacheRead: usageSession.usage.cacheRead,
       cacheWrite: usageSession.usage.cacheWrite,
-      total: usageSession.usage.totalTokens,
+      total: usageSession.usage.totalTokens
     })
   } catch (error) {
     if (requestId !== sessionTokenUsageRequestId) return
@@ -388,7 +440,7 @@ function isThinkingOnlyStructuredMessage(structured: StructuredMessageView | nul
 
 function parseToolResultMessage(item: ChatMessage): StructuredMessageView | null {
   const toolResults: ToolResultItemView[] = []
-  
+
   let contentText = ''
   if (item.rawContent && Array.isArray(item.rawContent)) {
     for (const part of item.rawContent) {
@@ -399,21 +451,21 @@ function parseToolResultMessage(item: ChatMessage): StructuredMessageView | null
   } else if (item.content) {
     contentText = item.content
   }
-  
+
   toolResults.push({
     id: item.toolCallId,
     name: item.toolName || 'unknown',
     status: item.isError ? 'error' : undefined,
-    content: contentText,
+    content: contentText
   })
-  
+
   return {
     toolCalls: [],
     thinkings: [],
     toolResults,
     validationErrors: [],
     plainTexts: [],
-    images: [],
+    images: []
   }
 }
 
@@ -424,12 +476,12 @@ function buildImageUrl(part: ChatMessageContent): string | undefined {
   }
   if (part.mediaPath) {
     let mediaPath = part.mediaPath
-    
+
     // 处理 MEDIA: 前缀
     if (mediaPath.startsWith('MEDIA:')) {
       mediaPath = mediaPath.slice(6)
     }
-    
+
     // 从 file:// URL 中提取相对路径
     // 例如: file:///C:/Users/xxx/.hermes/media/browser/xxx.png -> browser/xxx.png
     if (mediaPath.startsWith('file://')) {
@@ -445,7 +497,7 @@ function buildImageUrl(part: ChatMessageContent): string | undefined {
         }
       }
     }
-    
+
     return `/api/media?path=${encodeURIComponent(mediaPath)}`
   }
   return undefined
@@ -459,7 +511,7 @@ function normalizeMediaPath(path: string): string {
   if (path.startsWith('MEDIA:')) {
     path = path.slice(6)
   }
-  
+
   // 从 file:// URL 中提取相对路径
   // 例如: file:///C:/Users/xxx/.hermes/media/browser/xxx.png -> browser/xxx.png
   if (path.startsWith('file://')) {
@@ -473,14 +525,14 @@ function normalizeMediaPath(path: string): string {
       return `browser/${path.slice(lastSlash + 1)}`
     }
   }
-  
+
   return path
 }
 
 function extractImageFromText(text: string): { images: ImageItemView[]; cleanedText: string } {
   const images: ImageItemView[] = []
   let cleanedText = text
-  
+
   const mdImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g
   let match
   while ((match = mdImageRegex.exec(text)) !== null) {
@@ -490,12 +542,12 @@ function extractImageFromText(text: string): { images: ImageItemView[]; cleanedT
       const imageUrl = `/api/media?path=${encodeURIComponent(normalizedPath)}`
       images.push({
         mimeType: `image/${imagePath.split('.').pop()?.toLowerCase() || 'png'}`,
-        url: imageUrl,
+        url: imageUrl
       })
       cleanedText = cleanedText.replace(match[0], '').trim()
     }
   }
-  
+
   const mediaPathRegex = /MEDIA:([^\s\n]+)/g
   while ((match = mediaPathRegex.exec(text)) !== null) {
     const imagePath = match[1]
@@ -504,12 +556,12 @@ function extractImageFromText(text: string): { images: ImageItemView[]; cleanedT
       const imageUrl = `/api/media?path=${encodeURIComponent(normalizedPath)}`
       images.push({
         mimeType: `image/${imagePath.split('.').pop()?.toLowerCase() || 'png'}`,
-        url: imageUrl,
+        url: imageUrl
       })
       cleanedText = cleanedText.replace(match[0], '').trim()
     }
   }
-  
+
   return { images, cleanedText }
 }
 
@@ -524,7 +576,7 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
     if (part.type === 'text' && part.text) {
       const { images: extractedImages, cleanedText } = extractImageFromText(part.text)
       images.push(...extractedImages)
-      
+
       const trimmedText = cleanedText.trim()
       if (trimmedText.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i)) {
         // Add "browser/" prefix for image filenames without a path
@@ -532,7 +584,7 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
         const imageUrl = `/api/media?path=${encodeURIComponent(imagePath)}`
         images.push({
           mimeType: `image/${trimmedText.split('.').pop()?.toLowerCase() || 'png'}`,
-          url: imageUrl,
+          url: imageUrl
         })
         // Also add the image filename to plainTexts to display it as text
         plainTexts.push(cleanedText)
@@ -540,14 +592,14 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
         plainTexts.push(cleanedText)
       }
     }
-    
+
     if (part.type === 'thinking' && part.thinking) {
       thinkings.push({
         text: part.thinking,
-        hasEncryptedSignature: false,
+        hasEncryptedSignature: false
       })
     }
-    
+
     if (part.type === 'tool_call') {
       let argumentsJson: string | undefined
       if (part.arguments) {
@@ -560,10 +612,10 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
       toolCalls.push({
         id: part.id,
         name: part.name || 'unknown',
-        argumentsJson,
+        argumentsJson
       })
     }
-    
+
     if (part.type === 'tool_result') {
       let contentText: string
       const rawContent = part.content
@@ -578,15 +630,15 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
       } else {
         contentText = String(rawContent || '')
       }
-      
+
       const { images: extractedImages, cleanedText } = extractImageFromText(contentText)
       images.push(...extractedImages)
-      
+
       toolResults.push({
         id: part.id,
         name: part.name || 'unknown',
         status: part.isError ? 'error' : undefined,
-        content: cleanedText,
+        content: cleanedText
       })
     }
 
@@ -597,12 +649,18 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
         bytes: part.bytes,
         data: part.data,
         mediaPath: part.mediaPath,
-        url: imageUrl,
+        url: imageUrl
       })
     }
   }
 
-  if (toolCalls.length === 0 && thinkings.length === 0 && toolResults.length === 0 && plainTexts.length === 0 && images.length === 0) {
+  if (
+    toolCalls.length === 0 &&
+    thinkings.length === 0 &&
+    toolResults.length === 0 &&
+    plainTexts.length === 0 &&
+    images.length === 0
+  ) {
     return null
   }
 
@@ -612,7 +670,7 @@ function parseRawContent(rawContent: ChatMessageContent[]): StructuredMessageVie
     toolResults,
     validationErrors: [],
     plainTexts,
-    images,
+    images
   }
 }
 
@@ -623,37 +681,44 @@ const visibleMessageEntries = computed<RenderMessage[]>(() => {
   for (let idx = 0; idx < list.length; idx += 1) {
     const item = list[idx]
     if (!item) continue
-    
+
     if (item.role === 'tool') {
       const structured = parseToolResultMessage(item)
       if (structured) {
         rendered.push({
           key: item.id || `tool-${idx}`,
           item,
-          structured,
+          structured
         })
       }
       continue
     }
-    
+
     if (item.rawContent && Array.isArray(item.rawContent)) {
       const structured = parseRawContent(item.rawContent)
-      if (structured && (structured.toolCalls.length > 0 || structured.thinkings.length > 0 || structured.toolResults.length > 0 || structured.plainTexts.length > 0 || structured.images.length > 0)) {
+      if (
+        structured &&
+        (structured.toolCalls.length > 0 ||
+          structured.thinkings.length > 0 ||
+          structured.toolResults.length > 0 ||
+          structured.plainTexts.length > 0 ||
+          structured.images.length > 0)
+      ) {
         rendered.push({
           key: item.id || `${item.role}-${idx}`,
           item,
-          structured,
+          structured
         })
         continue
       }
     }
-    
+
     const structured = parseStructuredMessage(item.content)
     if (isThinkingOnlyStructuredMessage(structured)) continue
     rendered.push({
       key: item.id || `${item.role}-${idx}`,
       item,
-      structured,
+      structured
     })
   }
 
@@ -739,7 +804,14 @@ interface ConfiguredModelOption {
 }
 
 interface SlashSuggestionItem {
-  kind: 'command' | 'skill' | 'model' | 'new-model' | 'new-default' | 'subagents-subcommand' | 'subagents-agent'
+  kind:
+    | 'command'
+    | 'skill'
+    | 'model'
+    | 'new-model'
+    | 'new-default'
+    | 'subagents-subcommand'
+    | 'subagents-agent'
   key: string
   preset?: SlashCommandPreset
   subagentsSubcommand?: SubagentsSubcommandPreset
@@ -755,14 +827,14 @@ const slashCommandPresets = computed<SlashCommandPreset[]>(() => [
     usage: '[model]',
     description: t('pages.chat.slash.commands.new.description'),
     category: t('pages.chat.slash.categories.session'),
-    expectArgs: true,
+    expectArgs: true
   },
   {
     command: '/skill',
     usage: '<name> [input]',
     description: t('pages.chat.slash.commands.skill.description'),
     category: t('pages.chat.slash.categories.modelAndContext'),
-    expectArgs: true,
+    expectArgs: true
   },
   {
     command: '/model',
@@ -770,57 +842,57 @@ const slashCommandPresets = computed<SlashCommandPreset[]>(() => [
     aliases: ['/models'],
     description: t('pages.chat.slash.commands.model.description'),
     category: t('pages.chat.slash.categories.modelAndContext'),
-    expectArgs: true,
+    expectArgs: true
   },
   {
     command: '/status',
     description: t('pages.chat.slash.commands.status.description'),
-    category: t('pages.chat.slash.categories.common'),
+    category: t('pages.chat.slash.categories.common')
   },
   {
     command: '/subagents',
     usage: 'list|kill|log|info|send|steer|spawn',
     description: t('pages.chat.slash.commands.subagents.description'),
     category: t('pages.chat.slash.categories.session'),
-    expectArgs: true,
-  },
+    expectArgs: true
+  }
 ])
 
 const subagentsSubcommandPresets = computed<SubagentsSubcommandPreset[]>(() => [
   {
     subcommand: 'list',
-    description: t('pages.chat.slash.commands.subagents.subcommands.list'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.list')
   },
   {
     subcommand: 'kill',
     usage: '<runId>',
-    description: t('pages.chat.slash.commands.subagents.subcommands.kill'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.kill')
   },
   {
     subcommand: 'log',
     usage: '<runId>',
-    description: t('pages.chat.slash.commands.subagents.subcommands.log'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.log')
   },
   {
     subcommand: 'info',
     usage: '<runId>',
-    description: t('pages.chat.slash.commands.subagents.subcommands.info'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.info')
   },
   {
     subcommand: 'send',
     usage: '<runId> <message>',
-    description: t('pages.chat.slash.commands.subagents.subcommands.send'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.send')
   },
   {
     subcommand: 'steer',
     usage: '<runId> <message>',
-    description: t('pages.chat.slash.commands.subagents.subcommands.steer'),
+    description: t('pages.chat.slash.commands.subagents.subcommands.steer')
   },
   {
     subcommand: 'spawn',
     usage: '<agentId> <task> [--model <model>] [--thinking <level>]',
-    description: t('pages.chat.slash.commands.subagents.subcommands.spawn'),
-  },
+    description: t('pages.chat.slash.commands.subagents.subcommands.spawn')
+  }
 ])
 const transcriptLoading = computed(() => chatStore.loading && messageList.value.length === 0)
 const refreshingChatData = computed(() => sessionStore.loading || chatStore.loading)
@@ -912,7 +984,8 @@ const agentBusyToolName = computed(() => {
 const agentStatusTagType = computed<'default' | 'success' | 'warning' | 'info' | 'error'>(() => {
   if (agentBusyToolName.value) return 'warning'
   const phase = currentAgentStatus.value.phase
-  if (phase === 'replying' || phase === 'sending' || phase === 'waiting' || phase === 'thinking') return 'info'
+  if (phase === 'replying' || phase === 'sending' || phase === 'waiting' || phase === 'thinking')
+    return 'info'
   if (phase === 'tool' || phase === 'aborting' || phase === 'aborted') return 'warning'
   if (phase === 'done') return 'success'
   if (phase === 'error') return 'error'
@@ -920,11 +993,13 @@ const agentStatusTagType = computed<'default' | 'success' | 'warning' | 'info' |
 })
 
 const agentStatusText = computed(() => {
-  if (agentBusyToolName.value) return t('pages.chat.agentStatus.toolCall', { name: agentBusyToolName.value })
+  if (agentBusyToolName.value)
+    return t('pages.chat.agentStatus.toolCall', { name: agentBusyToolName.value })
   const status = currentAgentStatus.value
   if (status.phase === 'sending') return t('pages.chat.agentStatus.sending')
   if (status.phase === 'waiting') return t('pages.chat.agentStatus.waiting')
-  if (status.phase === 'thinking') return status.detail ? status.detail : t('pages.chat.agentStatus.thinking')
+  if (status.phase === 'thinking')
+    return status.detail ? status.detail : t('pages.chat.agentStatus.thinking')
   if (status.phase === 'tool') {
     return status.detail
       ? t('pages.chat.agentStatus.toolCall', { name: status.detail })
@@ -963,7 +1038,7 @@ function formatClock(ts: number): string {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: false,
+    hour12: false
   })
 }
 
@@ -1011,7 +1086,7 @@ const stats = computed(() => {
     user,
     assistant,
     system,
-    lastMessageAt: last?.timestamp ? formatRelativeTime(last.timestamp) : '-',
+    lastMessageAt: last?.timestamp ? formatRelativeTime(last.timestamp) : '-'
   }
 })
 
@@ -1020,7 +1095,6 @@ const renderedMessages = computed<RenderMessage[]>(() => {
   if (role === 'all') return visibleMessageEntries.value
   return visibleMessageEntries.value.filter((entry) => entry.item.role === role)
 })
-
 
 const selectedSlashCommandIndex = ref(0)
 const slashFirstLine = computed(() => (draft.value.split('\n')[0] || '').trimStart())
@@ -1049,10 +1123,14 @@ const slashCommandOptions = computed<SlashCommandPreset[]>(() => {
 })
 const slashNewMode = computed(() => slashMode.value && slashCommandKeyword.value === 'new')
 const slashSkillMode = computed(() => slashMode.value && slashCommandKeyword.value === 'skill')
-const slashModelMode = computed(() =>
-  slashMode.value && (slashCommandKeyword.value === 'model' || slashCommandKeyword.value === 'models')
+const slashModelMode = computed(
+  () =>
+    slashMode.value &&
+    (slashCommandKeyword.value === 'model' || slashCommandKeyword.value === 'models')
 )
-const slashSubagentsMode = computed(() => slashMode.value && slashCommandKeyword.value === 'subagents')
+const slashSubagentsMode = computed(
+  () => slashMode.value && slashCommandKeyword.value === 'subagents'
+)
 
 function skillSourceLabel(source: Skill['source']): string {
   if (source === 'workspace') return t('pages.skills.sources.workspace')
@@ -1097,7 +1175,7 @@ function splitModelRef(value: string): ConfiguredModelOption | null {
   return {
     modelRef: `${providerId}/${modelId}`,
     providerId,
-    modelId,
+    modelId
   }
 }
 
@@ -1195,7 +1273,12 @@ function collectConfiguredModelRefsFromProviders(input: unknown, refs: Set<strin
     const provider = asRecord(providerValue)
     if (!provider) continue
 
-    const candidates = [provider.models, provider.modelIds, provider.availableModels, provider.whitelist]
+    const candidates = [
+      provider.models,
+      provider.modelIds,
+      provider.availableModels,
+      provider.whitelist
+    ]
     for (const candidate of candidates) {
       const ids = extractProviderModelIds(candidate)
       for (const id of ids) {
@@ -1243,8 +1326,7 @@ function collectNativeModelRef(node: unknown, refs: Set<string>) {
     refs.add(alreadyQualified.modelRef)
     return
   }
-  const providerField =
-    (typeof row.provider === 'string' && row.provider.trim()) || ''
+  const providerField = (typeof row.provider === 'string' && row.provider.trim()) || ''
   if (providerField) {
     refs.add(`${providerField}/${modelField}`)
   }
@@ -1305,10 +1387,15 @@ const configuredModelOptions = computed<ConfiguredModelOption[]>(() => {
     .filter((item): item is ConfiguredModelOption => !!item)
 })
 
-function filterConfiguredModels(query: string, list: ConfiguredModelOption[]): ConfiguredModelOption[] {
+function filterConfiguredModels(
+  query: string,
+  list: ConfiguredModelOption[]
+): ConfiguredModelOption[] {
   if (!query) return list
   return list.filter((model) =>
-    [model.modelRef, model.providerId, model.modelId].some((field) => field.toLowerCase().includes(query))
+    [model.modelRef, model.providerId, model.modelId].some((field) =>
+      field.toLowerCase().includes(query)
+    )
   )
 }
 
@@ -1374,7 +1461,9 @@ const slashSubagentsSubcommandQuery = computed(() => {
   return first.toLowerCase()
 })
 
-const slashSubagentsSubcommand = computed(() => normalizeSubagentsSubcommand(slashSubagentsSubcommandQuery.value))
+const slashSubagentsSubcommand = computed(() =>
+  normalizeSubagentsSubcommand(slashSubagentsSubcommandQuery.value)
+)
 
 const slashSubagentsSubcommandOptions = computed<SubagentsSubcommandPreset[]>(() => {
   if (!slashSubagentsMode.value) return []
@@ -1407,27 +1496,27 @@ const slashSuggestions = computed<SlashSuggestionItem[]>(() => {
       return slashSubagentsSpawnAgentOptions.value.map((agent) => ({
         kind: 'subagents-agent',
         key: `subagents-spawn-agent-${agent.id}`,
-        agent,
+        agent
       }))
     }
     return slashSubagentsSubcommandOptions.value.map((preset) => ({
       kind: 'subagents-subcommand',
       key: `subagents-subcommand-${preset.subcommand}`,
-      subagentsSubcommand: preset,
+      subagentsSubcommand: preset
     }))
   }
   if (slashNewMode.value) {
     const defaults: SlashSuggestionItem[] = [
       {
         kind: 'new-default',
-        key: 'new-default',
-      },
+        key: 'new-default'
+      }
     ]
     const models: SlashSuggestionItem[] = slashNewModelOptions.value.map(
       (model): SlashSuggestionItem => ({
         kind: 'new-model',
         key: `new-model-${model.modelRef}`,
-        model,
+        model
       })
     )
     return [...defaults, ...models]
@@ -1436,20 +1525,20 @@ const slashSuggestions = computed<SlashSuggestionItem[]>(() => {
     return slashSkillOptions.value.map((skill) => ({
       kind: 'skill',
       key: `skill-${skill.name}`,
-      skill,
+      skill
     }))
   }
   if (slashModelMode.value) {
     return slashModelOptions.value.map((model) => ({
       kind: 'model',
       key: `model-${model.modelRef}`,
-      model,
+      model
     }))
   }
   return slashCommandOptions.value.map((preset) => ({
     kind: 'command',
     key: `cmd-${preset.command}`,
-    preset,
+    preset
   }))
 })
 
@@ -1495,10 +1584,7 @@ async function loadHistoryForKey(rawKey: string, options?: { force?: boolean }) 
   writeStoredSessionKey(key)
 
   const shouldSkip =
-    !options?.force &&
-    key === chatStore.sessionKey &&
-    !chatStore.loading &&
-    !chatStore.syncing
+    !options?.force && key === chatStore.sessionKey && !chatStore.loading && !chatStore.syncing
   if (shouldSkip) return
 
   chatStore.setSessionKey(key)
@@ -1537,7 +1623,8 @@ function looksLikeMarkdown(value: string): boolean {
   if (/`[^`\n]+`/.test(text)) return true
   if (/\[[^\]]+]\((https?:\/\/[^)\s]+)\)/.test(text)) return true
   if (/\*\*[^*\n]+\*\*/.test(text)) return true
-  if (/(^|[\s(（\[{【'"“‘])\*[^*\n]+\*(?=$|[\s)\]）}】'".,!?，。！？：:、”’])/u.test(text)) return true
+  if (/(^|[\s(（\[{【'"“‘])\*[^*\n]+\*(?=$|[\s)\]）}】'".,!?，。！？：:、”’])/u.test(text))
+    return true
   if (/^\s{0,3}#{1,6}\s+\S+/m.test(text)) return true
   if (/^\s{0,3}>\s+\S+/m.test(text)) return true
   if (/^\s{0,3}[-*+]\s+\S+/m.test(text)) return true
@@ -1641,7 +1728,9 @@ function requestScrollToBottom(options?: { force?: boolean }) {
 
   pendingScroll = true
   const schedule =
-    typeof queueMicrotask === 'function' ? queueMicrotask : (fn: () => void) => Promise.resolve().then(fn)
+    typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (fn: () => void) => Promise.resolve().then(fn)
   schedule(() => {
     pendingScroll = false
     if (destroyed) return
@@ -1833,7 +1922,7 @@ function splitLeadingJsonValue(line: string): { parsed: unknown; rest: string } 
       const rest = text.slice(i + 1).trim()
       return {
         parsed,
-        rest,
+        rest
       }
     }
   }
@@ -1858,7 +1947,7 @@ function parseJsonItems(content: string): { items: unknown[]; plainLines: string
     }
     return {
       items: rawItems,
-      plainLines,
+      plainLines
     }
   }
 
@@ -1902,7 +1991,7 @@ function parseJsonItems(content: string): { items: unknown[]; plainLines: string
   if (!rawItems.length) return null
   return {
     items: rawItems,
-    plainLines,
+    plainLines
   }
 }
 
@@ -1914,7 +2003,7 @@ function parseThinkingSignature(value: unknown): {
   const row = asRecord(unwrapJsonValue(value))
   if (!row) {
     return {
-      hasEncryptedSignature: false,
+      hasEncryptedSignature: false
     }
   }
   const signatureId = asString(row.id) || undefined
@@ -1931,7 +2020,7 @@ function parseThinkingSignature(value: unknown): {
   return {
     signatureId,
     summaryText: summaryText || undefined,
-    hasEncryptedSignature: !!encrypted,
+    hasEncryptedSignature: !!encrypted
   }
 }
 
@@ -1962,7 +2051,10 @@ function parseToolValidationError(content: string): ToolValidationErrorItemView 
 
   let argumentsText = ''
   if (argsMarkerIndex >= 0) {
-    const rawArguments = lines.slice(argsMarkerIndex + 1).join('\n').trim()
+    const rawArguments = lines
+      .slice(argsMarkerIndex + 1)
+      .join('\n')
+      .trim()
     const normalizedArguments = stripCodeFence(rawArguments).trim()
     if (rawArguments) {
       const parsedArgs = parseSingleJsonValue(normalizedArguments || rawArguments)
@@ -1984,7 +2076,7 @@ function parseToolValidationError(content: string): ToolValidationErrorItemView 
   return {
     toolName,
     issues,
-    argumentsText: argumentsText || undefined,
+    argumentsText: argumentsText || undefined
   }
 }
 
@@ -1999,7 +2091,7 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
       toolResults: [],
       validationErrors: [validationError],
       plainTexts: [],
-      images: [],
+      images: []
     }
   }
   const rawItems = parsed.items
@@ -2014,14 +2106,16 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
     const row = asRecord(unwrapJsonValue(rowValue))
     if (!row) continue
     const typeRaw = asString(row.type).toLowerCase()
-    const type = typeRaw ||
+    const type =
+      typeRaw ||
       ('thinking' in row || 'thinkingSignature' in row
         ? 'thinking'
-        : ('arguments' in row && ('name' in row || 'tool' in row) 
-          ? 'toolcall' 
-          : (('tool_call_id' in row || 'toolCallId' in row || 'call_id' in row) && ('content' in row || 'output' in row || 'result' in row)
+        : 'arguments' in row && ('name' in row || 'tool' in row)
+          ? 'toolcall'
+          : ('tool_call_id' in row || 'toolCallId' in row || 'call_id' in row) &&
+              ('content' in row || 'output' in row || 'result' in row)
             ? 'toolresult'
-            : '')))
+            : '')
 
     if (type === 'toolcall' || type === 'tool_call') {
       const args = asRecord(row.arguments ?? row.args ?? row.params)
@@ -2045,7 +2139,7 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
         workdir: args ? asString(args.workdir || args.cwd || args.dir) || undefined : undefined,
         timeout: args ? asNumber(args.timeout) : undefined,
         partialJson: asString(row.partialJson || row.partial_json) || undefined,
-        argumentsJson,
+        argumentsJson
       })
       recognized += 1
       continue
@@ -2054,7 +2148,8 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
     if (type === 'thinking' || type === 'reasoning') {
       const signature = parseThinkingSignature(row.thinkingSignature ?? row.signature)
       const text = asText(row.thinking ?? row.text ?? row.message).trim()
-      const hasSignature = signature.signatureId || signature.summaryText || signature.hasEncryptedSignature
+      const hasSignature =
+        signature.signatureId || signature.summaryText || signature.hasEncryptedSignature
       if (!text && !hasSignature) continue
       // 仅有签名而没有思考文本时，通常是内部元信息；若同条消息还有正文，就不额外占用版面
       if (!text && hasSignature && parsed.plainLines.length > 0) {
@@ -2066,7 +2161,7 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
         text,
         signatureId: signature.signatureId,
         summaryText: signature.summaryText,
-        hasEncryptedSignature: signature.hasEncryptedSignature,
+        hasEncryptedSignature: signature.hasEncryptedSignature
       })
       recognized += 1
       continue
@@ -2075,7 +2170,7 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
     if (type === 'toolresult' || type === 'tool_result') {
       let contentText: string
       const rawContent = row.content ?? row.output ?? row.result ?? row.message ?? row.response
-      
+
       if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
         try {
           contentText = JSON.stringify(rawContent, null, 2)
@@ -2085,13 +2180,13 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
       } else {
         contentText = asText(rawContent)
       }
-      
+
       if (!contentText.trim()) continue
       toolResults.push({
         id: asString(row.id || row.tool_call_id || row.toolCallId || row.call_id) || undefined,
         name: asString(row.name || row.tool || row.toolName || row.tool_name) || undefined,
         status: asString(row.status || row.state || row.error) || undefined,
-        content: contentText,
+        content: contentText
       })
       recognized += 1
       continue
@@ -2103,13 +2198,13 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
   for (const line of parsed.plainLines) {
     const { images: extractedImages, cleanedText } = extractImageFromText(line)
     images.push(...extractedImages)
-    
+
     const trimmedLine = cleanedText.trim()
     if (trimmedLine.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i)) {
       const imageUrl = `/api/media?path=${encodeURIComponent(trimmedLine)}`
       images.push({
         mimeType: `image/${trimmedLine.split('.').pop()?.toLowerCase() || 'png'}`,
-        url: imageUrl,
+        url: imageUrl
       })
     } else if (trimmedLine) {
       imagePlainTexts.push(cleanedText)
@@ -2123,11 +2218,9 @@ function parseStructuredMessage(content: string): StructuredMessageView | null {
     toolResults,
     validationErrors: [],
     plainTexts: imagePlainTexts,
-    images,
+    images
   }
 }
-
-
 
 function normalizeSlashArguments(line: string): string {
   const trimmed = line.trimStart()
@@ -2143,7 +2236,7 @@ function splitFirstToken(value: string): { first: string; rest: string } {
   const [first = '', ...rest] = parts
   return {
     first,
-    rest: rest.join(' '),
+    rest: rest.join(' ')
   }
 }
 
@@ -2223,9 +2316,7 @@ function applySlashSubagentsSpawnAgent(agentId: string) {
   if (normalizedSubcommand !== 'spawn') return
 
   const { rest: restAfterAgent } = splitFirstToken(rest)
-  lines[0] = restAfterAgent
-    ? `/subagents spawn ${id} ${restAfterAgent}`
-    : `/subagents spawn ${id} `
+  lines[0] = restAfterAgent ? `/subagents spawn ${id} ${restAfterAgent}` : `/subagents spawn ${id} `
   draft.value = lines.join('\n')
 }
 
@@ -2476,7 +2567,7 @@ onMounted(async () => {
           chatStore.handleAgentStatusEvent(eventName, data.payload)
           chatStore.handleRealtimeEvent(data.payload, {
             refreshHistory: false,
-            streaming: isStreamingEvent,
+            streaming: isStreamingEvent
           })
         }
       })
@@ -2495,7 +2586,9 @@ onMounted(async () => {
     chatStore.setSessionKey('main')
   }
   const routeSessionKey = normalizeSessionSelectValue(
-    Array.isArray(route.query.session) ? route.query.session[0] : (route.query.session as string | number | null)
+    Array.isArray(route.query.session)
+      ? route.query.session[0]
+      : (route.query.session as string | number | null)
   )
   const currentStoreKey = chatStore.sessionKey.trim()
   const storedSessionKey = readStoredSessionKey()
@@ -2529,11 +2622,21 @@ onUnmounted(() => {
 })
 
 // ── Hermes REST conversation management ──
+function ensureConversationIdle(): boolean {
+  if (!agentBusy.value) return true
+  message.warning(t('pages.chat.messages.waitForCurrentResponse'))
+  return false
+}
+
 function handleNewConversation() {
+  if (!ensureConversationIdle()) return
   chatStore.clearLastError()
   // Save current conversation first
   if (isHermesRest.value && hermesChatStore.activeId) {
-    hermesChatStore.setMessages([...chatStore.messages], connectionStore.hermesRealModel || undefined)
+    hermesChatStore.setMessages(
+      [...chatStore.messages],
+      connectionStore.hermesRealModel || undefined
+    )
   }
   hermesChatStore.createConversation()
   chatStore.clearMessages()
@@ -2541,11 +2644,15 @@ function handleNewConversation() {
 }
 
 function handleSwitchConversation(id: string) {
+  if (!ensureConversationIdle()) return
   if (id === hermesChatStore.activeId) return
   chatStore.clearLastError()
   // Save current conversation
   if (hermesChatStore.activeId) {
-    hermesChatStore.setMessages([...chatStore.messages], connectionStore.hermesRealModel || undefined)
+    hermesChatStore.setMessages(
+      [...chatStore.messages],
+      connectionStore.hermesRealModel || undefined
+    )
   }
   hermesChatStore.switchTo(id)
   const conv = hermesChatStore.activeConversation
@@ -2554,6 +2661,7 @@ function handleSwitchConversation(id: string) {
 }
 
 function handleDeleteConversation(id: string) {
+  if (!ensureConversationIdle()) return
   chatStore.clearLastError()
   hermesChatStore.deleteConversation(id)
   const conv = hermesChatStore.activeConversation
@@ -2586,8 +2694,8 @@ const hermesConvStats = computed(() => {
   const msgs = chatStore.messages
   return {
     total: msgs.length,
-    user: msgs.filter(m => m.role === 'user').length,
-    assistant: msgs.filter(m => m.role === 'assistant').length,
+    user: msgs.filter((m) => m.role === 'user').length,
+    assistant: msgs.filter((m) => m.role === 'assistant').length
   }
 })
 
@@ -2602,6 +2710,7 @@ async function handleSend() {
   const content = draft.value.trim()
   if (!content) return
   if (agentBusy.value) return
+  const conversationId = isHermesRest.value ? hermesChatStore.activeId : null
 
   try {
     const key = ensureSessionKey()
@@ -2609,8 +2718,12 @@ async function handleSend() {
     const sendModel = isHermesRest.value ? hermesModel.value : undefined
     await chatStore.sendMessage(content, sendModel)
     // Persist conversation in Hermes REST mode
-    if (isHermesRest.value) {
-      hermesChatStore.setMessages([...chatStore.messages], connectionStore.hermesRealModel || undefined)
+    if (isHermesRest.value && conversationId) {
+      hermesChatStore.setMessagesFor(
+        conversationId,
+        [...chatStore.messages],
+        connectionStore.hermesRealModel || undefined
+      )
     }
     void fetchSessionTokenUsage(key)
     draft.value = ''
@@ -2618,8 +2731,12 @@ async function handleSend() {
     autoFollowBottom.value = true
     requestScrollToBottom({ force: true })
   } catch (error) {
-    if (isHermesRest.value) {
-      hermesChatStore.setMessages([...chatStore.messages], connectionStore.hermesRealModel || undefined)
+    if (isHermesRest.value && conversationId) {
+      hermesChatStore.setMessagesFor(
+        conversationId,
+        [...chatStore.messages],
+        connectionStore.hermesRealModel || undefined
+      )
     }
     const reason = chatStore.lastError || (error instanceof Error ? error.message : String(error))
     message.error(reason)
@@ -2654,19 +2771,41 @@ async function handleSend() {
             {{ connectionStore.hermesRealModel || hermesModel }}
           </NTag>
           <!-- ACP: loading/unavailable state -->
-          <NTag v-else size="small" :bordered="false" round class="chat-token-chip chat-token-chip--loading">
+          <NTag
+            v-else
+            size="small"
+            :bordered="false"
+            round
+            class="chat-token-chip chat-token-chip--loading"
+          >
             {{ sessionTokenStatusText }}
           </NTag>
-          <NButton size="small" class="app-toolbar-btn app-toolbar-btn--refresh" :loading="refreshingChatData" @click="handleRefreshChatData">
+          <NButton
+            size="small"
+            class="app-toolbar-btn app-toolbar-btn--refresh"
+            :loading="refreshingChatData"
+            @click="handleRefreshChatData"
+          >
             <template #icon><NIcon :component="RefreshOutline" /></template>
             {{ t('pages.chat.actions.refreshChat') }}
           </NButton>
         </NSpace>
       </template>
 
-      <NGrid cols="1 l:3" responsive="screen" :x-gap="12" :y-gap="12" class="chat-grid" :class="{ 'chat-grid--collapsed': sideCollapsed }">
+      <NGrid
+        cols="1 l:3"
+        responsive="screen"
+        :x-gap="12"
+        :y-gap="12"
+        class="chat-grid"
+        :class="{ 'chat-grid--collapsed': sideCollapsed }"
+      >
         <!-- Unified sidebar — adapts between Hermes REST and ACP WebSocket modes -->
-        <NGridItem :span="1" class="chat-grid-side" :class="{ 'chat-grid-side--collapsed': sideCollapsed }">
+        <NGridItem
+          :span="1"
+          class="chat-grid-side"
+          :class="{ 'chat-grid-side--collapsed': sideCollapsed }"
+        >
           <div class="chat-side-collapse-btn" @click="sideCollapsed = !sideCollapsed">
             <NIcon :component="ChevronBackOutline" size="14" />
           </div>
@@ -2674,7 +2813,14 @@ async function handleSend() {
           <NCard v-show="!sideCollapsed" embedded :bordered="false" class="chat-side-card">
             <NSpace vertical :size="12">
               <!-- Hermes REST: New conversation button -->
-              <NButton v-if="isHermesRest" type="primary" block size="small" @click="handleNewConversation">
+              <NButton
+                v-if="isHermesRest"
+                type="primary"
+                block
+                size="small"
+                :disabled="agentBusy"
+                @click="handleNewConversation"
+              >
                 <template #icon><NIcon :component="AddOutline" /></template>
                 {{ t('pages.chat.hermes.newConversation') }}
               </NButton>
@@ -2697,21 +2843,24 @@ async function handleSend() {
 
               <!-- Hermes REST: Model selector + resolved model display -->
               <div v-if="isHermesRest">
-                <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.hermes.model') }}</NText>
+                <NText depth="3" style="font-size: 12px">{{ t('pages.chat.hermes.model') }}</NText>
                 <NInput
                   v-model:value="hermesModel"
                   size="small"
                   placeholder="hermes-agent"
-                  style="margin-top: 4px;"
+                  style="margin-top: 4px"
                   @blur="handleHermesModelChange"
                 />
-                <div v-if="connectionStore.hermesRealModel" style="margin-top: 4px;">
+                <div v-if="connectionStore.hermesRealModel" style="margin-top: 4px">
                   <NTag size="small" :bordered="false" round type="success">
                     {{ connectionStore.hermesRealModel }}
                   </NTag>
                 </div>
-                <div v-else-if="isHermesRest && connectionStore.currentServer && !isLocalServer" style="margin-top: 4px;">
-                  <NText depth="3" style="font-size: 11px;">
+                <div
+                  v-else-if="isHermesRest && connectionStore.currentServer && !isLocalServer"
+                  style="margin-top: 4px"
+                >
+                  <NText depth="3" style="font-size: 11px">
                     {{ t('pages.chat.hermes.remoteModelHint') }}
                   </NText>
                 </div>
@@ -2719,14 +2868,14 @@ async function handleSend() {
 
               <!-- ACP: Session key -->
               <div v-if="!isHermesRest">
-                <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.sessionKey') }}</NText>
+                <NText depth="3" style="font-size: 12px">{{ t('pages.chat.sessionKey') }}</NText>
                 <NSelect
                   v-model:value="sessionKeyInput"
                   :options="sessionOptions"
                   filterable
                   tag
                   :placeholder="t('pages.chat.sessionKeyPlaceholder')"
-                  style="min-width: 240px; margin-top: 6px;"
+                  style="min-width: 240px; margin-top: 6px"
                   @update:value="handleSessionKeyChange"
                 />
               </div>
@@ -2737,13 +2886,13 @@ async function handleSend() {
                   <NText>{{ t('pages.chat.preferences.autoFollow') }}</NText>
                   <NSwitch v-model:value="autoFollowBottom" />
                 </NSpace>
-                <NSpace justify="space-between" align="center" style="margin-top: 8px;">
+                <NSpace justify="space-between" align="center" style="margin-top: 8px">
                   <NText>{{ t('pages.chat.filters.title') }}</NText>
                   <NSelect
                     v-model:value="roleFilter"
                     size="small"
                     :options="roleFilterOptions"
-                    style="width: 132px;"
+                    style="width: 132px"
                   />
                 </NSpace>
               </div>
@@ -2754,7 +2903,10 @@ async function handleSend() {
                   v-for="conv in hermesChatStore.conversations"
                   :key="conv.id"
                   class="hermes-conv-item"
-                  :class="{ 'hermes-conv-item--active': conv.id === hermesChatStore.activeId }"
+                  :class="{
+                    'hermes-conv-item--active': conv.id === hermesChatStore.activeId,
+                    'hermes-conv-item--disabled': agentBusy
+                  }"
                   @click="handleSwitchConversation(conv.id)"
                 >
                   <NInput
@@ -2776,10 +2928,10 @@ async function handleSend() {
                     {{ conv.title || t('pages.chat.hermes.untitled') }}
                   </div>
                   <div class="hermes-conv-meta">
-                    <NText depth="3" style="font-size: 11px;">
+                    <NText depth="3" style="font-size: 11px">
                       {{ conv.messages.length }} {{ t('pages.chat.hermes.msgCount') }}
                     </NText>
-                    <NText depth="3" style="font-size: 11px;">
+                    <NText depth="3" style="font-size: 11px">
                       {{ formatRelativeTime(conv.updatedAt) }}
                     </NText>
                   </div>
@@ -2788,6 +2940,7 @@ async function handleSend() {
                     size="tiny"
                     text
                     class="hermes-conv-edit"
+                    :disabled="agentBusy"
                     @click.stop="handleStartEditTitle(conv.id, conv.title || '')"
                   >
                     <template #icon><NIcon :component="CreateOutline" :size="14" /></template>
@@ -2797,6 +2950,7 @@ async function handleSend() {
                     size="tiny"
                     text
                     class="hermes-conv-delete"
+                    :disabled="agentBusy"
                     @click.stop="handleDeleteConversation(conv.id)"
                   >
                     <template #icon><NIcon :component="TrashOutline" :size="14" /></template>
@@ -2834,7 +2988,12 @@ async function handleSend() {
 
           <div class="chat-main-column">
             <NCard embedded :bordered="false" class="chat-transcript-card">
-              <NSpace v-if="!isHermesRest" justify="space-between" align="center" style="margin-bottom: 10px;">
+              <NSpace
+                v-if="!isHermesRest"
+                justify="space-between"
+                align="center"
+                style="margin-bottom: 10px"
+              >
                 <NSpace align="center" :size="8">
                   <NTag size="small" type="info" :bordered="false" round>
                     {{ t('pages.chat.sessionTag', { key: normalizedSessionKey }) }}
@@ -2843,8 +3002,14 @@ async function handleSend() {
                     {{ syncHint }}
                   </NTag>
                 </NSpace>
-                <NText depth="3" style="font-size: 12px;">
-                  {{ t('pages.chat.stats.breakdown', { user: stats.user, assistant: stats.assistant, system: stats.system }) }}
+                <NText depth="3" style="font-size: 12px">
+                  {{
+                    t('pages.chat.stats.breakdown', {
+                      user: stats.user,
+                      assistant: stats.assistant,
+                      system: stats.system
+                    })
+                  }}
                 </NText>
               </NSpace>
 
@@ -2858,9 +3023,19 @@ async function handleSend() {
                         class="chat-bubble"
                         :class="[`is-${entry.item.role}`, { 'is-error': entry.item.isError }]"
                       >
-                        <NSpace justify="space-between" align="center" class="chat-bubble-meta" :size="8">
+                        <NSpace
+                          justify="space-between"
+                          align="center"
+                          class="chat-bubble-meta"
+                          :size="8"
+                        >
                           <NSpace align="center" :size="6">
-                            <NTag size="small" :type="roleType(entry.item.role)" :bordered="false" round>
+                            <NTag
+                              size="small"
+                              :type="roleType(entry.item.role)"
+                              :bordered="false"
+                              round
+                            >
                               {{ roleLabel(entry.item.role) }}
                             </NTag>
                             <FallbackChip
@@ -2869,11 +3044,11 @@ async function handleSend() {
                               :from="entry.item.fallbackFrom"
                               :reason-text="entry.item.fallbackReasonText"
                             />
-                            <NText v-if="entry.item.name" depth="3" style="font-size: 12px;">
+                            <NText v-if="entry.item.name" depth="3" style="font-size: 12px">
                               {{ entry.item.name }}
                             </NText>
                           </NSpace>
-                          <NText v-if="entry.item.timestamp" depth="3" style="font-size: 12px;">
+                          <NText v-if="entry.item.timestamp" depth="3" style="font-size: 12px">
                             {{ formatDate(entry.item.timestamp) }}
                           </NText>
                         </NSpace>
@@ -2885,14 +3060,18 @@ async function handleSend() {
                               :key="`${entry.key}-tool-${toolIndex}`"
                               class="tool-call-card"
                             >
-                                <NSpace align="center" justify="space-between">
-                                  <NSpace align="center" :size="6">
-                                  <NTag size="small" type="warning" :bordered="false" round>{{ t('pages.chat.structured.toolCall') }}</NTag>
+                              <NSpace align="center" justify="space-between">
+                                <NSpace align="center" :size="6">
+                                  <NTag size="small" type="warning" :bordered="false" round>{{
+                                    t('pages.chat.structured.toolCall')
+                                  }}</NTag>
                                   <NText strong>{{ tool.name }}</NText>
                                 </NSpace>
                                 <NSpace align="center" :size="8">
-                                  <NText v-if="tool.timeout" depth="3" style="font-size: 12px;">
-                                    {{ t('pages.chat.structured.timeout', { seconds: tool.timeout }) }}
+                                  <NText v-if="tool.timeout" depth="3" style="font-size: 12px">
+                                    {{
+                                      t('pages.chat.structured.timeout', { seconds: tool.timeout })
+                                    }}
                                   </NText>
                                   <NButton
                                     v-if="tool.argumentsJson"
@@ -2900,17 +3079,31 @@ async function handleSend() {
                                     text
                                     @click="toggleToolCallExpand(`${entry.key}-tool-${toolIndex}`)"
                                   >
-                                    {{ expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`) ? t('pages.chat.structured.hideArgs') : t('pages.chat.structured.viewArgs') }}
+                                    {{
+                                      expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)
+                                        ? t('pages.chat.structured.hideArgs')
+                                        : t('pages.chat.structured.viewArgs')
+                                    }}
                                   </NButton>
                                 </NSpace>
                               </NSpace>
 
                               <div v-if="tool.command || tool.workdir" class="tool-call-meta">
-                                <code v-if="tool.command" class="tool-call-meta__code">{{ tool.command }}</code>
-                                <code v-if="tool.workdir" class="tool-call-meta__code">{{ tool.workdir }}</code>
+                                <code v-if="tool.command" class="tool-call-meta__code">{{
+                                  tool.command
+                                }}</code>
+                                <code v-if="tool.workdir" class="tool-call-meta__code">{{
+                                  tool.workdir
+                                }}</code>
                               </div>
 
-                              <div v-if="tool.argumentsJson && expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)" class="tool-call-args">
+                              <div
+                                v-if="
+                                  tool.argumentsJson &&
+                                  expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)
+                                "
+                                class="tool-call-args"
+                              >
                                 <pre class="tool-call-args__content">{{ tool.argumentsJson }}</pre>
                               </div>
 
@@ -2927,32 +3120,50 @@ async function handleSend() {
                               :key="`${entry.key}-tool-result-${resultIndex}`"
                               class="tool-result-card"
                             >
-                                <NSpace align="center" justify="space-between">
-                                  <NSpace align="center" :size="6">
-                                  <NTag size="small" type="success" :bordered="false" round>{{ t('pages.chat.structured.toolResult') }}</NTag>
+                              <NSpace align="center" justify="space-between">
+                                <NSpace align="center" :size="6">
+                                  <NTag size="small" type="success" :bordered="false" round>{{
+                                    t('pages.chat.structured.toolResult')
+                                  }}</NTag>
                                   <NText strong>{{ result.name || 'unknown' }}</NText>
                                 </NSpace>
                                 <NSpace align="center" :size="8">
-                                  <NText v-if="result.status" depth="3" style="font-size: 12px;">
+                                  <NText v-if="result.status" depth="3" style="font-size: 12px">
                                     {{ result.status }}
                                   </NText>
                                   <NButton
                                     size="tiny"
                                     text
-                                    @click="toggleToolResultExpand(`${entry.key}-result-${resultIndex}`)"
+                                    @click="
+                                      toggleToolResultExpand(`${entry.key}-result-${resultIndex}`)
+                                    "
                                   >
-                                    {{ expandedToolResults.has(`${entry.key}-result-${resultIndex}`) ? t('pages.chat.structured.hideArgs') : t('pages.chat.structured.viewArgs') }}
+                                    {{
+                                      expandedToolResults.has(`${entry.key}-result-${resultIndex}`)
+                                        ? t('pages.chat.structured.hideArgs')
+                                        : t('pages.chat.structured.viewArgs')
+                                    }}
                                   </NButton>
                                 </NSpace>
                               </NSpace>
 
-                              <div v-if="expandedToolResults.has(`${entry.key}-result-${resultIndex}`)" class="tool-call-grid">
-                                <span class="tool-call-label">{{ t('pages.chat.structured.callId') }}</span>
+                              <div
+                                v-if="expandedToolResults.has(`${entry.key}-result-${resultIndex}`)"
+                                class="tool-call-grid"
+                              >
+                                <span class="tool-call-label">{{
+                                  t('pages.chat.structured.callId')
+                                }}</span>
                                 <div class="tool-call-value-wrapper">
                                   <code>{{ result.id || '-' }}</code>
                                   <NTooltip>
                                     <template #trigger>
-                                      <NButton quaternary size="tiny" class="tool-value-copy-btn" @click="copyToClipboard(result.id || '-')">
+                                      <NButton
+                                        quaternary
+                                        size="tiny"
+                                        class="tool-value-copy-btn"
+                                        @click="copyToClipboard(result.id || '-')"
+                                      >
                                         <template #icon>
                                           <NIcon :component="CopyOutline" />
                                         </template>
@@ -2961,12 +3172,19 @@ async function handleSend() {
                                     {{ t('common.copy') }}
                                   </NTooltip>
                                 </div>
-                                <span class="tool-call-label">{{ t('pages.chat.structured.content') }}</span>
+                                <span class="tool-call-label">{{
+                                  t('pages.chat.structured.content')
+                                }}</span>
                                 <div class="tool-call-value-wrapper tool-result-content-wrapper">
                                   <pre class="tool-result-content">{{ result.content }}</pre>
                                   <NTooltip>
                                     <template #trigger>
-                                      <NButton quaternary size="tiny" class="tool-value-copy-btn" @click="copyToClipboard(result.content)">
+                                      <NButton
+                                        quaternary
+                                        size="tiny"
+                                        class="tool-value-copy-btn"
+                                        @click="copyToClipboard(result.content)"
+                                      >
                                         <template #icon>
                                           <NIcon :component="CopyOutline" />
                                         </template>
@@ -2979,27 +3197,42 @@ async function handleSend() {
                             </div>
                           </div>
 
-                          <div v-if="entry.structured.validationErrors.length" class="validation-error-list">
+                          <div
+                            v-if="entry.structured.validationErrors.length"
+                            class="validation-error-list"
+                          >
                             <div
-                              v-for="(validation, validationIndex) in entry.structured.validationErrors"
+                              v-for="(validation, validationIndex) in entry.structured
+                                .validationErrors"
                               :key="`${entry.key}-validation-${validationIndex}`"
                               class="validation-error-card"
                             >
-                                <NSpace align="center" justify="space-between">
-                                  <NSpace align="center" :size="6">
-                                  <NTag size="small" type="warning" :bordered="false" round>{{ t('pages.chat.structured.validationFailed') }}</NTag>
+                              <NSpace align="center" justify="space-between">
+                                <NSpace align="center" :size="6">
+                                  <NTag size="small" type="warning" :bordered="false" round>{{
+                                    t('pages.chat.structured.validationFailed')
+                                  }}</NTag>
                                   <NText strong>{{ validation.toolName }}</NText>
                                 </NSpace>
-                                <NText depth="3" style="font-size: 12px;">
-                                  {{ t('pages.chat.structured.issuesCount', { count: validation.issues.length }) }}
+                                <NText depth="3" style="font-size: 12px">
+                                  {{
+                                    t('pages.chat.structured.issuesCount', {
+                                      count: validation.issues.length
+                                    })
+                                  }}
                                 </NText>
                               </NSpace>
 
                               <div class="tool-call-grid">
-                                <span class="tool-call-label">{{ t('pages.chat.structured.issues') }}</span>
+                                <span class="tool-call-label">{{
+                                  t('pages.chat.structured.issues')
+                                }}</span>
                                 <div class="validation-issues">
                                   <div v-if="validation.issues.length === 0">-</div>
-                                  <div v-for="(issue, issueIndex) in validation.issues" :key="issueIndex">
+                                  <div
+                                    v-for="(issue, issueIndex) in validation.issues"
+                                    :key="issueIndex"
+                                  >
                                     - {{ issue }}
                                   </div>
                                 </div>
@@ -3016,13 +3249,23 @@ async function handleSend() {
                             v-if="entry.structured.plainTexts.length"
                             class="chat-bubble-content-wrapper"
                           >
-                            <div class="chat-bubble-content structured-plain-text chat-markdown"
-                              v-html="renderChatMarkdown(entry.structured.plainTexts.join('\n'), entry.item.role)"
+                            <div
+                              class="chat-bubble-content structured-plain-text chat-markdown"
+                              v-html="
+                                renderChatMarkdown(
+                                  entry.structured.plainTexts.join('\n'),
+                                  entry.item.role
+                                )
+                              "
                             ></div>
                             <div class="chat-content-copy-btn">
                               <NTooltip>
                                 <template #trigger>
-                                  <NButton quaternary size="tiny" @click="copyMessageContent(entry)">
+                                  <NButton
+                                    quaternary
+                                    size="tiny"
+                                    @click="copyMessageContent(entry)"
+                                  >
                                     <template #icon>
                                       <NIcon :component="CopyOutline" />
                                     </template>
@@ -3046,7 +3289,9 @@ async function handleSend() {
                                 loading="lazy"
                                 @click="openImagePreview(img.url)"
                               />
-                              <span v-else class="chat-image-placeholder">{{ t('pages.chat.image.unavailable') }}</span>
+                              <span v-else class="chat-image-placeholder">{{
+                                t('pages.chat.image.unavailable')
+                              }}</span>
                             </div>
                           </div>
                         </div>
@@ -3074,8 +3319,12 @@ async function handleSend() {
 
                     <NEmpty
                       v-else
-                      :description="visibleMessageEntries.length ? t('pages.chat.messages.emptyFiltered') : t('common.noMessages')"
-                      style="padding: 72px 0;"
+                      :description="
+                        visibleMessageEntries.length
+                          ? t('pages.chat.messages.emptyFiltered')
+                          : t('common.noMessages')
+                      "
+                      style="padding: 72px 0"
                     />
                   </div>
                 </NSpin>
@@ -3094,8 +3343,12 @@ async function handleSend() {
 
                 <div v-if="slashMode" class="chat-slash-panel">
                   <div class="chat-slash-head">
-                    <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.slash.title') }}</NText>
-                    <NText depth="3" style="font-size: 12px;">{{ t('pages.chat.slash.hint') }}</NText>
+                    <NText depth="3" style="font-size: 12px">{{
+                      t('pages.chat.slash.title')
+                    }}</NText>
+                    <NText depth="3" style="font-size: 12px">{{
+                      t('pages.chat.slash.hint')
+                    }}</NText>
                   </div>
                   <div v-if="slashSuggestions.length" class="chat-slash-list">
                     <button
@@ -3111,13 +3364,19 @@ async function handleSend() {
                       <div v-if="item.kind === 'command' && item.preset">
                         <div class="chat-slash-line">
                           <span class="chat-slash-command">{{ item.preset.command }}</span>
-                          <span v-if="item.preset.usage" class="chat-slash-usage">{{ item.preset.usage }}</span>
-                          <NTag size="tiny" :bordered="false" round>{{ item.preset.category }}</NTag>
+                          <span v-if="item.preset.usage" class="chat-slash-usage">{{
+                            item.preset.usage
+                          }}</span>
+                          <NTag size="tiny" :bordered="false" round>{{
+                            item.preset.category
+                          }}</NTag>
                         </div>
                         <div class="chat-slash-line chat-slash-desc">
                           <span>{{ item.preset.description }}</span>
                           <span v-if="item.preset.requiresFlag" class="chat-slash-flag">
-                            {{ t('pages.chat.slash.requiresFlag', { flag: item.preset.requiresFlag }) }}
+                            {{
+                              t('pages.chat.slash.requiresFlag', { flag: item.preset.requiresFlag })
+                            }}
                           </span>
                         </div>
                       </div>
@@ -3130,7 +3389,9 @@ async function handleSend() {
                         </div>
                         <div class="chat-slash-line chat-slash-desc">
                           <span>{{ item.skill.description || t('common.noDescription') }}</span>
-                          <span v-if="item.skill.version" class="chat-slash-flag">v{{ item.skill.version }}</span>
+                          <span v-if="item.skill.version" class="chat-slash-flag"
+                            >v{{ item.skill.version }}</span
+                          >
                         </div>
                       </div>
                       <div v-else-if="item.kind === 'model' && item.model">
@@ -3142,7 +3403,9 @@ async function handleSend() {
                         </div>
                         <div class="chat-slash-line chat-slash-desc">
                           <span>{{ item.model.modelId }}</span>
-                          <span class="chat-slash-flag">{{ t('pages.chat.slash.fromConfig') }}</span>
+                          <span class="chat-slash-flag">{{
+                            t('pages.chat.slash.fromConfig')
+                          }}</span>
                         </div>
                       </div>
                       <div v-else-if="item.kind === 'new-model' && item.model">
@@ -3154,16 +3417,22 @@ async function handleSend() {
                         </div>
                         <div class="chat-slash-line chat-slash-desc">
                           <span>{{ item.model.modelId }}</span>
-                          <span class="chat-slash-flag">{{ t('pages.chat.slash.fromConfig') }}</span>
+                          <span class="chat-slash-flag">{{
+                            t('pages.chat.slash.fromConfig')
+                          }}</span>
                         </div>
                       </div>
-                      <div v-else-if="item.kind === 'subagents-subcommand' && item.subagentsSubcommand">
+                      <div
+                        v-else-if="item.kind === 'subagents-subcommand' && item.subagentsSubcommand"
+                      >
                         <div class="chat-slash-line">
-                          <span class="chat-slash-command">/subagents {{ item.subagentsSubcommand.subcommand }}</span>
-                          <span v-if="item.subagentsSubcommand.usage" class="chat-slash-usage">{{ item.subagentsSubcommand.usage }}</span>
-                          <NTag size="tiny" type="info" :bordered="false" round>
-                            subagents
-                          </NTag>
+                          <span class="chat-slash-command"
+                            >/subagents {{ item.subagentsSubcommand.subcommand }}</span
+                          >
+                          <span v-if="item.subagentsSubcommand.usage" class="chat-slash-usage">{{
+                            item.subagentsSubcommand.usage
+                          }}</span>
+                          <NTag size="tiny" type="info" :bordered="false" round> subagents </NTag>
                         </div>
                         <div class="chat-slash-line chat-slash-desc">
                           <span>{{ item.subagentsSubcommand.description }}</span>
@@ -3178,7 +3447,9 @@ async function handleSend() {
                         </div>
                         <div class="chat-slash-line chat-slash-desc">
                           <span>{{ item.agent.model?.primary || '-' }}</span>
-                          <span class="chat-slash-flag">{{ t('pages.chat.slash.fromConfig') }}</span>
+                          <span class="chat-slash-flag">{{
+                            t('pages.chat.slash.fromConfig')
+                          }}</span>
                         </div>
                       </div>
                       <div v-else-if="item.kind === 'new-default'">
@@ -3196,13 +3467,25 @@ async function handleSend() {
                   </div>
                   <div v-else class="chat-slash-empty">
                     <template v-if="slashSkillMode">
-                      {{ skillStore.loading ? t('pages.chat.slash.skills.loading') : t('pages.chat.slash.skills.noMatch') }}
+                      {{
+                        skillStore.loading
+                          ? t('pages.chat.slash.skills.loading')
+                          : t('pages.chat.slash.skills.noMatch')
+                      }}
                     </template>
                     <template v-else-if="slashSubagentsMode">
-                      {{ configStore.loading ? t('pages.chat.slash.subagents.loading') : t('pages.chat.slash.subagents.noMatch') }}
+                      {{
+                        configStore.loading
+                          ? t('pages.chat.slash.subagents.loading')
+                          : t('pages.chat.slash.subagents.noMatch')
+                      }}
                     </template>
                     <template v-else-if="slashModelMode || slashNewMode">
-                      {{ configStore.loading ? t('pages.chat.slash.models.loading') : t('pages.chat.slash.models.noMatch') }}
+                      {{
+                        configStore.loading
+                          ? t('pages.chat.slash.models.loading')
+                          : t('pages.chat.slash.models.noMatch')
+                      }}
                     </template>
                     <template v-else>
                       {{ t('pages.chat.slash.commands.noMatch') }}
@@ -3211,7 +3494,7 @@ async function handleSend() {
                 </div>
 
                 <div class="chat-compose-status-line">
-                  <NSpace align="center" justify="space-between" style="width: 100%;">
+                  <NSpace align="center" justify="space-between" style="width: 100%">
                     <NTag
                       size="small"
                       :type="agentStatusTagType"
@@ -3227,19 +3510,34 @@ async function handleSend() {
                       text
                       @click="showAgentDetails = !showAgentDetails"
                     >
-                      {{ showAgentDetails ? t('pages.chat.agentDetails.hide') : t('pages.chat.agentDetails.show') }}
+                      {{
+                        showAgentDetails
+                          ? t('pages.chat.agentDetails.hide')
+                          : t('pages.chat.agentDetails.show')
+                      }}
                     </NButton>
                   </NSpace>
                 </div>
 
                 <div v-if="showAgentDetails && hasAgentDetails" class="chat-agent-details">
                   <NSpace vertical :size="6">
-                    <NText depth="3" style="font-size: 12px;">
-                      {{ t('pages.chat.agentDetails.phaseDuration', { duration: formatDurationMs(nowMs - currentAgentStatus.sinceMs) }) }}
+                    <NText depth="3" style="font-size: 12px">
+                      {{
+                        t('pages.chat.agentDetails.phaseDuration', {
+                          duration: formatDurationMs(nowMs - currentAgentStatus.sinceMs)
+                        })
+                      }}
                     </NText>
 
-                    <div v-if="chatStore.agentSteps.get(currentAgentId)?.length" class="chat-agent-steps">
-                      <div v-for="(step, index) in chatStore.agentSteps.get(currentAgentId)" :key="`step-${step.ts}-${index}`" class="chat-agent-step">
+                    <div
+                      v-if="chatStore.agentSteps.get(currentAgentId)?.length"
+                      class="chat-agent-steps"
+                    >
+                      <div
+                        v-for="(step, index) in chatStore.agentSteps.get(currentAgentId)"
+                        :key="`step-${step.ts}-${index}`"
+                        class="chat-agent-step"
+                      >
                         <span class="chat-agent-step__time">{{ formatClock(step.ts) }}</span>
                         <span class="chat-agent-step__label">{{ step.label }}</span>
                       </div>
@@ -3247,31 +3545,52 @@ async function handleSend() {
 
                     <div v-if="currentToolProgress" class="chat-tool-progress">
                       <div class="chat-tool-progress__title">
-                        <span>{{ t('pages.chat.agentDetails.tool', { name: currentToolProgress.name }) }}</span>
-                        <span v-if="currentToolProgress.meta" class="chat-tool-progress__meta">{{ currentToolProgress.meta }}</span>
+                        <span>{{
+                          t('pages.chat.agentDetails.tool', { name: currentToolProgress.name })
+                        }}</span>
+                        <span v-if="currentToolProgress.meta" class="chat-tool-progress__meta">{{
+                          currentToolProgress.meta
+                        }}</span>
                       </div>
                       <div class="chat-tool-progress__kv">
-                        <span class="chat-tool-progress__k">{{ t('pages.chat.structured.callId') }}</span>
-                        <code class="chat-tool-progress__v">{{ currentToolProgress.toolCallId }}</code>
-                        <span class="chat-tool-progress__k">{{ t('pages.chat.agentDetails.phase') }}</span>
+                        <span class="chat-tool-progress__k">{{
+                          t('pages.chat.structured.callId')
+                        }}</span>
+                        <code class="chat-tool-progress__v">{{
+                          currentToolProgress.toolCallId
+                        }}</code>
+                        <span class="chat-tool-progress__k">{{
+                          t('pages.chat.agentDetails.phase')
+                        }}</span>
                         <code class="chat-tool-progress__v">{{ currentToolProgress.phase }}</code>
-                        <span class="chat-tool-progress__k">{{ t('pages.chat.agentDetails.elapsed') }}</span>
+                        <span class="chat-tool-progress__k">{{
+                          t('pages.chat.agentDetails.elapsed')
+                        }}</span>
                         <code class="chat-tool-progress__v">
                           {{ formatDurationMs(toolElapsedMs) }}
                         </code>
                       </div>
 
-                      <details v-if="currentToolProgress.argsPreview" class="chat-tool-progress__details">
+                      <details
+                        v-if="currentToolProgress.argsPreview"
+                        class="chat-tool-progress__details"
+                      >
                         <summary>{{ t('pages.chat.structured.viewArgs') }}</summary>
                         <pre>{{ currentToolProgress.argsPreview }}</pre>
                       </details>
 
-                      <details v-if="currentToolProgress.partialPreview" class="chat-tool-progress__details">
+                      <details
+                        v-if="currentToolProgress.partialPreview"
+                        class="chat-tool-progress__details"
+                      >
                         <summary>{{ t('pages.chat.agentDetails.viewPartialResult') }}</summary>
                         <pre>{{ currentToolProgress.partialPreview }}</pre>
                       </details>
 
-                      <details v-if="currentToolProgress.resultPreview" class="chat-tool-progress__details">
+                      <details
+                        v-if="currentToolProgress.resultPreview"
+                        class="chat-tool-progress__details"
+                      >
                         <summary>{{ t('pages.chat.agentDetails.viewResult') }}</summary>
                         <pre>{{ currentToolProgress.resultPreview }}</pre>
                       </details>
@@ -3279,7 +3598,7 @@ async function handleSend() {
                       <NText
                         v-if="currentToolProgress.isError === true"
                         depth="3"
-                        style="font-size: 12px; color: var(--danger-color);"
+                        style="font-size: 12px; color: var(--danger-color)"
                       >
                         {{ t('pages.chat.agentDetails.toolFailed') }}
                       </NText>
@@ -3288,7 +3607,7 @@ async function handleSend() {
                 </div>
 
                 <NSpace justify="space-between" align="center">
-                  <NText depth="3" style="font-size: 12px;">
+                  <NText depth="3" style="font-size: 12px">
                     {{ t('pages.chat.input.sendHint', { key: normalizedSessionKey }) }}
                   </NText>
                   <NSpace :size="8">
@@ -3307,7 +3626,13 @@ async function handleSend() {
                       <template #icon><NIcon :component="StopCircleOutline" /></template>
                       {{ t('pages.chat.actions.stop') }}
                     </NButton>
-                    <NButton size="small" type="primary" :loading="agentBusy" :disabled="agentBusy" @click="handleSend">
+                    <NButton
+                      size="small"
+                      type="primary"
+                      :loading="agentBusy"
+                      :disabled="agentBusy"
+                      @click="handleSend"
+                    >
                       <template #icon><NIcon :component="SendOutline" /></template>
                       {{ t('pages.chat.actions.send') }}
                     </NButton>
@@ -3319,7 +3644,12 @@ async function handleSend() {
         </NGridItem>
       </NGrid>
 
-      <NAlert v-if="chatStore.lastError" type="error" :show-icon="true" style="margin-top: 12px; border-radius: var(--radius);">
+      <NAlert
+        v-if="chatStore.lastError"
+        type="error"
+        :show-icon="true"
+        style="margin-top: 12px; border-radius: var(--radius)"
+      >
         {{ chatStore.lastError }}
       </NAlert>
     </NCard>
@@ -3328,9 +3658,13 @@ async function handleSend() {
       v-model:show="showImagePreviewModal"
       preset="card"
       :title="t('pages.chat.image.preview')"
-      style="width: 90vw; max-width: 1200px;"
+      style="width: 90vw; max-width: 1200px"
       :mask-closable="true"
-      @update:show="(val: boolean) => { if (!val) closeImagePreview() }"
+      @update:show="
+        (val: boolean) => {
+          if (!val) closeImagePreview()
+        }
+      "
     >
       <div v-if="imagePreviewUrl" class="image-preview-container">
         <img :src="imagePreviewUrl" class="image-preview-full" />
@@ -3531,7 +3865,9 @@ async function handleSend() {
 
 .chat-agent-step__time {
   min-width: 74px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
   font-variant-numeric: tabular-nums;
   opacity: 0.9;
 }
@@ -3622,12 +3958,24 @@ async function handleSend() {
   border-radius: 6px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .hermes-conv-item:hover {
   background: rgba(99, 226, 183, 0.06);
   border-color: var(--border-color);
+}
+
+.hermes-conv-item--disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.hermes-conv-item--disabled:hover {
+  background: transparent;
+  border-color: transparent;
 }
 
 .hermes-conv-item--active {
@@ -3996,9 +4344,15 @@ async function handleSend() {
   letter-spacing: -0.01em;
 }
 
-.chat-markdown :deep(h1) { font-size: 1.25em; }
-.chat-markdown :deep(h2) { font-size: 1.12em; }
-.chat-markdown :deep(h3) { font-size: 1.02em; }
+.chat-markdown :deep(h1) {
+  font-size: 1.25em;
+}
+.chat-markdown :deep(h2) {
+  font-size: 1.12em;
+}
+.chat-markdown :deep(h3) {
+  font-size: 1.02em;
+}
 
 /* —— 段落 —— */
 .chat-markdown :deep(p) {
@@ -4112,7 +4466,9 @@ async function handleSend() {
   font-weight: 500;
   text-underline-offset: 2px;
   text-decoration-thickness: 1px;
-  transition: color 0.12s ease, text-decoration-color 0.12s ease;
+  transition:
+    color 0.12s ease,
+    text-decoration-color 0.12s ease;
   text-decoration-line: underline;
   text-decoration-color: var(--link-underline);
 }
@@ -4402,7 +4758,6 @@ body.wide-mode .chat-bubble {
     min-height: 320px;
     max-height: 52vh;
   }
-
 }
 
 @media (max-width: 640px) {

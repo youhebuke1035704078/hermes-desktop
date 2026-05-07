@@ -5,7 +5,12 @@
  * Task E1.
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { parseSseLine, makeInitialSseParserState } from './sse-parser'
+import {
+  flushSseEvent,
+  parseSseEventLine,
+  parseSseLine,
+  makeInitialSseParserState
+} from './sse-parser'
 import type { SseParserState } from './sse-parser'
 
 describe('parseSseLine', () => {
@@ -26,7 +31,7 @@ describe('parseSseLine', () => {
     expect(result).toEqual({
       kind: 'data',
       event: 'hermes.model.fallback_activated',
-      data: '{"x":1}',
+      data: '{"x":1}'
     })
   })
 
@@ -73,5 +78,49 @@ describe('parseSseLine', () => {
       expect(r.event).toBe('hermes.model.chain_exhausted')
       expect(r.event?.startsWith('hermes.model.')).toBe(true)
     }
+  })
+})
+
+describe('parseSseEventLine', () => {
+  let state: SseParserState
+
+  beforeEach(() => {
+    state = makeInitialSseParserState()
+  })
+
+  it('dispatches multi-line data as one SSE event', () => {
+    parseSseEventLine('event: hermes.model.fallback_activated', state)
+    expect(parseSseEventLine('data: {"a":1,', state)).toEqual({ kind: 'skip' })
+    expect(parseSseEventLine('data: "b":2}', state)).toEqual({ kind: 'skip' })
+
+    expect(parseSseEventLine('', state)).toEqual({
+      kind: 'data',
+      event: 'hermes.model.fallback_activated',
+      data: '{"a":1,\n"b":2}'
+    })
+  })
+
+  it('flushes a final data event without trailing blank line', () => {
+    parseSseEventLine('data: {"choices":[{"delta":{"content":"tail"}}]}', state)
+
+    expect(flushSseEvent(state)).toEqual({
+      kind: 'data',
+      event: null,
+      data: '{"choices":[{"delta":{"content":"tail"}}]}'
+    })
+    expect(flushSseEvent(state)).toBeNull()
+  })
+
+  it('resets event name after dispatch', () => {
+    parseSseEventLine('event: hermes.model.primary_restored', state)
+    parseSseEventLine('data: {"ok":true}', state)
+    parseSseEventLine('', state)
+    parseSseEventLine('data: {"plain":true}', state)
+
+    expect(parseSseEventLine('', state)).toEqual({
+      kind: 'data',
+      event: null,
+      data: '{"plain":true}'
+    })
   })
 })

@@ -1,19 +1,62 @@
-import { app, shell, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage, session, dialog, clipboard } from 'electron'
-import { join, resolve, extname, basename, relative as pathRelative, isAbsolute as pathIsAbsolute } from 'path'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  Tray,
+  Menu,
+  Notification,
+  nativeImage,
+  session,
+  dialog,
+  clipboard
+} from 'electron'
+import {
+  join,
+  resolve,
+  extname,
+  basename,
+  relative as pathRelative,
+  isAbsolute as pathIsAbsolute
+} from 'path'
 import { execFile } from 'child_process'
-import { readdir, stat, readFile, mkdir, unlink, copyFile, realpath, rename, mkdtemp, rm, open as openFile } from 'fs/promises'
+import {
+  readdir,
+  stat,
+  readFile,
+  mkdir,
+  unlink,
+  copyFile,
+  realpath,
+  rename,
+  mkdtemp,
+  rm,
+  open as openFile
+} from 'fs/promises'
 import { existsSync } from 'fs'
 import { homedir, tmpdir } from 'os'
 import { randomBytes } from 'crypto'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
-import { getServers, saveServer, removeServer, decryptPassword, isEncryptionAvailable } from './store'
+import {
+  getServers,
+  saveServer,
+  removeServer,
+  decryptPassword,
+  isEncryptionAvailable
+} from './store'
 import * as yaml from 'js-yaml'
 import { scanSkillsDirectory, setNestedValue } from './skill-parser'
 import { parseHermesConfig } from './config-parser'
 import { extractApiServerKey } from './dotenv-parser'
-import { parseSseLine, makeInitialSseParserState } from './sse-parser'
+import {
+  flushSseEvent,
+  parseSseEventLine,
+  makeInitialSseParserState,
+  type ParsedSseLine
+} from './sse-parser'
+import { extractAssistantContentFromChunk } from './hermes-chat-content'
 import { registerWsBridge, shutdownWsBridge } from './ws-bridge'
 import { runGit, gitFetchWithRetry, createGitLock } from './hermes-git'
 import { ensureDeviceIdentity, signDevicePayload } from './device-identity'
@@ -50,6 +93,7 @@ if (!gotTheLock) {
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let isQuitting = false
+const hermesChatRequests = new Map<string, AbortController>()
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -67,7 +111,7 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       // Sandbox disabled: preload uses Node.js APIs (ipcRenderer) for IPC bridge
       sandbox: false,
-      zoomFactor: 1.0,
+      zoomFactor: 1.0
     }
   })
 
@@ -77,7 +121,8 @@ function createWindow(): void {
       mainWindow?.webContents.openDevTools()
       // Forward renderer errors to main process stdout for diagnostics
       mainWindow?.webContents.on('console-message', (_event, level, message) => {
-        if (level >= 2) {  // warnings and errors only
+        if (level >= 2) {
+          // warnings and errors only
           console.log(`[renderer] ${message.substring(0, 300)}`)
         }
       })
@@ -137,7 +182,6 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
-
 }
 
 function createTray(): void {
@@ -214,7 +258,11 @@ async function atomicWriteFile(targetPath: string, content: string): Promise<voi
   try {
     await rename(tmpPath, targetPath)
   } catch (err) {
-    try { await unlink(tmpPath) } catch { /* ignore */ }
+    try {
+      await unlink(tmpPath)
+    } catch {
+      /* ignore */
+    }
     throw err
   }
 }
@@ -225,39 +273,62 @@ const configYamlLock = createGitLock()
 function registerIpcHandlers(): void {
   // Store: server config (wrapped in try-catch to prevent unhandled IPC failures)
   ipcMain.handle('store:getServers', () => {
-    try { return getServers() } catch (_e) { return [] }
+    try {
+      return getServers()
+    } catch (_e) {
+      return []
+    }
   })
   ipcMain.handle('store:saveServer', (_, server) => {
-    try { return saveServer(server) } catch (e: any) { throw new Error(`Save failed: ${e.message}`) }
+    try {
+      return saveServer(server)
+    } catch (e: any) {
+      throw new Error(`Save failed: ${e.message}`)
+    }
   })
   ipcMain.handle('store:removeServer', (_, id) => {
-    try { return removeServer(id) } catch (e: any) { throw new Error(`Remove failed: ${e.message}`) }
+    try {
+      return removeServer(id)
+    } catch (e: any) {
+      throw new Error(`Remove failed: ${e.message}`)
+    }
   })
   ipcMain.handle('store:decryptPassword', (_, id) => {
-    try { return decryptPassword(id) } catch (_e) { return null }
+    try {
+      return decryptPassword(id)
+    } catch (_e) {
+      return null
+    }
   })
   ipcMain.handle('store:isEncryptionAvailable', () => {
-    try { return isEncryptionAvailable() } catch { return false }
+    try {
+      return isEncryptionAvailable()
+    } catch {
+      return false
+    }
   })
 
   // App info
   ipcMain.handle('app:getVersion', () => app.getVersion())
 
   // ── Device identity (main-process Ed25519; private key never leaves main) ──
-  ipcMain.handle('device:ensure', async (_, migration?: { publicKey?: unknown; privateKey?: unknown } | null) => {
-    try {
-      const mig =
-        migration &&
-        typeof migration.publicKey === 'string' &&
-        typeof migration.privateKey === 'string'
-          ? { publicKey: migration.publicKey, privateKey: migration.privateKey }
-          : null
-      const result = await ensureDeviceIdentity(mig)
-      return { ok: true, ...result }
-    } catch (e: any) {
-      return { ok: false, error: e?.message ?? 'device identity unavailable' }
+  ipcMain.handle(
+    'device:ensure',
+    async (_, migration?: { publicKey?: unknown; privateKey?: unknown } | null) => {
+      try {
+        const mig =
+          migration &&
+          typeof migration.publicKey === 'string' &&
+          typeof migration.privateKey === 'string'
+            ? { publicKey: migration.publicKey, privateKey: migration.privateKey }
+            : null
+        const result = await ensureDeviceIdentity(mig)
+        return { ok: true, ...result }
+      } catch (e: any) {
+        return { ok: false, error: e?.message ?? 'device identity unavailable' }
+      }
     }
-  })
+  )
 
   ipcMain.handle('device:sign', async (_, payload: unknown) => {
     try {
@@ -273,22 +344,29 @@ function registerIpcHandlers(): void {
 
   // HTTP proxy — allows renderer to fetch from external URLs without CORS restrictions.
   // URL scheme is validated to block file://, data:, javascript:, etc.
-  ipcMain.handle('http:fetch', async (_, url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => {
-    if (!isSafeHttpUrl(url)) {
-      return { status: 0, ok: false, body: 'Blocked: only http/https URLs are allowed' }
+  ipcMain.handle(
+    'http:fetch',
+    async (
+      _,
+      url: string,
+      init?: { method?: string; headers?: Record<string, string>; body?: string }
+    ) => {
+      if (!isSafeHttpUrl(url)) {
+        return { status: 0, ok: false, body: 'Blocked: only http/https URLs are allowed' }
+      }
+      try {
+        const res = await fetch(url, {
+          method: init?.method || 'GET',
+          headers: init?.headers,
+          body: init?.body
+        })
+        const body = await res.text()
+        return { status: res.status, ok: res.ok, body }
+      } catch (e: any) {
+        return { status: 0, ok: false, body: e.message || 'Network error' }
+      }
     }
-    try {
-      const res = await fetch(url, {
-        method: init?.method || 'GET',
-        headers: init?.headers,
-        body: init?.body,
-      })
-      const body = await res.text()
-      return { status: res.status, ok: res.ok, body }
-    } catch (e: any) {
-      return { status: 0, ok: false, body: e.message || 'Network error' }
-    }
-  })
+  )
 
   ipcMain.handle('clipboard:writeText', (_, text: string) => {
     try {
@@ -301,103 +379,135 @@ function registerIpcHandlers(): void {
 
   // ── Hermes REST API: streaming chat via SSE ──
   // Main-process fetch bypasses renderer CORS; SSE chunks are forwarded via IPC events.
-  ipcMain.handle('hermes:chat', async (event, url: string, body: string, authToken?: string, sessionId?: string) => {
-    if (!isSafeHttpUrl(url)) {
-      return { ok: false, error: 'Blocked: only http/https URLs are allowed' }
-    }
-    try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (authToken) headers['Authorization'] = `Bearer ${authToken}`
-      if (sessionId) headers['X-Hermes-Session-Id'] = sessionId
-      const res = await fetch(url, {
-        method: 'POST',
-        headers,
-        body,
-      })
-      if (!res.ok) {
-        const errBody = await res.text()
-        return { ok: false, error: `HTTP ${res.status}: ${errBody}` }
+  ipcMain.handle('hermes:chat:abort', async (_event, requestId: string) => {
+    const controller = hermesChatRequests.get(requestId)
+    if (!controller) return { ok: false, error: 'No active chat request' }
+    controller.abort()
+    return { ok: true }
+  })
+
+  ipcMain.handle(
+    'hermes:chat',
+    async (
+      event,
+      url: string,
+      body: string,
+      authToken?: string,
+      sessionId?: string,
+      requestId?: string
+    ) => {
+      if (!isSafeHttpUrl(url)) {
+        return { ok: false, error: 'Blocked: only http/https URLs are allowed' }
       }
-
-      // Stream SSE chunks back to the renderer
-      const reader = res.body?.getReader()
-      if (!reader) return { ok: false, error: 'No readable stream' }
-
-      const decoder = new TextDecoder()
-      const parserState = makeInitialSseParserState()
-      let buffer = ''
-      let finalContent = ''
-
-      const appendAssistantContent = (chunk: unknown): void => {
-        if (!chunk || typeof chunk !== 'object') return
-        const row = chunk as Record<string, unknown>
-        const choices = Array.isArray(row.choices) ? row.choices : []
-        const choice = choices[0]
-        if (!choice || typeof choice !== 'object') return
-        const choiceRow = choice as Record<string, unknown>
-        const delta = choiceRow.delta
-        if (!delta || typeof delta !== 'object') return
-        const content = (delta as Record<string, unknown>).content
-        if (typeof content === 'string') finalContent += content
-      }
-
+      const id = requestId || `main-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      const controller = new AbortController()
+      hermesChatRequests.set(id, controller)
       try {
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`
+        if (sessionId) headers['X-Hermes-Session-Id'] = sessionId
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body,
+          signal: controller.signal
+        })
+        if (!res.ok) {
+          const errBody = await res.text()
+          return { ok: false, error: `HTTP ${res.status}: ${errBody}` }
+        }
 
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || '' // keep incomplete line in buffer
+        // Stream SSE chunks back to the renderer
+        const reader = res.body?.getReader()
+        if (!reader) return { ok: false, error: 'No readable stream' }
 
-          for (const line of lines) {
-            const parsed = parseSseLine(line, parserState)
-            if (parsed.kind !== 'data') continue
+        const decoder = new TextDecoder()
+        const parserState = makeInitialSseParserState()
+        let buffer = ''
+        let finalContent = ''
 
-            // Route hermes.model.* lifecycle events to a dedicated channel so
-            // the renderer can update the model-state badge without polluting
-            // the chat-chunk stream.
-            if (parsed.event && parsed.event.startsWith('hermes.model.')) {
-              try {
-                const payload = JSON.parse(parsed.data)
-                if (!event.sender.isDestroyed()) {
-                  event.sender.send('hermes:lifecycle', {
-                    name: parsed.event,
-                    payload,
-                  })
-                }
-              } catch (err) {
-                console.warn('[hermes:lifecycle] JSON parse failed', err)
-              }
-              continue
-            }
+        const handleParsedEvent = (parsed: ParsedSseLine): void => {
+          if (parsed.kind !== 'data') return
 
-            // Default path: OpenAI-compatible chat completion delta.
-            if (parsed.data === '[DONE]') {
+          // Route hermes.model.* lifecycle events to a dedicated channel so
+          // the renderer can update the model-state badge without polluting
+          // the chat-chunk stream.
+          if (parsed.event && parsed.event.startsWith('hermes.model.')) {
+            try {
+              const payload = JSON.parse(parsed.data)
               if (!event.sender.isDestroyed()) {
-                event.sender.send('hermes:chat:chunk', { done: true })
+                event.sender.send('hermes:lifecycle', {
+                  requestId: id,
+                  name: parsed.event,
+                  payload
+                })
               }
-            } else {
-              try {
-                const parsedJson = JSON.parse(parsed.data)
-                appendAssistantContent(parsedJson)
-                if (!event.sender.isDestroyed()) {
-                  event.sender.send('hermes:chat:chunk', { done: false, data: parsedJson })
-                }
-              } catch { /* skip malformed JSON */ }
+            } catch (err) {
+              console.warn('[hermes:lifecycle] JSON parse failed', err)
             }
+            return
+          }
+
+          // Default path: OpenAI-compatible chat completion delta.
+          if (parsed.data === '[DONE]') {
+            if (!event.sender.isDestroyed()) {
+              event.sender.send('hermes:chat:chunk', { requestId: id, done: true })
+            }
+            return
+          }
+
+          try {
+            const parsedJson = JSON.parse(parsed.data)
+            finalContent += extractAssistantContentFromChunk(parsedJson)
+            if (!event.sender.isDestroyed()) {
+              event.sender.send('hermes:chat:chunk', {
+                requestId: id,
+                done: false,
+                data: parsedJson
+              })
+            }
+          } catch {
+            /* skip malformed JSON */
           }
         }
-      } finally {
-        reader.cancel().catch(() => {})
-      }
 
-      return { ok: true, finalContent }
-    } catch (e: any) {
-      return { ok: false, error: e?.message || 'Network error' }
+        try {
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split(/\r?\n/)
+            buffer = lines.pop() || '' // keep incomplete line in buffer
+
+            for (const line of lines) {
+              handleParsedEvent(parseSseEventLine(line, parserState))
+            }
+          }
+
+          buffer += decoder.decode()
+          if (buffer) {
+            handleParsedEvent(parseSseEventLine(buffer, parserState))
+            buffer = ''
+          }
+          const flushed = flushSseEvent(parserState)
+          if (flushed) handleParsedEvent(flushed)
+        } finally {
+          reader.cancel().catch(() => {})
+        }
+
+        return { ok: true, requestId: id, finalContent }
+      } catch (e: any) {
+        if (controller.signal.aborted || e?.name === 'AbortError') {
+          return { ok: false, requestId: id, aborted: true, error: 'Chat request aborted' }
+        }
+        return { ok: false, requestId: id, error: e?.message || 'Network error' }
+      } finally {
+        hermesChatRequests.delete(id)
+      }
     }
-  })
+  )
 
   // ── Read Hermes Agent config (to extract actual underlying model name
   //     and the fallback chain for the renderer's model-state badge) ──
@@ -416,7 +526,7 @@ function registerIpcHandlers(): void {
         provider: null,
         primary: null,
         fallback_chain: [] as string[],
-        apiServerKey: null as string | null,
+        apiServerKey: null as string | null
       }
     }
 
@@ -446,7 +556,7 @@ function registerIpcHandlers(): void {
       // produce choices instead of an empty list.
       fallback_chain_full: summary.fallback_chain_full,
       // Bug 5 (post-merge): API_SERVER_KEY for connectLocal auth
-      apiServerKey,
+      apiServerKey
     }
   })
 
@@ -463,7 +573,8 @@ function registerIpcHandlers(): void {
       try {
         const raw = await readFile(configPath, 'utf-8')
         const parsed = yaml.load(raw)
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid')
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+          throw new Error('invalid')
         const skillsCfg = (parsed as Record<string, any>)?.skills
         if (skillsCfg && typeof skillsCfg === 'object') {
           disabled = Array.isArray(skillsCfg.disabled) ? skillsCfg.disabled : []
@@ -499,7 +610,14 @@ function registerIpcHandlers(): void {
 
       return { ok: true, skills, disabled, configValues, externalDirs }
     } catch (e: any) {
-      return { ok: false, skills: [], disabled: [], configValues: {}, externalDirs: [], error: e.message }
+      return {
+        ok: false,
+        skills: [],
+        disabled: [],
+        configValues: {},
+        externalDirs: [],
+        error: e.message
+      }
     }
   })
 
@@ -530,7 +648,8 @@ function registerIpcHandlers(): void {
         switch (action) {
           case 'toggle': {
             const { name, disabled } = payload as { name: string; disabled: boolean }
-            if (typeof name !== 'string' || !name.trim()) return { ok: false, error: 'Invalid skill name' }
+            if (typeof name !== 'string' || !name.trim())
+              return { ok: false, error: 'Invalid skill name' }
             if (!Array.isArray(skills.disabled)) skills.disabled = []
             if (disabled) {
               if (!skills.disabled.includes(name)) skills.disabled.push(name)
@@ -541,9 +660,11 @@ function registerIpcHandlers(): void {
           }
           case 'setConfigValue': {
             const { key, value } = payload as { key: string; value: any }
-            if (typeof key !== 'string' || !key.trim()) return { ok: false, error: 'Invalid config key' }
+            if (typeof key !== 'string' || !key.trim())
+              return { ok: false, error: 'Invalid config key' }
             const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype'])
-            if (key.split('.').some((k) => FORBIDDEN.has(k))) return { ok: false, error: 'Forbidden key segment' }
+            if (key.split('.').some((k) => FORBIDDEN.has(k)))
+              return { ok: false, error: 'Forbidden key segment' }
             if (!skills.config || typeof skills.config !== 'object') skills.config = {}
             setNestedValue(skills.config, key, value)
             break
@@ -626,7 +747,9 @@ function registerIpcHandlers(): void {
                 const s = await stat(fullPath)
                 size = s.size
                 mtimeMs = s.mtimeMs
-              } catch { /* ignore */ }
+              } catch {
+                /* ignore */
+              }
             }
             return {
               name: d.name,
@@ -634,7 +757,7 @@ function registerIpcHandlers(): void {
               type: isDir ? 'directory' : 'file',
               size,
               mtimeMs,
-              extension: isDir ? undefined : extname(d.name).replace('.', ''),
+              extension: isDir ? undefined : extname(d.name).replace('.', '')
             }
           })
       )
@@ -669,10 +792,36 @@ function registerIpcHandlers(): void {
         return { ok: false, error: 'File too large (>10MB)' }
       }
       const ext = extname(realFile).replace('.', '').toLowerCase()
-      const binaryExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'pdf', 'zip', 'tar', 'gz', 'rar', '7z', 'mp4', 'mp3', 'wav']
+      const binaryExts = [
+        'png',
+        'jpg',
+        'jpeg',
+        'gif',
+        'webp',
+        'ico',
+        'bmp',
+        'pdf',
+        'zip',
+        'tar',
+        'gz',
+        'rar',
+        '7z',
+        'mp4',
+        'mp3',
+        'wav'
+      ]
       const isBinary = binaryExts.includes(ext)
-      const content = await readFile(realFile, isBinary ? 'base64' : (encoding || 'utf-8') as BufferEncoding)
-      return { ok: true, content, encoding: isBinary ? 'base64' : 'utf-8', name: basename(realFile), size: s.size }
+      const content = await readFile(
+        realFile,
+        isBinary ? 'base64' : ((encoding || 'utf-8') as BufferEncoding)
+      )
+      return {
+        ok: true,
+        content,
+        encoding: isBinary ? 'base64' : 'utf-8',
+        name: basename(realFile),
+        size: s.size
+      }
     } catch (e: any) {
       return { ok: false, error: e.message }
     }
@@ -717,14 +866,19 @@ function registerIpcHandlers(): void {
   ipcMain.handle('hermes:restart', async () => {
     try {
       return await new Promise<{ ok: boolean; error?: string }>((resolve) => {
-        if (!process.getuid) return resolve({ ok: false, error: 'getuid not available on this platform' })
-        execFile('launchctl', ['kickstart', '-k', 'gui/' + process.getuid() + '/ai.hermes.gateway'], (err, _stdout, stderr) => {
-          if (err) {
-            resolve({ ok: false, error: stderr || err.message })
-          } else {
-            resolve({ ok: true })
+        if (!process.getuid)
+          return resolve({ ok: false, error: 'getuid not available on this platform' })
+        execFile(
+          'launchctl',
+          ['kickstart', '-k', 'gui/' + process.getuid() + '/ai.hermes.gateway'],
+          (err, _stdout, stderr) => {
+            if (err) {
+              resolve({ ok: false, error: stderr || err.message })
+            } else {
+              resolve({ ok: true })
+            }
           }
-        })
+        )
       })
     } catch (e: any) {
       return { ok: false, error: e.message }
@@ -741,21 +895,23 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('hermes:version', async () => {
     try {
-      return await new Promise<{ ok: boolean; version?: string; date?: string; error?: string }>((resolve) => {
-        execFile(HERMES_BIN, ['--version'], { timeout: 5000 }, (err, stdout) => {
-          if (err) {
-            resolve({ ok: false, error: err.message })
-            return
-          }
-          // Parse: "Hermes Agent v0.8.0 (2026.4.8)"
-          const match = stdout.match(/v([\d.]+)\s*\(([^)]+)\)/)
-          resolve({
-            ok: true,
-            version: match ? match[1] : stdout.trim(),
-            date: match ? match[2] : undefined,
+      return await new Promise<{ ok: boolean; version?: string; date?: string; error?: string }>(
+        (resolve) => {
+          execFile(HERMES_BIN, ['--version'], { timeout: 5000 }, (err, stdout) => {
+            if (err) {
+              resolve({ ok: false, error: err.message })
+              return
+            }
+            // Parse: "Hermes Agent v0.8.0 (2026.4.8)"
+            const match = stdout.match(/v([\d.]+)\s*\(([^)]+)\)/)
+            resolve({
+              ok: true,
+              version: match ? match[1] : stdout.trim(),
+              date: match ? match[2] : undefined
+            })
           })
-        })
-      })
+        }
+      )
     } catch (e: any) {
       return { ok: false, error: e.message }
     }
@@ -780,7 +936,10 @@ function registerIpcHandlers(): void {
         const tagTime = parseInt(tagTs.stdout || '0', 10)
         const updateAvailable = tagTime > headTime
 
-        const desc = await runGit(['-C', HERMES_REPO, 'describe', '--tags', '--always', 'HEAD'], 5000)
+        const desc = await runGit(
+          ['-C', HERMES_REPO, 'describe', '--tags', '--always', 'HEAD'],
+          5000
+        )
         const current = desc.stdout || 'dev'
         return { ok: true, current, latest, updateAvailable }
       } catch (e: any) {
@@ -794,10 +953,18 @@ function registerIpcHandlers(): void {
       try {
         // Auto-stash any local changes (e.g. package-lock.json, __pycache__)
         // that would block `git checkout` during `hermes update`. Silent fail OK.
-        await runGit([
-          '-C', HERMES_REPO, 'stash', 'push', '--include-untracked',
-          '-m', `hermes-desktop-auto-stash-${Date.now()}`,
-        ], 10000)
+        await runGit(
+          [
+            '-C',
+            HERMES_REPO,
+            'stash',
+            'push',
+            '--include-untracked',
+            '-m',
+            `hermes-desktop-auto-stash-${Date.now()}`
+          ],
+          10000
+        )
 
         // Pre-fetch with retry so a transient blip doesn't abort the whole update.
         const preFetch = await gitFetchWithRetry(HERMES_REPO, 60000)
@@ -847,9 +1014,11 @@ function registerIpcHandlers(): void {
             filename: name,
             size: s.size,
             createdAt: s.birthtime.toISOString(),
-            date: s.birthtime.toLocaleString(),
+            date: s.birthtime.toLocaleString()
           })
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
       backups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       return { ok: true, backups }
@@ -876,17 +1045,27 @@ function registerIpcHandlers(): void {
 
       await new Promise<void>((resolve, reject) => {
         // tar the .hermes directory, excluding large cache dirs
-        execFile('tar', [
-          'czf', outPath,
-          '--exclude', '.hermes/workspace/node_modules',
-          '--exclude', '.hermes/workspace/exports',
-          '--exclude', '.hermes/media',
-          '-C', homedir(),
-          '.hermes',
-        ], { timeout: 300000 }, (err) => {
-          if (err) reject(new Error(err.message))
-          else resolve()
-        })
+        execFile(
+          'tar',
+          [
+            'czf',
+            outPath,
+            '--exclude',
+            '.hermes/workspace/node_modules',
+            '--exclude',
+            '.hermes/workspace/exports',
+            '--exclude',
+            '.hermes/media',
+            '-C',
+            homedir(),
+            '.hermes'
+          ],
+          { timeout: 300000 },
+          (err) => {
+            if (err) reject(new Error(err.message))
+            else resolve()
+          }
+        )
       })
 
       send(90, '正在验证备份...')
@@ -920,7 +1099,7 @@ function registerIpcHandlers(): void {
       if (!mainWindow) return { ok: false, error: 'Window not available' }
       const result = await dialog.showSaveDialog(mainWindow, {
         defaultPath: filename,
-        filters: [{ name: 'Archive', extensions: ['tar.gz'] }],
+        filters: [{ name: 'Archive', extensions: ['tar.gz'] }]
       })
       if (result.canceled || !result.filePath) return { ok: false, error: 'Cancelled' }
       await copyFile(srcPath, result.filePath)
@@ -967,7 +1146,13 @@ function registerIpcHandlers(): void {
           { timeout: 60000, maxBuffer: 16 * 1024 * 1024 },
           (err, stdout) => {
             if (err) reject(new Error(err.message))
-            else resolve(stdout.split('\n').map((s) => s.trim()).filter(Boolean))
+            else
+              resolve(
+                stdout
+                  .split('\n')
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+              )
           }
         )
       })
@@ -982,11 +1167,16 @@ function registerIpcHandlers(): void {
           normalized.includes('/../') ||
           normalized.includes('\\') ||
           // Allow the root entry ('') and anything under .hermes/
-          !(normalized === '' || normalized === '.hermes' || normalized === '.hermes/' || normalized.startsWith('.hermes/'))
+          !(
+            normalized === '' ||
+            normalized === '.hermes' ||
+            normalized === '.hermes/' ||
+            normalized.startsWith('.hermes/')
+          )
         ) {
           return {
             ok: false,
-            error: `Backup rejected: unsafe entry "${entry}". Only .hermes/* paths are allowed.`,
+            error: `Backup rejected: unsafe entry "${entry}". Only .hermes/* paths are allowed.`
           }
         }
       }
@@ -994,13 +1184,15 @@ function registerIpcHandlers(): void {
       send(15, '正在解压备份...')
 
       await new Promise<void>((resolve, reject) => {
-        execFile('tar', [
-          'xzf', stagedPath,
-          '-C', homedir(),
-        ], { timeout: 300000, maxBuffer: 10 * 1024 * 1024 }, (err) => {
-          if (err) reject(new Error(err.message))
-          else resolve()
-        })
+        execFile(
+          'tar',
+          ['xzf', stagedPath, '-C', homedir()],
+          { timeout: 300000, maxBuffer: 10 * 1024 * 1024 },
+          (err) => {
+            if (err) reject(new Error(err.message))
+            else resolve()
+          }
+        )
       })
 
       send(100, '恢复完成')
@@ -1009,7 +1201,11 @@ function registerIpcHandlers(): void {
       return { ok: false, error: e.message }
     } finally {
       if (tempDir) {
-        try { await rm(tempDir, { recursive: true, force: true }) } catch { /* ignore */ }
+        try {
+          await rm(tempDir, { recursive: true, force: true })
+        } catch {
+          /* ignore */
+        }
       }
     }
   })
@@ -1019,7 +1215,7 @@ function registerIpcHandlers(): void {
       if (!mainWindow) return { ok: false, error: 'Window not available' }
       const result = await dialog.showOpenDialog(mainWindow, {
         properties: ['openFile'],
-        filters: [{ name: 'Archive', extensions: ['gz'] }],
+        filters: [{ name: 'Archive', extensions: ['gz'] }]
       })
       if (result.canceled || result.filePaths.length === 0) return { ok: false, error: 'Cancelled' }
       const src = result.filePaths[0]!
@@ -1070,26 +1266,33 @@ function registerIpcHandlers(): void {
   })
 
   // Notifications — enhanced with severity, sound, and badge
-  ipcMain.on('notify:alert', (_, opts: {
-    title: string
-    body: string
-    severity?: 'critical' | 'warning' | 'info'
-    silent?: boolean
-  }) => {
-    const notification = new Notification({
-      title: opts.title,
-      body: opts.body,
-      silent: opts.silent ?? (opts.severity === 'info'),
-      urgency: opts.severity === 'critical' ? 'critical' : opts.severity === 'warning' ? 'normal' : 'low'
-    })
-    notification.on('click', () => {
-      mainWindow?.show()
-      mainWindow?.focus()
-      // Navigate to alerts page
-      mainWindow?.webContents.send('navigate', '/alerts')
-    })
-    notification.show()
-  })
+  ipcMain.on(
+    'notify:alert',
+    (
+      _,
+      opts: {
+        title: string
+        body: string
+        severity?: 'critical' | 'warning' | 'info'
+        silent?: boolean
+      }
+    ) => {
+      const notification = new Notification({
+        title: opts.title,
+        body: opts.body,
+        silent: opts.silent ?? opts.severity === 'info',
+        urgency:
+          opts.severity === 'critical' ? 'critical' : opts.severity === 'warning' ? 'normal' : 'low'
+      })
+      notification.on('click', () => {
+        mainWindow?.show()
+        mainWindow?.focus()
+        // Navigate to alerts page
+        mainWindow?.webContents.send('navigate', '/alerts')
+      })
+      notification.show()
+    }
+  )
 
   // Badge count (macOS dock badge)
   ipcMain.on('badge:set', (_, count: number) => {
@@ -1119,13 +1322,13 @@ function setupAutoUpdater(): void {
     mainWindow?.webContents.send('updater:status', {
       event: 'available',
       version: info.version,
-      releaseDate: info.releaseDate,
+      releaseDate: info.releaseDate
     })
   })
   autoUpdater.on('update-not-available', (info) => {
     mainWindow?.webContents.send('updater:status', {
       event: 'not-available',
-      version: info.version,
+      version: info.version
     })
   })
   autoUpdater.on('download-progress', (progress) => {
@@ -1134,19 +1337,19 @@ function setupAutoUpdater(): void {
       percent: progress.percent,
       bytesPerSecond: progress.bytesPerSecond,
       transferred: progress.transferred,
-      total: progress.total,
+      total: progress.total
     })
   })
   autoUpdater.on('update-downloaded', (info) => {
     mainWindow?.webContents.send('updater:status', {
       event: 'downloaded',
-      version: info.version,
+      version: info.version
     })
   })
   autoUpdater.on('error', (err) => {
     mainWindow?.webContents.send('updater:status', {
       event: 'error',
-      error: err.message,
+      error: err.message
     })
   })
 

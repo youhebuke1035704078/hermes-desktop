@@ -43,8 +43,8 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
   /** Debounce timer for server sync */
   let syncTimer: ReturnType<typeof setTimeout> | null = null
 
-  const activeConversation = computed(() =>
-    conversations.value.find(c => c.id === activeId.value) || null,
+  const activeConversation = computed(
+    () => conversations.value.find((c) => c.id === activeId.value) || null
   )
 
   // ── Server sync helpers ──
@@ -58,7 +58,9 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
       const u = new URL(url)
       u.port = '8643'
       return u.origin
-    } catch { return '' }
+    } catch {
+      return ''
+    }
   }
 
   function getAuthToken(): string | null {
@@ -66,7 +68,10 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     return conn.hermesAuthToken
   }
 
-  async function mgmtFetch(path: string, opts: { method?: string; body?: string } = {}): Promise<any> {
+  async function mgmtFetch(
+    path: string,
+    opts: { method?: string; body?: string } = {}
+  ): Promise<any> {
     const baseUrl = getMgmtUrl()
     if (!baseUrl) throw new Error('No management URL')
     const url = `${baseUrl}${path}`
@@ -74,15 +79,24 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     const token = getAuthToken()
     if (token) headers['Authorization'] = `Bearer ${token}`
     if (window.api?.httpFetch) {
-      const resp = await window.api.httpFetch(url, { method: opts.method || 'GET', headers, body: opts.body })
+      const resp = await window.api.httpFetch(url, {
+        method: opts.method || 'GET',
+        headers,
+        body: opts.body
+      })
       if (!resp.ok) {
         const errBody = typeof resp.body === 'string' ? resp.body : ''
         throw new Error(errBody || `HTTP ${resp.status}`)
       }
       return typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}
     }
-    const resp = await fetch(url, { method: opts.method || 'GET', headers, body: opts.body, signal: AbortSignal.timeout(10000) })
-    if (!resp.ok) throw new Error(await resp.text() || `HTTP ${resp.status}`)
+    const resp = await fetch(url, {
+      method: opts.method || 'GET',
+      headers,
+      body: opts.body,
+      signal: AbortSignal.timeout(10000)
+    })
+    if (!resp.ok) throw new Error((await resp.text()) || `HTTP ${resp.status}`)
     return resp.json()
   }
 
@@ -109,8 +123,8 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
         }
         // Merge: remote takes precedence for conversations that exist on both sides
         // (keyed by id, newer updatedAt wins)
-        const localMap = new Map(conversations.value.map(c => [c.id, c]))
-        const remoteMap = new Map((remote.conversations || []).map(c => [c.id, c]))
+        const localMap = new Map(conversations.value.map((c) => [c.id, c]))
+        const remoteMap = new Map((remote.conversations || []).map((c) => [c.id, c]))
 
         const merged: HermesConversation[] = []
         const allIds = new Set([...localMap.keys(), ...remoteMap.keys()])
@@ -139,7 +153,9 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
         saveLocal()
         return true
       }
-    } catch { /* server sync failed, use local */ }
+    } catch {
+      /* server sync failed, use local */
+    }
     return false
   }
 
@@ -155,11 +171,13 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
             data: {
               conversations: conversations.value.slice(0, MAX_CONVERSATIONS),
               activeId: activeId.value,
-              model: model.value,
-            },
-          }),
+              model: model.value
+            }
+          })
         })
-      } catch { /* silent fail */ }
+      } catch {
+        /* silent fail */
+      }
     }, SYNC_DEBOUNCE)
   }
 
@@ -167,11 +185,14 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
 
   function saveLocal() {
     try {
-      safeSet(STORAGE_KEY, JSON.stringify({
-        conversations: conversations.value.slice(0, MAX_CONVERSATIONS),
-        activeId: activeId.value,
-        model: model.value,
-      }))
+      safeSet(
+        STORAGE_KEY,
+        JSON.stringify({
+          conversations: conversations.value.slice(0, MAX_CONVERSATIONS),
+          activeId: activeId.value,
+          model: model.value
+        })
+      )
     } catch (e) {
       console.warn('[hermes-chat] Failed to save:', e)
     }
@@ -207,7 +228,10 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
       if (raw) {
         try {
           safeSet(`${STORAGE_KEY}.corrupt.${Date.now()}`, raw)
-          console.warn('[hermes-chat] Persisted conversations corrupt — quarantined to *.corrupt.*', e)
+          console.warn(
+            '[hermes-chat] Persisted conversations corrupt — quarantined to *.corrupt.*',
+            e
+          )
         } catch (saveErr) {
           console.warn('[hermes-chat] Failed to quarantine corrupt conversations:', saveErr)
         }
@@ -219,7 +243,7 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     if (!conversations.value.length) {
       createConversation()
     }
-    if (!activeId.value || !conversations.value.find(c => c.id === activeId.value)) {
+    if (!activeId.value || !conversations.value.find((c) => c.id === activeId.value)) {
       activeId.value = conversations.value[0]?.id || null
     }
 
@@ -232,7 +256,7 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
         await loadFromServer()
         if (!conversations.value.length) {
           createConversation()
-          if (!activeId.value || !conversations.value.find(c => c.id === activeId.value)) {
+          if (!activeId.value || !conversations.value.find((c) => c.id === activeId.value)) {
             activeId.value = conversations.value[0]?.id || null
           }
         }
@@ -249,7 +273,7 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
       messages: [],
       model: model.value,
       createdAt: Date.now(),
-      updatedAt: Date.now(),
+      updatedAt: Date.now()
     }
     conversations.value.unshift(conv)
     activeId.value = id
@@ -265,7 +289,7 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
 
   /** Delete a conversation */
   function deleteConversation(id: string) {
-    conversations.value = conversations.value.filter(c => c.id !== id)
+    conversations.value = conversations.value.filter((c) => c.id !== id)
     if (activeId.value === id) {
       activeId.value = conversations.value[0]?.id || null
       if (!conversations.value.length) createConversation()
@@ -275,28 +299,34 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
 
   /** Rename a conversation */
   function renameConversation(id: string, title: string) {
-    const conv = conversations.value.find(c => c.id === id)
+    const conv = conversations.value.find((c) => c.id === id)
     if (!conv) return
     conv.title = title.trim()
     conv.updatedAt = Date.now()
     save()
   }
 
-  /** Update messages for the active conversation and persist */
-  function setMessages(messages: ChatMessage[], resolvedModel?: string) {
-    const conv = conversations.value.find(c => c.id === activeId.value)
+  /** Update messages for a specific conversation and persist */
+  function setMessagesFor(id: string, messages: ChatMessage[], resolvedModel?: string) {
+    const conv = conversations.value.find((c) => c.id === id)
     if (!conv) return
     conv.messages = messages
     conv.updatedAt = Date.now()
     if (resolvedModel) conv.resolvedModel = resolvedModel
     // Auto-title from first user message
     if (!conv.title) {
-      const firstUser = messages.find(m => m.role === 'user')
+      const firstUser = messages.find((m) => m.role === 'user')
       if (firstUser?.content) {
         conv.title = firstUser.content.slice(0, 30) + (firstUser.content.length > 30 ? '...' : '')
       }
     }
     save()
+  }
+
+  /** Update messages for the active conversation and persist */
+  function setMessages(messages: ChatMessage[], resolvedModel?: string) {
+    if (!activeId.value) return
+    setMessagesFor(activeId.value, messages, resolvedModel)
   }
 
   function setModel(m: string) {
@@ -305,20 +335,25 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
   }
 
   /** Accumulate token usage from a single turn into the conversation total AND append a per-turn history entry */
-  function accumulateTokenUsage(id: string, inputTokens: number, outputTokens: number, model?: string) {
+  function accumulateTokenUsage(
+    id: string,
+    inputTokens: number,
+    outputTokens: number,
+    model?: string
+  ) {
     if (inputTokens <= 0 && outputTokens <= 0) return
-    const conv = conversations.value.find(c => c.id === id)
+    const conv = conversations.value.find((c) => c.id === id)
     if (!conv) return
     const prev = conv.tokenUsage || { totalInput: 0, totalOutput: 0 }
     conv.tokenUsage = {
       totalInput: prev.totalInput + inputTokens,
-      totalOutput: prev.totalOutput + outputTokens,
+      totalOutput: prev.totalOutput + outputTokens
     }
     if (!conv.tokenUsageHistory) conv.tokenUsageHistory = []
     const entry: TokenUsageEntry = {
       ts: Date.now(),
       input: inputTokens,
-      output: outputTokens,
+      output: outputTokens
     }
     if (model) entry.model = model
     conv.tokenUsageHistory.push(entry)
@@ -344,8 +379,9 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     switchTo,
     deleteConversation,
     renameConversation,
+    setMessagesFor,
     setMessages,
     setModel,
-    accumulateTokenUsage,
+    accumulateTokenUsage
   }
 })
