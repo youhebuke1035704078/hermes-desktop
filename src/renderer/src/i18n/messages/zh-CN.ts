@@ -196,7 +196,8 @@ export default {
         total: '总数',
         enabled: '已启用',
         disabled: '已禁用',
-        configVars: '配置变量'
+        configVars: '配置变量',
+        userCreated: '自建 Skill'
       },
       search: '搜索 skill 名称 / 描述 / 标签',
       categoryFilter: '分类',
@@ -205,14 +206,21 @@ export default {
       statusAll: '全部',
       statusEnabled: '已启用',
       statusDisabled: '已禁用',
+      sourceFilter: '来源',
+      sourceAll: '全部来源',
+      sourceOther: '其他来源',
       source: {
         server: '服务端 Skill',
         local: '本机 Skill',
         fallback: '服务端 Skill 读取失败，已显示本机扫描结果：{error}'
       },
+      userCreated: {
+        title: '自建 Skill'
+      },
       columns: {
         name: '名称',
         category: '分类',
+        source: '来源',
         platform: '平台',
         status: '状态'
       },
@@ -255,6 +263,7 @@ export default {
       },
       empty: '未发现任何 skill。请检查 ~/.hermes/skills/ 目录。',
       sources: {
+        userCreated: '自建',
         workspace: '用户创建',
         managed: '用户安装',
         extra: '外部插件',

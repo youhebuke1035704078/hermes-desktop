@@ -7,7 +7,7 @@ export * from './remote-desktop'
 export * from './backup'
 import type { ModelConfig, ToolPolicyConfig } from './config'
 
-export type SkillSource = 'bundled' | 'workspace' | 'managed' | 'extra'
+export type SkillSource = 'bundled' | 'workspace' | 'managed' | 'extra' | 'user_created'
 
 export interface SkillMeta {
   name: string

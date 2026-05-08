@@ -19,6 +19,7 @@ const skillStore = useSkillStore()
 const searchQuery = ref('')
 const categoryFilter = ref<string | null>(null)
 const statusFilter = ref<string | null>(null)
+const sourceFilter = ref<'user_created' | 'other' | null>(null)
 
 const categoryOptions = computed(() => [
   { label: t('pages.skills.categoryAll'), value: null as any },
@@ -31,12 +32,19 @@ const statusOptions = computed(() => [
   { label: t('pages.skills.statusDisabled'), value: 'disabled' },
 ])
 
+const skillSourceOptions = computed(() => [
+  { label: t('pages.skills.sourceAll'), value: null as any },
+  { label: t('pages.skills.sources.userCreated'), value: 'user_created' },
+  { label: t('pages.skills.sourceOther'), value: 'other' },
+])
+
 const sourceType = computed(() => (skillStore.source === 'server' ? 'success' : 'warning'))
 const sourceLabel = computed(() =>
   skillStore.source === 'server'
     ? t('pages.skills.source.server')
     : t('pages.skills.source.local'),
 )
+const userCreatedSkills = computed(() => skillStore.userCreatedSkills)
 
 const filteredSkills = computed(() => {
   let list = skillStore.skills
@@ -57,8 +65,27 @@ const filteredSkills = computed(() => {
   } else if (statusFilter.value === 'disabled') {
     list = list.filter((s) => skillStore.isDisabled(s.name))
   }
+  if (sourceFilter.value === 'user_created') {
+    list = list.filter((s) => s.source === 'user_created')
+  } else if (sourceFilter.value === 'other') {
+    list = list.filter((s) => s.source !== 'user_created')
+  }
   return list
 })
+
+function skillSourceLabel(source: SkillMeta['source']): string {
+  if (source === 'user_created') return t('pages.skills.sources.userCreated')
+  if (source === 'workspace') return t('pages.skills.sources.workspace')
+  if (source === 'managed') return t('pages.skills.sources.managed')
+  if (source === 'extra') return t('pages.skills.sources.extra')
+  return t('pages.skills.sources.bundled')
+}
+
+function skillSourceTagType(source: SkillMeta['source']): 'info' | 'success' | 'default' {
+  if (source === 'user_created') return 'info'
+  if (source === 'managed' || source === 'workspace') return 'success'
+  return 'default'
+}
 
 // ── Responsive ──
 const windowWidth = ref(window.innerWidth)
@@ -203,6 +230,18 @@ const columns = computed<DataTableColumns<SkillMeta>>(() => [
     },
   },
   {
+    title: t('pages.skills.columns.source'),
+    key: 'source',
+    width: 110,
+    render(row) {
+      return h(
+        NTag,
+        { size: 'small', type: skillSourceTagType(row.source), bordered: false, round: true },
+        { default: () => skillSourceLabel(row.source) },
+      )
+    },
+  },
+  {
     title: t('pages.skills.columns.platform'),
     key: 'platforms',
     width: 100,
@@ -265,7 +304,7 @@ function rowProps(row: SkillMeta) {
         </NSpace>
       </template>
 
-      <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="10" :y-gap="10">
+      <NGrid cols="1 s:2 m:5" responsive="screen" :x-gap="10" :y-gap="10">
         <NGridItem>
           <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
             <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.metrics.total') }}</NText>
@@ -296,6 +335,14 @@ function rowProps(row: SkillMeta) {
             </div>
           </NCard>
         </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.metrics.userCreated') }}</NText>
+            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+              <NText type="info">{{ skillStore.userCreatedCount }}</NText>
+            </div>
+          </NCard>
+        </NGridItem>
       </NGrid>
 
       <!-- Filter bar -->
@@ -320,10 +367,37 @@ function rowProps(row: SkillMeta) {
           clearable
           style="width: 140px;"
         />
+        <NSelect
+          v-model:value="sourceFilter"
+          :options="skillSourceOptions"
+          :placeholder="t('pages.skills.sourceFilter')"
+          clearable
+          style="width: 150px;"
+        />
       </div>
       <NText v-if="skillStore.sourceError" type="warning" style="font-size: 12px; margin-top: 8px; display: block;">
         {{ t('pages.skills.source.fallback', { error: skillStore.sourceError }) }}
       </NText>
+    </NCard>
+
+    <NCard v-if="userCreatedSkills.length > 0">
+      <template #header>
+        <NSpace align="center" :size="8">
+          <NTag type="info" round>{{ t('pages.skills.sources.userCreated') }}</NTag>
+          <span>{{ t('pages.skills.userCreated.title') }}</span>
+        </NSpace>
+      </template>
+      <NSpace :size="8" style="flex-wrap: wrap;">
+        <NButton
+          v-for="skill in userCreatedSkills"
+          :key="skill.name"
+          secondary
+          size="small"
+          @click="selectSkill(skill.name)"
+        >
+          {{ skill.name }}
+        </NButton>
+      </NSpace>
     </NCard>
 
     <!-- Empty state -->

@@ -16,6 +16,7 @@ export interface SkillMeta {
   dirPath: string
   relatedSkills?: string[]
   homepage?: string
+  source?: 'bundled' | 'workspace' | 'managed' | 'extra' | 'user_created'
 }
 
 /**
@@ -48,6 +49,7 @@ export function frontmatterToMeta(
   const relPath = relative(skillsRoot, skillDir)
   const fsCategory = relPath.split('/')[0] || 'uncategorized'
   const category = hermes.category || fsCategory
+  const source = normalizeSkillSource(hermes.source || hermes.origin)
 
   return {
     name: fm.name || '',
@@ -62,8 +64,20 @@ export function frontmatterToMeta(
     license: fm.license || undefined,
     dirPath: skillDir,
     relatedSkills: Array.isArray(hermes.related_skills) ? hermes.related_skills : undefined,
-    homepage: hermes.homepage || undefined
+    homepage: hermes.homepage || undefined,
+    source
   }
+}
+
+function normalizeSkillSource(value: unknown): SkillMeta['source'] {
+  const source = String(value || '').trim().toLowerCase().replace(/-/g, '_')
+  if (['user', 'custom', 'created', 'self_created', 'agent_created'].includes(source)) {
+    return 'user_created'
+  }
+  if (['bundled', 'workspace', 'managed', 'extra', 'user_created'].includes(source)) {
+    return source as SkillMeta['source']
+  }
+  return 'bundled'
 }
 
 /**

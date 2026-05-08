@@ -202,7 +202,8 @@ export default {
         total: 'Total',
         enabled: 'Enabled',
         disabled: 'Disabled',
-        configVars: 'Config Vars'
+        configVars: 'Config Vars',
+        userCreated: 'Custom Skills'
       },
       search: 'Search by name / description / tags',
       categoryFilter: 'Category',
@@ -211,14 +212,21 @@ export default {
       statusAll: 'All',
       statusEnabled: 'Enabled',
       statusDisabled: 'Disabled',
+      sourceFilter: 'Source',
+      sourceAll: 'All Sources',
+      sourceOther: 'Other Sources',
       source: {
         server: 'Server Skills',
         local: 'Local Skills',
         fallback: 'Failed to load server skills; showing local scan instead: {error}'
       },
+      userCreated: {
+        title: 'Custom Skills'
+      },
       columns: {
         name: 'Name',
         category: 'Category',
+        source: 'Source',
         platform: 'Platform',
         status: 'Status'
       },
@@ -261,6 +269,7 @@ export default {
       },
       empty: 'No skills found. Check ~/.hermes/skills/ directory.',
       sources: {
+        userCreated: 'Custom',
         workspace: 'Created',
         managed: 'Installed',
         extra: 'External',

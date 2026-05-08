@@ -36,6 +36,7 @@ function normalizeSkill(skill: Partial<SkillMeta>): SkillMeta {
     dirPath: typeof skill.dirPath === 'string' ? skill.dirPath : '',
     relatedSkills: ensureArray<string>(skill.relatedSkills),
     homepage: typeof skill.homepage === 'string' ? skill.homepage : undefined,
+    source: skill.source || 'bundled',
   }
 }
 
@@ -56,6 +57,10 @@ export const useSkillStore = defineStore('skill', () => {
   const configVarCount = computed(() =>
     skills.value.reduce((sum, s) => sum + (s.configVars?.length || 0), 0)
   )
+  const userCreatedSkills = computed(() =>
+    skills.value.filter((s) => s.source === 'user_created').sort((a, b) => a.name.localeCompare(b.name))
+  )
+  const userCreatedCount = computed(() => userCreatedSkills.value.length)
   const categories = computed(() => [...new Set(skills.value.map((s) => s.category))].sort())
   const selectedSkill = computed(() =>
     skills.value.find((s) => s.name === selectedSkillName.value) || null
@@ -268,7 +273,7 @@ export const useSkillStore = defineStore('skill', () => {
 
   return {
     skills, disabled, configValues, externalDirs, loading, selectedSkillName, source, rootDir, sourceError,
-    enabledCount, disabledCount, configVarCount, categories, selectedSkill,
+    enabledCount, disabledCount, configVarCount, userCreatedSkills, userCreatedCount, categories, selectedSkill,
     isDisabled, isSkillVisibleInChat,
     fetchSkills, toggleSkill, setConfigValue, addExternalDir, removeExternalDir,
   }

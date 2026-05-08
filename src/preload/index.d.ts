@@ -97,6 +97,7 @@ interface HermesAPI {
       dirPath: string
       relatedSkills?: string[]
       homepage?: string
+      source?: 'bundled' | 'workspace' | 'managed' | 'extra' | 'user_created'
     }>
     disabled: string[]
     configValues: Record<string, any>

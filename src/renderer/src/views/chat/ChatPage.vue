@@ -1133,6 +1133,7 @@ const slashSubagentsMode = computed(
 )
 
 function skillSourceLabel(source: Skill['source']): string {
+  if (source === 'user_created') return t('pages.skills.sources.userCreated')
   if (source === 'workspace') return t('pages.skills.sources.workspace')
   if (source === 'managed') return t('pages.skills.sources.managed')
   if (source === 'extra') return t('pages.skills.sources.extra')
