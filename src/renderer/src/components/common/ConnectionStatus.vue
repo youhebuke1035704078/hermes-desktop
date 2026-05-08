@@ -14,6 +14,9 @@ const appDownloadPercent = ref(0)
 const appDownloaded = ref(false)
 const appUpdateError = ref('')
 const appChecking = ref(false)
+const appManualDownload = ref(false)
+const appDownloadUrl = ref('')
+const appReleaseUrl = ref('')
 
 const installCountdown = ref(0)
 
@@ -23,8 +26,9 @@ const updateStatusText = computed(() => {
   if (appDownloaded.value) return t('components.connectionStatus.ready')
   if (appDownloading.value)
     return t('components.connectionStatus.downloading', {
-      percent: Math.round(appDownloadPercent.value),
+      percent: Math.round(appDownloadPercent.value)
     })
+  if (appUpdateError.value) return t('components.connectionStatus.updateFailed')
   if (appUpdateAvailable.value) return t('components.connectionStatus.updateDetected')
   if (appChecking.value) return t('components.connectionStatus.checking')
   return t('components.connectionStatus.upToDate')
@@ -43,15 +47,22 @@ onMounted(async () => {
       switch (data.event) {
         case 'checking':
           appChecking.value = true
+          appUpdateError.value = ''
           break
         case 'available':
           appChecking.value = false
           appUpdateAvailable.value = true
           appNewVersion.value = data.version || ''
+          appManualDownload.value = !!data.manual
+          appDownloadUrl.value = data.downloadUrl || ''
+          appReleaseUrl.value = data.releaseUrl || ''
           break
         case 'not-available':
           appChecking.value = false
           appUpdateAvailable.value = false
+          appManualDownload.value = false
+          appDownloadUrl.value = ''
+          appReleaseUrl.value = data.releaseUrl || ''
           break
         case 'progress':
           appDownloading.value = true
@@ -89,6 +100,13 @@ async function checkAppUpdate() {
   if (api?.updaterCheck) {
     try {
       const result = await api.updaterCheck()
+      if (result.ok && result.updateAvailable) {
+        appUpdateAvailable.value = true
+        appNewVersion.value = result.version || appNewVersion.value
+        appManualDownload.value = !!result.manual
+        appDownloadUrl.value = result.downloadUrl || appDownloadUrl.value
+        appReleaseUrl.value = result.releaseUrl || appReleaseUrl.value
+      }
       if (!result.ok && result.error) {
         appUpdateError.value = result.error
       }
@@ -98,6 +116,27 @@ async function checkAppUpdate() {
       // stale listener), appChecking would stay true and disable the button.
       appChecking.value = false
     }
+  }
+}
+
+async function downloadAppUpdate() {
+  appUpdateError.value = ''
+  const api = (window as any).api
+  try {
+    if (appManualDownload.value || appDownloadUrl.value) {
+      const result = await api?.updaterOpenDownload?.(appDownloadUrl.value || appReleaseUrl.value)
+      if (!result?.ok && result?.error) appUpdateError.value = result.error
+      return
+    }
+    appDownloading.value = true
+    const result = await api?.updaterDownload?.()
+    if (!result?.ok && result?.error) {
+      appDownloading.value = false
+      appUpdateError.value = result.error
+    }
+  } catch (error) {
+    appDownloading.value = false
+    appUpdateError.value = error instanceof Error ? error.message : String(error)
   }
 }
 
@@ -116,7 +155,10 @@ function startAutoInstall() {
 }
 
 function installAppUpdate() {
-  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
   installCountdown.value = 0
   const api = (window as any).api
   if (api?.updaterInstall) {
@@ -126,29 +168,28 @@ function installAppUpdate() {
 </script>
 
 <template>
-  <NPopover
-    v-if="appVersion"
-    trigger="click"
-    placement="bottom"
-    :width="320"
-  >
+  <NPopover v-if="appVersion" trigger="click" placement="bottom" :width="320">
     <template #trigger>
       <NTag
         size="small"
         :bordered="false"
         round
-        :type="appUpdateAvailable || appDownloading ? 'warning' : appDownloaded ? 'success' : 'default'"
-        style="cursor: pointer;"
+        :type="
+          appUpdateAvailable || appDownloading ? 'warning' : appDownloaded ? 'success' : 'default'
+        "
+        style="cursor: pointer"
       >
         Desktop v{{ appVersion }} · {{ updateStatusText }}
       </NTag>
     </template>
-    <div style="padding: 12px;">
-      <div style="margin-bottom: 8px; font-size: 13px;">
+    <div style="padding: 12px">
+      <div style="margin-bottom: 8px; font-size: 13px">
         {{ t('components.connectionStatus.currentVersion', { version: appVersion })
-        }}{{ appUpdateAvailable && appNewVersion
-          ? t('components.connectionStatus.upgradableTo', { version: appNewVersion })
-          : '' }}
+        }}{{
+          appUpdateAvailable && appNewVersion
+            ? t('components.connectionStatus.upgradableTo', { version: appNewVersion })
+            : ''
+        }}
       </div>
 
       <!-- Download progress -->
@@ -158,7 +199,7 @@ function installAppUpdate() {
         :percentage="Math.round(appDownloadPercent)"
         :show-indicator="true"
         :status="appDownloaded ? 'success' : 'default'"
-        style="margin-bottom: 8px;"
+        style="margin-bottom: 8px"
       />
 
       <NSpace :size="8">
@@ -171,30 +212,47 @@ function installAppUpdate() {
           :disabled="appChecking"
           @click="checkAppUpdate"
         >
-          {{ appChecking
-            ? t('components.connectionStatus.checking')
-            : t('components.connectionStatus.checkForUpdate') }}
+          {{
+            appChecking
+              ? t('components.connectionStatus.checking')
+              : t('components.connectionStatus.checkForUpdate')
+          }}
         </NButton>
         <!-- Downloaded: install now (or wait for countdown) -->
+        <NButton v-if="appDownloaded" size="small" type="primary" @click="installAppUpdate">
+          {{
+            installCountdown > 0
+              ? t('components.connectionStatus.installingInShort', { count: installCountdown })
+              : t('components.connectionStatus.installNow')
+          }}
+        </NButton>
         <NButton
-          v-if="appDownloaded"
+          v-else-if="appUpdateAvailable && !appDownloading"
           size="small"
           type="primary"
-          @click="installAppUpdate"
+          @click="downloadAppUpdate"
         >
-          {{ installCountdown > 0
-            ? t('components.connectionStatus.installingInShort', { count: installCountdown })
-            : t('components.connectionStatus.installNow') }}
+          {{
+            appManualDownload || appDownloadUrl
+              ? t('components.connectionStatus.downloadInstaller')
+              : t('components.connectionStatus.downloadUpdate')
+          }}
         </NButton>
       </NSpace>
 
-      <div v-if="appUpdateError" style="margin-top: 6px; font-size: 12px; color: #d03050;">
+      <div v-if="appUpdateError" style="margin-top: 6px; font-size: 12px; color: #d03050">
         {{ appUpdateError }}
       </div>
-      <div v-else-if="appDownloading" style="margin-top: 6px; font-size: 12px; color: var(--text-color-3);">
+      <div
+        v-else-if="appDownloading"
+        style="margin-top: 6px; font-size: 12px; color: var(--text-color-3)"
+      >
         {{ t('components.connectionStatus.downloadingInBackground') }}
       </div>
-      <div v-else-if="!appUpdateAvailable && !appDownloading && !appDownloaded && !appChecking" style="margin-top: 6px; font-size: 12px; color: var(--text-color-3);">
+      <div
+        v-else-if="!appUpdateAvailable && !appDownloading && !appDownloaded && !appChecking"
+        style="margin-top: 6px; font-size: 12px; color: var(--text-color-3)"
+      >
         {{ t('components.connectionStatus.clickToCheck') }}
       </div>
     </div>

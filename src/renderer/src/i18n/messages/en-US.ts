@@ -80,6 +80,8 @@ export default {
       currentVersion: 'Current Desktop version v{version}',
       upgradableTo: ', upgradable to v{version}',
       checkForUpdate: 'Check for updates',
+      downloadUpdate: 'Download update',
+      downloadInstaller: 'Download installer',
       installNow: 'Install now',
       installingInShort: '{count}s until auto install',
       downloadingInBackground: 'Downloading new version in background...',

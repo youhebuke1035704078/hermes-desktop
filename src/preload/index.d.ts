@@ -176,14 +176,26 @@ interface HermesAPI {
   deviceSign(payload: string): Promise<{ ok: boolean; signature?: string; error?: string }>
 
   // App auto-updater
-  updaterCheck(): Promise<{ ok: boolean; version?: string; error?: string }>
+  updaterCheck(): Promise<{
+    ok: boolean
+    version?: string
+    updateAvailable?: boolean
+    manual?: boolean
+    downloadUrl?: string
+    releaseUrl?: string
+    error?: string
+  }>
   updaterDownload(): Promise<{ ok: boolean; error?: string }>
   updaterInstall(): void
+  updaterOpenDownload(url?: string): Promise<{ ok: boolean; error?: string }>
   onUpdaterStatus(
     cb: (data: {
       event: 'checking' | 'available' | 'not-available' | 'progress' | 'downloaded' | 'error'
       version?: string
       releaseDate?: string
+      manual?: boolean
+      downloadUrl?: string
+      releaseUrl?: string
       percent?: number
       bytesPerSecond?: number
       transferred?: number

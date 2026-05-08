@@ -1311,6 +1311,111 @@ function registerIpcHandlers(): void {
 // ── Auto-updater setup ──
 let initialUpdateCheckTimer: ReturnType<typeof setTimeout> | null = null
 
+interface DesktopReleaseInfo {
+  version: string
+  releaseUrl: string
+  downloadUrl: string
+}
+
+function parseVersionParts(version: string): number[] {
+  return version
+    .replace(/^v/i, '')
+    .split('.')
+    .map((part) => {
+      const parsed = Number.parseInt(part.replace(/\D.*$/, ''), 10)
+      return Number.isFinite(parsed) ? parsed : 0
+    })
+}
+
+function compareVersions(a: string, b: string): number {
+  const left = parseVersionParts(a)
+  const right = parseVersionParts(b)
+  const len = Math.max(left.length, right.length)
+  for (let i = 0; i < len; i += 1) {
+    const diff = (left[i] || 0) - (right[i] || 0)
+    if (diff !== 0) return diff
+  }
+  return 0
+}
+
+function normalizeReleaseVersion(tagName: string): string {
+  return tagName.replace(/^v/i, '')
+}
+
+async function fetchLatestDesktopRelease(): Promise<DesktopReleaseInfo> {
+  const res = await fetch(
+    'https://api.github.com/repos/youhebuke1035704078/hermes-desktop/releases/latest',
+    {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': `Hermes-Desktop/${app.getVersion()}`
+      }
+    }
+  )
+  if (!res.ok) {
+    throw new Error(`GitHub release API HTTP ${res.status}: ${await res.text()}`)
+  }
+  const row = (await res.json()) as {
+    tag_name?: string
+    html_url?: string
+    assets?: Array<{ name?: string; browser_download_url?: string }>
+  }
+  const tagName = row.tag_name || ''
+  const exeAsset = (row.assets || []).find((asset) => /setup\.exe$/i.test(asset.name || ''))
+  const downloadUrl = exeAsset?.browser_download_url || ''
+  if (!tagName || !downloadUrl) {
+    throw new Error('Latest release does not include a Windows installer asset')
+  }
+  return {
+    version: normalizeReleaseVersion(tagName),
+    releaseUrl:
+      row.html_url ||
+      `https://github.com/youhebuke1035704078/hermes-desktop/releases/tag/${tagName}`,
+    downloadUrl
+  }
+}
+
+async function checkUpdaterWithGithubFallback(autoUpdaterError?: unknown): Promise<{
+  ok: boolean
+  version?: string
+  updateAvailable?: boolean
+  manual?: boolean
+  downloadUrl?: string
+  releaseUrl?: string
+  error?: string
+}> {
+  try {
+    const latest = await fetchLatestDesktopRelease()
+    const current = app.getVersion()
+    const updateAvailable = compareVersions(latest.version, current) > 0
+    mainWindow?.webContents.send('updater:status', {
+      event: updateAvailable ? 'available' : 'not-available',
+      version: latest.version,
+      manual: updateAvailable,
+      downloadUrl: updateAvailable ? latest.downloadUrl : undefined,
+      releaseUrl: latest.releaseUrl,
+      autoUpdaterError: autoUpdaterError instanceof Error ? autoUpdaterError.message : undefined
+    })
+    return {
+      ok: true,
+      version: latest.version,
+      updateAvailable,
+      manual: updateAvailable,
+      downloadUrl: updateAvailable ? latest.downloadUrl : undefined,
+      releaseUrl: latest.releaseUrl
+    }
+  } catch (fallbackError) {
+    const primaryMessage = autoUpdaterError instanceof Error ? autoUpdaterError.message : ''
+    const fallbackMessage =
+      fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+    const error = primaryMessage
+      ? `${primaryMessage}; GitHub fallback failed: ${fallbackMessage}`
+      : fallbackMessage
+    mainWindow?.webContents.send('updater:status', { event: 'error', error })
+    return { ok: false, error }
+  }
+}
+
 function setupAutoUpdater(): void {
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
@@ -1322,7 +1427,8 @@ function setupAutoUpdater(): void {
     mainWindow?.webContents.send('updater:status', {
       event: 'available',
       version: info.version,
-      releaseDate: info.releaseDate
+      releaseDate: info.releaseDate,
+      manual: false
     })
   })
   autoUpdater.on('update-not-available', (info) => {
@@ -1356,9 +1462,13 @@ function setupAutoUpdater(): void {
   ipcMain.handle('updater:check', async () => {
     try {
       const result = await autoUpdater.checkForUpdates()
-      return { ok: true, version: result?.updateInfo?.version }
+      const updateInfoVersion = result?.updateInfo?.version
+      if (updateInfoVersion && compareVersions(updateInfoVersion, app.getVersion()) > 0) {
+        return { ok: true, version: updateInfoVersion, updateAvailable: true, manual: false }
+      }
+      return await checkUpdaterWithGithubFallback()
     } catch (e: any) {
-      return { ok: false, error: e.message }
+      return await checkUpdaterWithGithubFallback(e)
     }
   })
 
@@ -1373,6 +1483,15 @@ function setupAutoUpdater(): void {
 
   ipcMain.handle('updater:install', () => {
     autoUpdater.quitAndInstall(true, true)
+  })
+
+  ipcMain.handle('updater:openDownload', async (_event, url?: string) => {
+    const target =
+      typeof url === 'string' && url.startsWith('https://')
+        ? url
+        : 'https://github.com/youhebuke1035704078/hermes-desktop/releases/latest'
+    await shell.openExternal(target)
+    return { ok: true }
   })
 
   // Check for updates 5s after launch (non-dev only). Track the handle so

@@ -243,18 +243,30 @@ const api = {
     ipcRenderer.invoke('device:sign', payload),
 
   // ── App auto-updater ──
-  updaterCheck: (): Promise<{ ok: boolean; version?: string; error?: string }> =>
-    ipcRenderer.invoke('updater:check'),
+  updaterCheck: (): Promise<{
+    ok: boolean
+    version?: string
+    updateAvailable?: boolean
+    manual?: boolean
+    downloadUrl?: string
+    releaseUrl?: string
+    error?: string
+  }> => ipcRenderer.invoke('updater:check'),
   updaterDownload: (): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('updater:download'),
   updaterInstall: (): void => {
     ipcRenderer.invoke('updater:install')
   },
+  updaterOpenDownload: (url?: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('updater:openDownload', url),
   onUpdaterStatus: (
     cb: (data: {
       event: 'checking' | 'available' | 'not-available' | 'progress' | 'downloaded' | 'error'
       version?: string
       releaseDate?: string
+      manual?: boolean
+      downloadUrl?: string
+      releaseUrl?: string
       percent?: number
       bytesPerSecond?: number
       transferred?: number

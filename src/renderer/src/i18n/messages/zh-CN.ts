@@ -80,6 +80,8 @@ export default {
       currentVersion: '当前 Desktop 版本 v{version}',
       upgradableTo: '，可升级到 v{version}',
       checkForUpdate: '检查新版本',
+      downloadUpdate: '下载更新',
+      downloadInstaller: '下载安装包',
       installNow: '立即安装',
       installingInShort: '{count}s 后自动安装',
       downloadingInBackground: '正在后台下载新版本...',
