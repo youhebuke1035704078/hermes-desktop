@@ -12,6 +12,7 @@ import { buildHermesRestUsageData, type UsageFilter } from '@/stores/hermes-rest
 import { useCronStore } from '@/stores/cron'
 import { useConnectionStore } from '@/stores/connection'
 import { useWebSocketStore } from '@/stores/websocket'
+import { hermesRestGet } from '@/api/hermes-rest-client'
 import { formatRelativeTime } from '@/utils/format'
 import type { SessionsUsageResult } from '@/api/types'
 
@@ -34,11 +35,22 @@ const rangePreset = ref<RangePreset>('all')
 const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
 // ── Stat row computeds ──
-const totalConversations = computed(() => hermesChatStore.conversations.length)
+const totalConversations = computed(() =>
+  isHermesRest.value && usageData.value
+    ? usageData.value.sessions.length
+    : hermesChatStore.conversations.length,
+)
 const totalJobs = computed(() => cronStore.jobs.length)
 const enabledJobs = computed(() => cronStore.jobs.filter(j => j.enabled).length)
 
 const modelsSeen = computed(() => {
+  if (isHermesRest.value && usageData.value) {
+    return new Set(
+      (usageData.value.aggregates?.byModel || [])
+        .map(item => item.model)
+        .filter(Boolean),
+    ).size
+  }
   const set = new Set<string>()
   for (const c of hermesChatStore.conversations) {
     const m = c.resolvedModel || c.model
@@ -71,6 +83,11 @@ const connectionType = computed<'success' | 'warning' | 'error' | 'default'>(() 
 })
 
 const coverageText = computed(() => {
+  if (isHermesRest.value && usageData.value) {
+    const total = usageData.value.sessions.length
+    if (total === 0) return t('pages.dashboard.usage.coverage.none')
+    return t('pages.dashboard.usage.coverage.text', { withUsage: total, total })
+  }
   const total = hermesChatStore.conversations.length
   const withUsage = hermesChatStore.conversations.filter(
     c => (c.tokenUsage?.totalInput || 0) + (c.tokenUsage?.totalOutput || 0) > 0,
@@ -86,6 +103,9 @@ const lastUpdatedText = computed(() => {
 
 // ── KPI computeds ──
 const lastUsedMs = computed(() => {
+  if (isHermesRest.value && usageData.value) {
+    return Math.max(...usageData.value.sessions.map(item => Number(item.updatedAt || 0)), 0)
+  }
   let max = 0
   for (const c of hermesChatStore.conversations) {
     const history = c.tokenUsageHistory
@@ -297,21 +317,40 @@ function buildFilterFromPreset(preset: RangePreset): UsageFilter | undefined {
   }
 }
 
+function dateToYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function buildServerRangeFromPreset(preset: RangePreset): { startDate?: string; endDate?: string } {
+  if (preset === 'all') return {}
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const day = 24 * 60 * 60 * 1000
+  switch (preset) {
+    case 'today':
+      return { startDate: dateToYmd(today), endDate: dateToYmd(today) }
+    case 'yesterday': {
+      const yesterday = new Date(today.getTime() - day)
+      return { startDate: dateToYmd(yesterday), endDate: dateToYmd(yesterday) }
+    }
+    case '7d':
+      return { startDate: dateToYmd(new Date(today.getTime() - 6 * day)), endDate: dateToYmd(today) }
+    case '15d':
+      return { startDate: dateToYmd(new Date(today.getTime() - 14 * day)), endDate: dateToYmd(today) }
+    case '30d':
+      return { startDate: dateToYmd(new Date(today.getTime() - 29 * day)), endDate: dateToYmd(today) }
+  }
+}
+
 function setRangePreset(preset: RangePreset) {
   rangePreset.value = preset
-  if (isHermesRest.value) {
-    usageData.value = buildHermesRestUsageData(
-      hermesChatStore.conversations,
-      buildFilterFromPreset(preset),
-    )
-    lastUpdatedAt.value = Date.now()
-  }
+  fetchUsageData().catch(() => {})
 }
 
 watch(
   () => [hermesChatStore.conversations.length, hermesChatStore.activeConversation?.updatedAt],
   () => {
-    if (isHermesRest.value) {
+    if (isHermesRest.value && usageError.value) {
       usageData.value = buildHermesRestUsageData(
         hermesChatStore.conversations,
         buildFilterFromPreset(rangePreset.value),
@@ -350,23 +389,27 @@ function topBarWidth(value: number, max: number): string {
 
 // ── Actions ──
 async function fetchUsageData() {
-  if (isHermesRest.value) {
-    usageData.value = buildHermesRestUsageData(
-      hermesChatStore.conversations,
-      buildFilterFromPreset(rangePreset.value),
-    )
-    usageError.value = null
-    lastUpdatedAt.value = Date.now()
-    return
-  }
   usageLoading.value = true
   usageError.value = null
   try {
-    const result = await wsStore.rpc.getSessionsUsage({ limit: 500 })
+    const result = isHermesRest.value
+      ? await hermesRestGet<SessionsUsageResult>('/v1/hermes/insights/sessions-usage', {
+          limit: 1000,
+          ...buildServerRangeFromPreset(rangePreset.value),
+          includeContextWeight: true,
+        })
+      : await wsStore.rpc.getSessionsUsage({ limit: 500 })
     usageData.value = result
     lastUpdatedAt.value = Date.now()
   } catch (e: any) {
     usageError.value = e?.message || 'Failed to fetch usage data'
+    if (isHermesRest.value) {
+      usageData.value = buildHermesRestUsageData(
+        hermesChatStore.conversations,
+        buildFilterFromPreset(rangePreset.value),
+      )
+      lastUpdatedAt.value = Date.now()
+    }
   } finally {
     usageLoading.value = false
   }
