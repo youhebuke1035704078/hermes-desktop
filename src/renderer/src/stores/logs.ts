@@ -12,8 +12,16 @@ const DEFAULT_LIMIT = 500
 /** Default max bytes per poll (256 KiB) */
 const DEFAULT_MAX_BYTES = 256 * 1024
 
+function normalizeLogLevel(level: unknown): LogLevel | null {
+  if (typeof level !== 'string') return null
+  const value = level.toLowerCase()
+  if (value === 'warning') return 'warn'
+  const validLevels: LogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal']
+  return validLevels.includes(value as LogLevel) ? (value as LogLevel) : null
+}
+
 /** Parse a raw log line into a structured entry (best-effort) */
-function parseLogLine(raw: string): LogEntry {
+export function parseLogLine(raw: string): LogEntry {
   const trimmed = raw.trim()
   if (!trimmed) return { raw }
 
@@ -22,7 +30,7 @@ function parseLogLine(raw: string): LogEntry {
     try {
       const obj = JSON.parse(trimmed)
       if (obj && typeof obj === 'object') {
-        const level = typeof obj.level === 'string' ? (obj.level.toLowerCase() as LogLevel) : null
+        const level = normalizeLogLevel(obj.level)
         return {
           raw,
           time: typeof obj.time === 'string' ? obj.time : typeof obj.ts === 'string' ? obj.ts : null,
@@ -37,14 +45,26 @@ function parseLogLine(raw: string): LogEntry {
     }
   }
 
+  // Python logging default: "2026-05-08 18:08:44,075 INFO gateway.run: message"
+  const pythonMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:[,.]\d{3,6})?)\s+([A-Za-z]+)\s+([^:]+):\s?(.*)$/)
+  if (pythonMatch) {
+    const [, time, levelRaw, subsystem, message] = pythonMatch
+    return {
+      raw,
+      time,
+      level: normalizeLogLevel(levelRaw),
+      subsystem: subsystem.trim(),
+      message,
+    }
+  }
+
   // Plain text: try to extract ISO timestamp + level prefix
-  const plainMatch = trimmed.match(/^(\S+)\s+\[?(\w+)\]?\s+(.*)$/)
+  const plainMatch = trimmed.match(/^(\S+)\s+\[?([A-Za-z]+)\]?\s+(.*)$/)
   if (plainMatch) {
     const [, time, levelRaw, message] = plainMatch
-    const lvl = levelRaw?.toLowerCase() as LogLevel
-    const validLevels: LogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal']
-    if (validLevels.includes(lvl)) {
-      return { raw, time, level: lvl, message }
+    const level = normalizeLogLevel(levelRaw)
+    if (level) {
+      return { raw, time, level, message }
     }
   }
 

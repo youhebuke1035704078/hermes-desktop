@@ -171,9 +171,11 @@ async function remoteSettingsFetch(path: string, options: { method?: string; bod
  *  Safe to call repeatedly — used by onMounted, the Retry button, and the
  *  connection-status watcher after a reconnect. */
 async function triggerMgmtProbe(): Promise<void> {
+  restSettingsAvailable.value = false
+  restSettingsError.value = ''
+  mgmtProbe.reset()
   if (isLocalServer.value || !isHermesRest.value) return
   restSettingsProbing.value = true
-  restSettingsError.value = ''
   try {
     const summary = await restSettingsFetch('/summary')
     if (summary?.ok) {
@@ -470,6 +472,18 @@ watch(() => connectionStore.status, (newStatus, oldStatus) => {
     void triggerMgmtProbe()
   }
 })
+
+watch(
+  () => [connectionStore.currentServer?.url || '', connectionStore.serverType] as const,
+  () => {
+    restSettingsAvailable.value = false
+    restSettingsError.value = ''
+    mgmtProbe.reset()
+    if (connectionStore.status === 'connected' && isHermesRest.value && !isLocalServer.value) {
+      void triggerMgmtProbe()
+    }
+  },
+)
 </script>
 
 <template>
