@@ -10,15 +10,11 @@ import {
   PlayCircleOutline, PauseCircleOutline, ArrowDownOutline,
 } from '@vicons/ionicons5'
 import { useLogsStore } from '@/stores/logs'
-import { useConnectionStore } from '@/stores/connection'
 import type { LogEntry, LogLevel } from '@/api/types'
 
 const { t } = useI18n()
 const message = useMessage()
 const logsStore = useLogsStore()
-const connectionStore = useConnectionStore()
-
-const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
 // ── Auto-scroll ──
 const autoScroll = ref(true)
@@ -135,7 +131,6 @@ function handleIntervalChange(val: number): void {
 
 // ── Lifecycle ──
 onMounted(() => {
-  if (isHermesRest.value) return
   logsStore.fetchOnce(true).then(() => scrollToBottom())
 })
 
@@ -146,17 +141,6 @@ onUnmounted(() => {
 
 <template>
   <NSpace vertical :size="16">
-    <!-- Hermes REST not supported notice -->
-    <NCard v-if="isHermesRest">
-      <div style="text-align: center; padding: 40px 16px;">
-        <NIcon :component="DocumentTextOutline" :size="48" depth="3" />
-        <div style="margin-top: 12px;">
-          <NText depth="3">{{ t('pages.logs.unavailableHermesRest') }}</NText>
-        </div>
-      </div>
-    </NCard>
-
-    <template v-else>
       <!-- Header + Metrics + Actions -->
       <NCard>
         <template #header>
@@ -318,7 +302,6 @@ onUnmounted(() => {
           </NSpace>
         </div>
       </NCard>
-    </template>
   </NSpace>
 </template>
 

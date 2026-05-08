@@ -1,7 +1,9 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useWebSocketStore } from './websocket'
-import type { LogEntry, LogLevel } from '@/api/types'
+import { useConnectionStore } from './connection'
+import { hermesRestGet } from '@/api/hermes-rest-client'
+import type { LogEntry, LogLevel, LogsTailResult } from '@/api/types'
 
 /** Cap raw line buffer to prevent unbounded memory growth */
 const MAX_BUFFER_LINES = 5000
@@ -100,6 +102,7 @@ export const useLogsStore = defineStore('logs', () => {
 
   async function fetchOnce(reset = false): Promise<void> {
     const wsStore = useWebSocketStore()
+    const connectionStore = useConnectionStore()
     loading.value = true
     error.value = null
     try {
@@ -107,7 +110,9 @@ export const useLogsStore = defineStore('logs', () => {
         ? { limit: DEFAULT_LIMIT, maxBytes: DEFAULT_MAX_BYTES }
         : { cursor: cursor.value, limit: DEFAULT_LIMIT, maxBytes: DEFAULT_MAX_BYTES }
 
-      const result = await wsStore.rpc.tailLogs(params)
+      const result = connectionStore.serverType === 'hermes-rest'
+        ? await hermesRestGet<LogsTailResult>('/v1/hermes/logs', params)
+        : await wsStore.rpc.tailLogs(params)
 
       // If server indicates log file was reset (rotated), clear buffer
       if (result.reset || reset) {

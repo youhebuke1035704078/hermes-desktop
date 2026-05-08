@@ -1,6 +1,8 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useWebSocketStore } from './websocket'
+import { useConnectionStore } from './connection'
+import { hermesRestGet } from '@/api/hermes-rest-client'
 import type { SessionsUsageResult, CostUsageSummary } from '@/api/types'
 
 export type DateRange = '7d' | '14d' | '30d' | '90d' | 'all'
@@ -97,18 +99,29 @@ export const useInsightsStore = defineStore('insights', () => {
   // ── Actions ──
   async function fetchInsights(): Promise<void> {
     const wsStore = useWebSocketStore()
+    const connectionStore = useConnectionStore()
     loading.value = true
     error.value = null
     try {
       const { startDate, endDate, days } = rangeToDates(range.value)
+      const isHermesRest = connectionStore.serverType === 'hermes-rest'
       const [usageResult, costResult] = await Promise.allSettled([
-        wsStore.rpc.getSessionsUsage({
-          limit: 1000,
-          startDate,
-          endDate,
-          includeContextWeight: true,
-        }),
-        wsStore.rpc.getUsageCost({ startDate, endDate, days }),
+        isHermesRest
+          ? hermesRestGet<SessionsUsageResult>('/v1/hermes/insights/sessions-usage', {
+              limit: 1000,
+              startDate,
+              endDate,
+              includeContextWeight: true,
+            })
+          : wsStore.rpc.getSessionsUsage({
+              limit: 1000,
+              startDate,
+              endDate,
+              includeContextWeight: true,
+            }),
+        isHermesRest
+          ? hermesRestGet<CostUsageSummary>('/v1/hermes/insights/usage-cost', { startDate, endDate, days })
+          : wsStore.rpc.getUsageCost({ startDate, endDate, days }),
       ])
 
       if (usageResult.status === 'fulfilled') {

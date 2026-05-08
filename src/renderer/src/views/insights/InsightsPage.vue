@@ -9,13 +9,9 @@ import {
   AnalyticsOutline, RefreshOutline, TrendingUpOutline,
 } from '@vicons/ionicons5'
 import { useInsightsStore, type DateRange } from '@/stores/insights'
-import { useConnectionStore } from '@/stores/connection'
 
 const { t } = useI18n()
 const insightsStore = useInsightsStore()
-const connectionStore = useConnectionStore()
-
-const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
 // ── Format helpers ──
 function formatTokens(n: number): string {
@@ -78,24 +74,12 @@ const topProvidersWithShare = computed(() => {
 
 // ── Lifecycle ──
 onMounted(() => {
-  if (isHermesRest.value) return
   insightsStore.fetchInsights()
 })
 </script>
 
 <template>
   <NSpace vertical :size="16">
-    <!-- Hermes REST not supported -->
-    <NCard v-if="isHermesRest">
-      <div style="text-align: center; padding: 40px 16px;">
-        <NIcon :component="AnalyticsOutline" :size="48" depth="3" />
-        <div style="margin-top: 12px;">
-          <NText depth="3">{{ t('pages.insights.unavailableHermesRest') }}</NText>
-        </div>
-      </div>
-    </NCard>
-
-    <template v-else>
       <!-- Header with range + refresh -->
       <NCard>
         <template #header>
@@ -394,7 +378,6 @@ onMounted(() => {
           </NCard>
         </NGridItem>
       </NGrid>
-    </template>
   </NSpace>
 </template>
 

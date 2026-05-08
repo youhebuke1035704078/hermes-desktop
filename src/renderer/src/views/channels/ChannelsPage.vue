@@ -202,26 +202,32 @@ const columns = computed<DataTableColumns<Channel>>(() => [
     width: 230,
     fixed: 'right',
     render(row) {
+      const actions = [
+        h(NButton, {
+          size: 'tiny',
+          quaternary: true,
+          onClick: () => handleRefreshStatus(row.id),
+        }, {
+          icon: () => h(NIcon, { component: RefreshOutline }),
+        }),
+      ]
+      if (isHermesRest.value) {
+        return h(NSpace, { size: 4 }, { default: () => actions })
+      }
+      actions.unshift(
+        h(NButton, {
+          size: 'tiny',
+          quaternary: true,
+          type: 'primary',
+          loading: channelsStore.isAuthInFlight(row.id),
+          onClick: () => handleStartAuth(row),
+        }, {
+          icon: () => h(NIcon, { component: row.status === 'connected' ? UnlinkOutline : LinkOutline }),
+          default: () => row.status === 'connected' ? t('pages.channels.reauth') : t('pages.channels.auth'),
+        }),
+      )
       return h(NSpace, { size: 4 }, {
-        default: () => [
-          h(NButton, {
-            size: 'tiny',
-            quaternary: true,
-            type: 'primary',
-            loading: channelsStore.isAuthInFlight(row.id),
-            onClick: () => handleStartAuth(row),
-          }, {
-            icon: () => h(NIcon, { component: row.status === 'connected' ? UnlinkOutline : LinkOutline }),
-            default: () => row.status === 'connected' ? t('pages.channels.reauth') : t('pages.channels.auth'),
-          }),
-          h(NButton, {
-            size: 'tiny',
-            quaternary: true,
-            onClick: () => handleRefreshStatus(row.id),
-          }, {
-            icon: () => h(NIcon, { component: RefreshOutline }),
-          }),
-        ],
+        default: () => actions,
       })
     },
   },
@@ -241,24 +247,12 @@ function rowProps(row: Channel) {
 
 // ── Lifecycle ──
 onMounted(() => {
-  if (isHermesRest.value) return
   channelsStore.fetchChannels()
 })
 </script>
 
 <template>
   <NSpace vertical :size="16">
-    <!-- Hermes REST not supported -->
-    <NCard v-if="isHermesRest">
-      <div style="text-align: center; padding: 40px 16px;">
-        <NIcon :component="ChatbubblesOutline" :size="48" depth="3" />
-        <div style="margin-top: 12px;">
-          <NText depth="3">{{ t('pages.channels.unavailableHermesRest') }}</NText>
-        </div>
-      </div>
-    </NCard>
-
-    <template v-else>
       <!-- Metrics + filter bar -->
       <NCard>
         <template #header>
@@ -447,6 +441,5 @@ onMounted(() => {
           </NInput>
         </NSpace>
       </NModal>
-    </template>
   </NSpace>
 </template>

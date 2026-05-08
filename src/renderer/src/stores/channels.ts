@@ -1,6 +1,8 @@
 import { ref, computed, shallowRef, triggerRef } from 'vue'
 import { defineStore } from 'pinia'
 import { useWebSocketStore } from './websocket'
+import { useConnectionStore } from './connection'
+import { hermesRestGet } from '@/api/hermes-rest-client'
 import type { Channel, ChannelAuthParams, PairParams } from '@/api/types/channel'
 
 export const useChannelsStore = defineStore('channels', () => {
@@ -37,10 +39,16 @@ export const useChannelsStore = defineStore('channels', () => {
   // ── Actions ──
   async function fetchChannels(): Promise<void> {
     const wsStore = useWebSocketStore()
+    const connectionStore = useConnectionStore()
     loading.value = true
     error.value = null
     try {
-      channels.value = await wsStore.rpc.listChannels()
+      if (connectionStore.serverType === 'hermes-rest') {
+        const payload = await hermesRestGet<{ channels?: Channel[] }>('/v1/hermes/channels')
+        channels.value = Array.isArray(payload.channels) ? payload.channels : []
+      } else {
+        channels.value = await wsStore.rpc.listChannels()
+      }
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e)
     } finally {
@@ -68,6 +76,10 @@ export const useChannelsStore = defineStore('channels', () => {
 
   async function authChannel(params: ChannelAuthParams): Promise<{ ok: boolean; error?: string; payload?: unknown }> {
     const wsStore = useWebSocketStore()
+    const connectionStore = useConnectionStore()
+    if (connectionStore.serverType === 'hermes-rest') {
+      return { ok: false, error: 'Hermes REST channels are read-only in this version' }
+    }
     if (!markInFlight(params.channelId)) {
       return { ok: false, error: 'auth already in flight' }
     }
@@ -84,6 +96,10 @@ export const useChannelsStore = defineStore('channels', () => {
 
   async function pairChannel(params: PairParams): Promise<{ ok: boolean; error?: string }> {
     const wsStore = useWebSocketStore()
+    const connectionStore = useConnectionStore()
+    if (connectionStore.serverType === 'hermes-rest') {
+      return { ok: false, error: 'Hermes REST channels are read-only in this version' }
+    }
     if (!markInFlight(params.channelId)) {
       return { ok: false, error: 'pair already in flight' }
     }
@@ -100,7 +116,12 @@ export const useChannelsStore = defineStore('channels', () => {
 
   async function refreshStatus(channelId: string): Promise<void> {
     const wsStore = useWebSocketStore()
+    const connectionStore = useConnectionStore()
     try {
+      if (connectionStore.serverType === 'hermes-rest') {
+        await fetchChannels()
+        return
+      }
       const status = await wsStore.rpc.getChannelStatus(channelId)
       const channel = channels.value.find((c) => c.id === channelId)
       if (channel) {
