@@ -17,6 +17,7 @@ const appChecking = ref(false)
 const appManualDownload = ref(false)
 const appDownloadUrl = ref('')
 const appReleaseUrl = ref('')
+const defaultReleaseUrl = 'https://github.com/youhebuke1035704078/hermes-desktop/releases/latest'
 
 const installCountdown = ref(0)
 
@@ -79,6 +80,7 @@ onMounted(async () => {
           appChecking.value = false
           appDownloading.value = false
           appUpdateError.value = data.error || t('components.connectionStatus.updateFailed')
+          appReleaseUrl.value = data.releaseUrl || appReleaseUrl.value || defaultReleaseUrl
           break
       }
     })
@@ -109,6 +111,7 @@ async function checkAppUpdate() {
       }
       if (!result.ok && result.error) {
         appUpdateError.value = result.error
+        appReleaseUrl.value = result.releaseUrl || appReleaseUrl.value || defaultReleaseUrl
       }
     } finally {
       // Safety net: if the updater IPC fires 'checking' but a final
@@ -138,6 +141,12 @@ async function downloadAppUpdate() {
     appDownloading.value = false
     appUpdateError.value = error instanceof Error ? error.message : String(error)
   }
+}
+
+async function openReleasePage() {
+  const api = (window as any).api
+  const result = await api?.updaterOpenDownload?.(appReleaseUrl.value || defaultReleaseUrl)
+  if (!result?.ok && result?.error) appUpdateError.value = result.error
 }
 
 let countdownTimer: ReturnType<typeof setInterval> | null = null
@@ -243,6 +252,14 @@ function installAppUpdate() {
       <div v-if="appUpdateError" style="margin-top: 6px; font-size: 12px; color: #d03050">
         {{ appUpdateError }}
       </div>
+      <NSpace v-if="appUpdateError" :size="8" style="margin-top: 8px">
+        <NButton size="tiny" secondary @click="checkAppUpdate">
+          {{ t('components.connectionStatus.checkForUpdate') }}
+        </NButton>
+        <NButton size="tiny" type="primary" @click="openReleasePage">
+          {{ t('components.connectionStatus.openReleases') }}
+        </NButton>
+      </NSpace>
       <div
         v-else-if="appDownloading"
         style="margin-top: 6px; font-size: 12px; color: var(--text-color-3)"

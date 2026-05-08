@@ -82,6 +82,7 @@ export default {
       checkForUpdate: '检查新版本',
       downloadUpdate: '下载更新',
       downloadInstaller: '下载安装包',
+      openReleases: '打开 Releases',
       installNow: '立即安装',
       installingInShort: '{count}s 后自动安装',
       downloadingInBackground: '正在后台下载新版本...',

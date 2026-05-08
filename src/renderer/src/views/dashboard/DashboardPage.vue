@@ -14,9 +14,20 @@ import { useConnectionStore } from '@/stores/connection'
 import { useWebSocketStore } from '@/stores/websocket'
 import { hermesRestGet } from '@/api/hermes-rest-client'
 import { formatRelativeTime } from '@/utils/format'
-import type { SessionsUsageResult } from '@/api/types'
+import type { CronJob, SessionsUsageResult } from '@/api/types'
 
 type RangePreset = 'all' | 'today' | 'yesterday' | '7d' | '15d' | '30d'
+type HealthType = 'success' | 'warning' | 'error' | 'info' | 'default'
+
+interface PriceWorkflowStage {
+  key: string
+  label: string
+  hint: string
+  job?: CronJob
+  type: HealthType
+  status: string
+  detail: string
+}
 
 const { t } = useI18n()
 const router = useRouter()
@@ -62,6 +73,183 @@ const modelsSeen = computed(() => {
 const totalTokens = computed(() => usageData.value?.totals?.totalTokens || 0)
 const inputTokens = computed(() => usageData.value?.totals?.input || 0)
 const outputTokens = computed(() => usageData.value?.totals?.output || 0)
+
+// ── Health center ──
+const runningJobs = computed(() => cronStore.jobs.filter(j => j.state?.runningAtMs))
+const failedJobs = computed(() => cronStore.jobs.filter(j => j.enabled && j.state?.lastStatus === 'error'))
+const disabledJobs = computed(() => cronStore.jobs.filter(j => !j.enabled))
+
+const currentModelLabel = computed(() =>
+  connectionStore.hermesRealModel || (isHermesRest.value ? '未知模型' : wsStore.gatewayVersion || '未知模型'),
+)
+
+const priceJobs = computed(() =>
+  cronStore.jobs.filter(job => /jd-tongrentang-price-watch|tongrentang|cron-health/i.test(job.name)),
+)
+
+function jobActivityMs(job?: CronJob): number {
+  if (!job) return 0
+  return Number(job.state?.runningAtMs || job.state?.lastRunAtMs || job.updatedAtMs || job.createdAtMs || 0)
+}
+
+function formatJobTime(ms?: number): string {
+  if (!ms || ms <= 0) return '-'
+  return formatRelativeTime(ms)
+}
+
+function jobStatusType(job?: CronJob): HealthType {
+  if (!job) return 'default'
+  if (!job.enabled) return 'warning'
+  if (job.state?.lastStatus === 'error') return 'error'
+  if (job.state?.lastStatus === 'skipped') return 'warning'
+  if (job.state?.runningAtMs) return 'info'
+  if (job.state?.lastStatus === 'ok') return 'success'
+  return 'default'
+}
+
+function jobStatusLabel(job?: CronJob): string {
+  if (!job) return '未配置'
+  if (!job.enabled) return '已停用'
+  if (job.state?.runningAtMs) return '运行中'
+  if (job.state?.lastStatus === 'ok') return '正常'
+  if (job.state?.lastStatus === 'error') return '失败'
+  if (job.state?.lastStatus === 'skipped') return '跳过'
+  return '等待执行'
+}
+
+function connectionStatusText(): string {
+  switch (connectionStore.status) {
+    case 'connected': return t('pages.dashboard.connection.connected')
+    case 'connecting': return t('pages.dashboard.connection.connecting')
+    case 'error': return t('pages.dashboard.connection.failed')
+    default: return t('pages.dashboard.connection.disconnected')
+  }
+}
+
+function connectionStatusType(): HealthType {
+  switch (connectionStore.status) {
+    case 'connected': return 'success'
+    case 'connecting': return 'warning'
+    case 'error': return 'error'
+    default: return 'default'
+  }
+}
+
+function findPriceStageJob(key: string): CronJob | undefined {
+  const jobs = priceJobs.value
+  if (key === 'daily') {
+    return jobs.find(job =>
+      /jd-tongrentang-price-watch/i.test(job.name) &&
+      !/backfill|watchdog|evening|alarm|backup|health/i.test(job.name),
+    )
+  }
+  if (key === 'watchdog') return jobs.find(job => /watchdog|11:00|11：00/i.test(job.name))
+  if (key === 'backfill') return jobs.find(job => /backfill|补录|17:00|17：00/i.test(job.name))
+  if (key === 'alarm') return jobs.find(job => /evening|alarm|告警|17:30|17：30/i.test(job.name))
+  if (key === 'health') return jobs.find(job => /cron-health|health|健康/i.test(job.name))
+  if (key === 'backup') return jobs.find(job => /backup|备份/i.test(job.name))
+  return undefined
+}
+
+const priceWorkflowStages = computed<PriceWorkflowStage[]>(() => {
+  const defs = [
+    { key: 'daily', label: '07:30 价格获取', hint: '主采集任务' },
+    { key: 'watchdog', label: '11:00 巡检', hint: '上午缺口检查' },
+    { key: 'backfill', label: '17:00 补录', hint: '失败数据补采' },
+    { key: 'alarm', label: '17:30 告警', hint: '晚间通知' },
+    { key: 'health', label: '23:00 健康检查', hint: 'Cron 状态巡检' },
+    { key: 'backup', label: '03:00 数据备份', hint: 'SQLite 备份' },
+  ]
+  return defs.map(def => {
+    const job = findPriceStageJob(def.key)
+    const type = jobStatusType(job)
+    const last = formatJobTime(jobActivityMs(job))
+    const error = job?.state?.lastError
+    return {
+      ...def,
+      job,
+      type,
+      status: jobStatusLabel(job),
+      detail: error ? error : last === '-' ? def.hint : `上次 ${last}`,
+    }
+  })
+})
+
+const priceIssueCount = computed(() =>
+  priceWorkflowStages.value.filter(stage => stage.type === 'error' || stage.type === 'warning').length,
+)
+
+const overallHealthType = computed<HealthType>(() => {
+  if (connectionStore.status === 'error' || failedJobs.value.length > 0) return 'error'
+  if (connectionStore.status !== 'connected' || usageError.value || disabledJobs.value.length > 0 || priceIssueCount.value > 0) return 'warning'
+  return 'success'
+})
+
+const overallHealthLabel = computed(() => {
+  if (overallHealthType.value === 'success') return '健康'
+  if (overallHealthType.value === 'error') return '需要处理'
+  return '需关注'
+})
+
+const healthItems = computed(() => [
+  {
+    key: 'connection',
+    title: '连接',
+    value: connectionStatusText(),
+    detail: connectionStore.currentServer?.url || '未选择服务器',
+    type: connectionStatusType(),
+  },
+  {
+    key: 'model',
+    title: '主模型',
+    value: currentModelLabel.value,
+    detail: connectionStore.hermesRealModel ? '已从服务器识别实际模型' : '等待模型探测结果',
+    type: connectionStore.hermesRealModel ? 'success' as HealthType : 'warning' as HealthType,
+  },
+  {
+    key: 'cron',
+    title: '任务计划',
+    value: `${enabledJobs.value}/${totalJobs.value} 启用`,
+    detail: failedJobs.value.length
+      ? `${failedJobs.value.length} 个任务失败`
+      : runningJobs.value.length
+        ? `${runningJobs.value.length} 个任务运行中`
+        : 'Cron 状态正常',
+    type: failedJobs.value.length ? 'error' as HealthType : 'success' as HealthType,
+  },
+  {
+    key: 'usage',
+    title: '运营用量',
+    value: formatTokens(totalTokens.value),
+    detail: usageError.value ? '远端统计不可用，使用本地兜底' : '统计接口可用',
+    type: usageError.value ? 'warning' as HealthType : 'success' as HealthType,
+  },
+  {
+    key: 'price',
+    title: '价格监控',
+    value: `${priceJobs.value.length} 个任务`,
+    detail: priceJobs.value.length === 0
+      ? '未发现同仁堂价格监控任务'
+      : priceIssueCount.value
+        ? `${priceIssueCount.value} 个环节需关注`
+        : '闭环任务正常',
+    type: priceJobs.value.length === 0
+      ? 'warning' as HealthType
+      : priceIssueCount.value
+        ? 'warning' as HealthType
+        : 'success' as HealthType,
+  },
+])
+
+const healthIssues = computed(() => {
+  const issues: string[] = []
+  if (connectionStore.status !== 'connected') issues.push('Hermes 连接未处于 connected 状态')
+  if (!connectionStore.hermesRealModel) issues.push('尚未识别服务器实际主模型')
+  if (failedJobs.value.length) issues.push(`Cron 有 ${failedJobs.value.length} 个启用任务最近执行失败`)
+  if (usageError.value) issues.push(`运营统计接口异常：${usageError.value}`)
+  if (priceJobs.value.length === 0) issues.push('未发现 jd-tongrentang-price-watch 自建价格监控任务')
+  return issues
+})
 
 // ── Hero card computeds ──
 const connectionLabel = computed(() => {
@@ -477,6 +665,51 @@ onMounted(() => {
         </NAlert>
       </NCard>
 
+      <!-- Global health center -->
+      <NCard title="全局健康中心" class="dashboard-card">
+        <template #header-extra>
+          <NTag :type="overallHealthType" round :bordered="false">{{ overallHealthLabel }}</NTag>
+        </template>
+
+        <div class="health-grid">
+          <div v-for="item in healthItems" :key="item.key" class="health-card">
+            <div class="health-card-head">
+              <NText depth="3" class="health-title">{{ item.title }}</NText>
+              <NTag size="small" :type="item.type" round :bordered="false">{{ item.value }}</NTag>
+            </div>
+            <NText depth="3" class="health-detail">{{ item.detail }}</NText>
+          </div>
+        </div>
+
+        <NAlert v-if="healthIssues.length" type="warning" :bordered="false" style="margin-top: 12px;">
+          <div class="health-issues">
+            <div v-for="issue in healthIssues" :key="issue">{{ issue }}</div>
+          </div>
+        </NAlert>
+      </NCard>
+
+      <!-- Price monitor workflow -->
+      <NCard title="价格监控闭环" class="dashboard-card">
+        <template #header-extra>
+          <NTag :type="priceIssueCount ? 'warning' : 'success'" round :bordered="false">
+            {{ priceIssueCount ? `${priceIssueCount} 项需关注` : '运行正常' }}
+          </NTag>
+        </template>
+
+        <div class="price-stage-grid">
+          <div v-for="stage in priceWorkflowStages" :key="stage.key" class="price-stage-card">
+            <div class="price-stage-head">
+              <NText strong>{{ stage.label }}</NText>
+              <NTag size="small" :type="stage.type" round :bordered="false">{{ stage.status }}</NTag>
+            </div>
+            <NText depth="3" class="price-stage-hint">{{ stage.hint }}</NText>
+            <NText class="price-stage-detail" :type="stage.type === 'error' ? 'error' : undefined">
+              {{ stage.detail }}
+            </NText>
+          </div>
+        </div>
+      </NCard>
+
       <!-- Stat row (4 cards) -->
       <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="12" :y-gap="12">
         <NGridItem>
@@ -724,6 +957,69 @@ onMounted(() => {
   font-weight: 400;
 }
 
+.health-grid,
+.price-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.health-card,
+.price-stage-card {
+  border: 1px solid var(--n-border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--n-card-color);
+  min-width: 0;
+}
+
+.health-card-head,
+.price-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.health-title,
+.health-detail,
+.price-stage-hint,
+.price-stage-detail {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.health-detail {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.health-issues {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.price-stage-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.price-stage-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.price-stage-detail {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -957,10 +1253,20 @@ onMounted(() => {
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .health-grid,
+  .price-stage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 560px) {
   .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .health-grid,
+  .price-stage-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -1325,6 +1325,9 @@ interface DesktopReleaseInfo {
   downloadUrl: string
 }
 
+const DESKTOP_RELEASES_LATEST_URL =
+  'https://github.com/youhebuke1035704078/hermes-desktop/releases/latest'
+
 function parseVersionParts(version: string): number[] {
   return version
     .replace(/^v/i, '')
@@ -1369,7 +1372,10 @@ async function fetchLatestDesktopRelease(): Promise<DesktopReleaseInfo> {
     assets?: Array<{ name?: string; browser_download_url?: string }>
   }
   const tagName = row.tag_name || ''
-  const exeAsset = (row.assets || []).find((asset) => /setup\.exe$/i.test(asset.name || ''))
+  const assets = row.assets || []
+  const exeAsset =
+    assets.find((asset) => /\.exe$/i.test(asset.name || '') && /(setup|installer|hermes.*desktop)/i.test(asset.name || '')) ||
+    assets.find((asset) => /\.exe$/i.test(asset.name || ''))
   const downloadUrl = exeAsset?.browser_download_url || ''
   if (!tagName || !downloadUrl) {
     throw new Error('Latest release does not include a Windows installer asset')
@@ -1419,8 +1425,12 @@ async function checkUpdaterWithGithubFallback(autoUpdaterError?: unknown): Promi
     const error = primaryMessage
       ? `${primaryMessage}; GitHub fallback failed: ${fallbackMessage}`
       : fallbackMessage
-    mainWindow?.webContents.send('updater:status', { event: 'error', error })
-    return { ok: false, error }
+    mainWindow?.webContents.send('updater:status', {
+      event: 'error',
+      error,
+      releaseUrl: DESKTOP_RELEASES_LATEST_URL
+    })
+    return { ok: false, error, releaseUrl: DESKTOP_RELEASES_LATEST_URL }
   }
 }
 
@@ -1463,7 +1473,8 @@ function setupAutoUpdater(): void {
   autoUpdater.on('error', (err) => {
     mainWindow?.webContents.send('updater:status', {
       event: 'error',
-      error: err.message
+      error: err.message,
+      releaseUrl: DESKTOP_RELEASES_LATEST_URL
     })
   })
 
@@ -1497,7 +1508,7 @@ function setupAutoUpdater(): void {
     const target =
       typeof url === 'string' && url.startsWith('https://')
         ? url
-        : 'https://github.com/youhebuke1035704078/hermes-desktop/releases/latest'
+        : DESKTOP_RELEASES_LATEST_URL
     await shell.openExternal(target)
     return { ok: true }
   })

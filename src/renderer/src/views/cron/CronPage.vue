@@ -48,6 +48,44 @@ const filteredJobs = computed(() => {
 
 const enabledCount = computed(() => cronStore.jobs.filter(j => j.enabled).length)
 const disabledCount = computed(() => cronStore.jobs.filter(j => !j.enabled).length)
+const runningCount = computed(() => cronStore.jobs.filter(j => j.state?.runningAtMs).length)
+const failedCount = computed(() => cronStore.jobs.filter(j => j.enabled && j.state?.lastStatus === 'error').length)
+
+function jobActivityMs(job: CronJob): number {
+  return Number(job.state?.runningAtMs || job.state?.lastRunAtMs || job.updatedAtMs || job.createdAtMs || 0)
+}
+
+function cronStatusType(job: CronJob): 'success' | 'warning' | 'error' | 'info' | 'default' {
+  if (!job.enabled) return 'default'
+  if (job.state?.runningAtMs) return 'info'
+  if (job.state?.lastStatus === 'ok') return 'success'
+  if (job.state?.lastStatus === 'error') return 'error'
+  if (job.state?.lastStatus === 'skipped') return 'warning'
+  return 'default'
+}
+
+function cronStatusLabel(job: CronJob): string {
+  if (!job.enabled) return '已停用'
+  if (job.state?.runningAtMs) return '运行中'
+  if (job.state?.lastStatus === 'ok') return 'OK'
+  if (job.state?.lastStatus === 'error') return '失败'
+  if (job.state?.lastStatus === 'skipped') return '跳过'
+  return '等待'
+}
+
+function cronRelativeTime(ms?: number): string {
+  return ms && ms > 0 ? formatRelativeTime(ms) : '-'
+}
+
+const recentJobs = computed(() =>
+  [...cronStore.jobs]
+    .sort((a, b) => jobActivityMs(b) - jobActivityMs(a))
+    .slice(0, 6),
+)
+
+const priceMonitorJobs = computed(() =>
+  cronStore.jobs.filter(job => /jd-tongrentang-price-watch|tongrentang|cron-health/i.test(job.name)),
+)
 
 // Soonest next run
 const nextRunText = computed(() => {
@@ -302,6 +340,7 @@ async function handleRun(job: CronJob) {
   const ok = await cronStore.runJob(job.id)
   if (ok) {
     message.success(t('pages.cron.messages.jobTriggered'))
+    await cronStore.fetchJobs()
   } else {
     message.error(`${t('pages.cron.messages.triggerFailed')}: ${cronStore.lastError}`)
   }
@@ -409,6 +448,73 @@ onMounted(() => {
         </NSpace>
       </NAlert>
 
+      <!-- Operational health -->
+      <NGrid cols="1 l:2" responsive="screen" :x-gap="12" :y-gap="12" style="margin-bottom: 16px;">
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <template #header>
+              <NSpace align="center" :size="8">
+                <NText strong>最近执行</NText>
+                <NTag size="small" :type="failedCount ? 'error' : runningCount ? 'info' : 'success'" round :bordered="false">
+                  {{ failedCount ? `${failedCount} 个失败` : runningCount ? `${runningCount} 个运行中` : '正常' }}
+                </NTag>
+              </NSpace>
+            </template>
+            <NSpace v-if="recentJobs.length" vertical :size="8">
+              <div v-for="job in recentJobs" :key="`recent-${job.id}`" class="cron-mini-row">
+                <div class="cron-mini-main">
+                  <NText strong class="cron-mini-name">{{ job.name }}</NText>
+                  <NTag size="small" :type="cronStatusType(job)" round :bordered="false">{{ cronStatusLabel(job) }}</NTag>
+                </div>
+                <NText depth="3" class="cron-mini-detail">
+                  上次 {{ cronRelativeTime(job.state?.lastRunAtMs) }}
+                  <template v-if="job.state?.lastDurationMs != null">
+                    · {{ (job.state.lastDurationMs / 1000).toFixed(1) }}s
+                  </template>
+                  <template v-if="job.state?.consecutiveErrors">
+                    · 连续失败 {{ job.state.consecutiveErrors }} 次
+                  </template>
+                </NText>
+                <NText v-if="job.state?.lastError" type="error" class="cron-mini-error">
+                  {{ job.state.lastError }}
+                </NText>
+              </div>
+            </NSpace>
+            <NText v-else depth="3">暂无执行记录</NText>
+          </NCard>
+        </NGridItem>
+
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <template #header>
+              <NSpace align="center" :size="8">
+                <NText strong>价格监控任务</NText>
+                <NTag size="small" :type="priceMonitorJobs.length ? 'success' : 'warning'" round :bordered="false">
+                  {{ priceMonitorJobs.length }} 个
+                </NTag>
+              </NSpace>
+            </template>
+            <NSpace v-if="priceMonitorJobs.length" vertical :size="8">
+              <div v-for="job in priceMonitorJobs" :key="`price-${job.id}`" class="cron-mini-row">
+                <div class="cron-mini-main">
+                  <NText strong class="cron-mini-name">{{ job.name }}</NText>
+                  <NTag size="small" :type="cronStatusType(job)" round :bordered="false">{{ cronStatusLabel(job) }}</NTag>
+                </div>
+                <NText depth="3" class="cron-mini-detail">
+                  下次 {{ job.nextRun ? formatDate(job.nextRun) : '-' }} · 上次 {{ cronRelativeTime(job.state?.lastRunAtMs) }}
+                </NText>
+                <NText v-if="job.state?.lastError" type="error" class="cron-mini-error">
+                  {{ job.state.lastError }}
+                </NText>
+              </div>
+            </NSpace>
+            <NAlert v-else type="warning" :closable="false">
+              未发现 jd-tongrentang-price-watch 相关任务，请检查自建 skill 和 Cron 配置是否已同步。
+            </NAlert>
+          </NCard>
+        </NGridItem>
+      </NGrid>
+
       <!-- Search -->
       <NInput
         v-model:value="search"
@@ -479,3 +585,40 @@ onMounted(() => {
     </NModal>
   </NSpace>
 </template>
+
+<style scoped>
+.cron-mini-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--n-border-color);
+  min-width: 0;
+}
+
+.cron-mini-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.cron-mini-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cron-mini-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cron-mini-detail,
+.cron-mini-error {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+</style>

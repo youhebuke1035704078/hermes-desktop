@@ -82,6 +82,7 @@ export default {
       checkForUpdate: 'Check for updates',
       downloadUpdate: 'Download update',
       downloadInstaller: 'Download installer',
+      openReleases: 'Open Releases',
       installNow: 'Install now',
       installingInShort: '{count}s until auto install',
       downloadingInBackground: 'Downloading new version in background...',

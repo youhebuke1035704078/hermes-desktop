@@ -37,6 +37,7 @@ import { useConnectionStore } from '@/stores/connection'
 import { ConnectionState } from '@/api/types'
 import { useMgmtProbe, type MgmtFetchResult } from '@/composables/useMgmtProbe'
 import { hermesRestRequest } from '@/api/hermes-rest-client'
+import { formatRelativeTime } from '@/utils/format'
 
 const router = useRouter()
 const themeStore = useThemeStore()
@@ -250,6 +251,177 @@ const hermesUpdateLog = ref('')
 // toast fades. Cleared at the start of each check/update attempt.
 const hermesCheckError = ref('')
 const hermesUpdateError = ref('')
+
+type DiagnosticType = 'success' | 'warning' | 'error' | 'info' | 'default'
+
+interface ModelDiagnosticItem {
+  key: string
+  label: string
+  value: string
+  detail: string
+  type: DiagnosticType
+}
+
+const modelDiagnosticLoading = ref(false)
+const modelDiagnosticCheckedAt = ref<number | null>(null)
+const modelDiagnosticItems = ref<ModelDiagnosticItem[]>([])
+
+const hermesReleaseUrl = computed(() =>
+  hermesLatestTag.value
+    ? `https://github.com/NousResearch/hermes-agent/releases/tag/${hermesLatestTag.value}`
+    : 'https://github.com/NousResearch/hermes-agent/releases',
+)
+
+const modelDiagnosticSummary = computed(() => {
+  const hasError = modelDiagnosticItems.value.some(item => item.type === 'error')
+  const hasWarning = modelDiagnosticItems.value.some(item => item.type === 'warning')
+  return {
+    type: hasError ? 'error' as DiagnosticType : hasWarning ? 'warning' as DiagnosticType : 'success' as DiagnosticType,
+    label: hasError ? '异常' : hasWarning ? '需关注' : '可用',
+  }
+})
+
+const modelDiagnosticCheckedText = computed(() =>
+  modelDiagnosticCheckedAt.value ? formatRelativeTime(modelDiagnosticCheckedAt.value) : '尚未运行',
+)
+
+const updateAdvice = computed(() => {
+  const error = hermesUpdateError.value || hermesCheckError.value
+  if (!error) return ''
+  return classifyUpdateError(error)
+})
+
+function extractYamlScalar(content: string, key: string): string {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = content.match(new RegExp(`^\\s*${escaped}:\\s*['"]?([^'"#\\n]+)`, 'm'))
+  return (match?.[1] || '').trim()
+}
+
+function extractFallbackModels(content: string): string {
+  const fallbackBlock = content.match(/(?:fallback_providers|fallback_model):([\s\S]*?)(?:\n\S|$)/)
+  const source = fallbackBlock?.[1] || ''
+  const models = [...source.matchAll(/^\s*model:\s*['"]?([^'"#\n]+)/gm)]
+    .map(match => (match[1] || '').trim())
+    .filter(Boolean)
+  return models.slice(0, 3).join(', ')
+}
+
+function hasEnvValue(content: string, key: string): boolean {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^\\s*${escaped}\\s*=\\s*\\S+`, 'm').test(content)
+}
+
+function classifyUpdateError(error: string): string {
+  const text = error.toLowerCase()
+  if (text.includes('connection closed') || text.includes('socket') || text.includes('network')) {
+    return '网络连接被关闭，优先检查 GitHub/VPN/Tailscale 连接；也可以直接打开 Releases 页面下载安装包。'
+  }
+  if (text.includes('timeout') || text.includes('timed out')) {
+    return '检查更新超时，通常是网络链路不稳定；稍后重试或打开 Releases 页面手动下载。'
+  }
+  if (text.includes('403') || text.includes('permission') || text.includes('forbidden')) {
+    return '当前网络或账号权限访问更新源受限，请换网络或手动打开 Releases 页面。'
+  }
+  if (text.includes('dirty') || text.includes('local changes')) {
+    return '本地 Hermes Agent 有未提交改动，自动更新会被保护性拦截。'
+  }
+  return '可以先重试；如果仍失败，打开 Releases 页面手动下载或检查远端管理接口。'
+}
+
+async function runModelDiagnostic() {
+  modelDiagnosticLoading.value = true
+  const items: ModelDiagnosticItem[] = []
+
+  const tokenPresent = !!connectionStore.hermesAuthToken
+  items.push({
+    key: 'token',
+    label: '访问令牌',
+    value: tokenPresent ? '已配置' : '未配置',
+    detail: tokenPresent ? 'Desktop 会在 REST 请求中附带 Bearer token' : '受保护接口可能返回 401',
+    type: tokenPresent ? 'success' : 'warning',
+  })
+
+  try {
+    const health = await hermesRestRequest<any>('/health')
+    items.push({
+      key: 'health',
+      label: '服务健康',
+      value: health?.status || health?.ok ? '可访问' : '有响应',
+      detail: currentServer.value?.url || 'Hermes REST',
+      type: health?.ok === false ? 'warning' : 'success',
+    })
+  } catch (e: any) {
+    items.push({
+      key: 'health',
+      label: '服务健康',
+      value: '失败',
+      detail: e?.message || 'health probe failed',
+      type: 'error',
+    })
+  }
+
+  try {
+    const models = await hermesRestRequest<any>('/v1/models')
+    const modelIds = Array.isArray(models?.data)
+      ? models.data.map((row: any) => row?.id || row?.name).filter(Boolean)
+      : []
+    items.push({
+      key: 'models',
+      label: '模型接口',
+      value: modelIds[0] || connectionStore.hermesRealModel || '已响应',
+      detail: modelIds.length ? `可见模型 ${modelIds.slice(0, 3).join(', ')}` : '接口响应中未包含模型列表',
+      type: modelIds.length || connectionStore.hermesRealModel ? 'success' : 'warning',
+    })
+  } catch (e: any) {
+    items.push({
+      key: 'models',
+      label: '模型接口',
+      value: '失败',
+      detail: e?.message || 'models probe failed',
+      type: 'error',
+    })
+  }
+
+  if (canManage.value && !configYaml.value && !configYamlLoading.value && !envLoading.value) {
+    await loadConfigFiles()
+  }
+
+  const configuredDefault = extractYamlScalar(configYaml.value, 'default')
+  const configuredProvider = extractYamlScalar(configYaml.value, 'provider')
+  const fallbackModels = extractFallbackModels(configYaml.value)
+  items.push({
+    key: 'config-main',
+    label: '主模型配置',
+    value: configuredDefault || connectionStore.hermesRealModel || '未识别',
+    detail: configuredProvider ? `provider: ${configuredProvider}` : '未从 config.yaml 解析到 provider',
+    type: configuredDefault || connectionStore.hermesRealModel ? 'success' : 'warning',
+  })
+  items.push({
+    key: 'config-fallback',
+    label: '备用模型',
+    value: fallbackModels || '未配置',
+    detail: fallbackModels ? 'fallback_providers 已配置' : '建议保留可用备用模型，避免主模型凭据失败时中断',
+    type: fallbackModels ? 'success' : 'warning',
+  })
+  items.push({
+    key: 'gemini-key',
+    label: 'GEMINI_API_KEY',
+    value: hasEnvValue(envContent.value, 'GEMINI_API_KEY') ? '已配置' : '未配置',
+    detail: '用于 Gemini 备用模型可用性',
+    type: hasEnvValue(envContent.value, 'GEMINI_API_KEY') ? 'success' : 'warning',
+  })
+  items.push({
+    key: 'server-key',
+    label: 'API_SERVER_KEY',
+    value: hasEnvValue(envContent.value, 'API_SERVER_KEY') ? '已配置' : '未配置',
+    detail: '用于 Desktop 访问受保护的 Hermes REST 接口',
+    type: hasEnvValue(envContent.value, 'API_SERVER_KEY') || tokenPresent ? 'success' : 'warning',
+  })
+
+  modelDiagnosticItems.value = items
+  modelDiagnosticCheckedAt.value = Date.now()
+  modelDiagnosticLoading.value = false
+}
 
 async function fetchHermesVersion() {
   hermesVersionLoading.value = true
@@ -532,6 +704,61 @@ watch(
       </NSpace>
     </NCard>
 
+    <!-- Model & credential diagnostics -->
+    <NCard class="app-card" v-if="isHermesRest">
+      <template #header>
+        <NSpace align="center" :size="8">
+          <NIcon :component="InformationCircleOutline" size="18" />
+          <span>模型与凭据诊断</span>
+        </NSpace>
+      </template>
+      <template #header-extra>
+        <NSpace align="center" :size="8">
+          <NTag
+            size="small"
+            :type="modelDiagnosticItems.length ? modelDiagnosticSummary.type : 'default'"
+            round
+            :bordered="false"
+          >
+            {{ modelDiagnosticItems.length ? modelDiagnosticSummary.label : modelDiagnosticCheckedText }}
+          </NTag>
+          <NButton size="small" :loading="modelDiagnosticLoading" @click="runModelDiagnostic">
+            <template #icon><NIcon :component="RefreshOutline" /></template>
+            运行诊断
+          </NButton>
+        </NSpace>
+      </template>
+
+      <NDescriptions label-placement="left" :column="1" bordered size="small">
+        <NDescriptionsItem label="服务器">
+          <NText code>{{ currentServer?.url || '-' }}</NText>
+        </NDescriptionsItem>
+        <NDescriptionsItem label="当前识别模型">
+          <NTag size="small" :bordered="false" round :type="connectionStore.hermesRealModel ? 'success' : 'warning'">
+            {{ connectionStore.hermesRealModel || 'unknown' }}
+          </NTag>
+        </NDescriptionsItem>
+        <NDescriptionsItem label="上次诊断">
+          {{ modelDiagnosticCheckedText }}
+        </NDescriptionsItem>
+      </NDescriptions>
+
+      <NSpin :show="modelDiagnosticLoading">
+        <div v-if="modelDiagnosticItems.length" class="diagnostic-grid">
+          <div v-for="item in modelDiagnosticItems" :key="item.key" class="diagnostic-item">
+            <div class="diagnostic-item-head">
+              <NText strong>{{ item.label }}</NText>
+              <NTag size="small" :type="item.type" round :bordered="false">{{ item.value }}</NTag>
+            </div>
+            <NText depth="3" class="diagnostic-item-detail">{{ item.detail }}</NText>
+          </div>
+        </div>
+        <NAlert v-else type="info" :closable="false" style="margin-top: 12px;">
+          点击运行诊断后，会检查服务健康、模型接口、主模型配置、备用模型和关键环境变量。
+        </NAlert>
+      </NSpin>
+    </NCard>
+
     <!-- Server Info (remote without management API — basic fallback) -->
     <NCard class="app-card" v-if="isHermesRest && !isLocalServer && !remoteManageAvailable">
       <template #header>
@@ -628,6 +855,7 @@ watch(
           @close="hermesUpdateError = ''"
         >
           <div style="word-break: break-word; font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 12px;">{{ hermesUpdateError }}</div>
+          <div v-if="updateAdvice" style="margin-top: 6px; font-size: 12px;">{{ updateAdvice }}</div>
           <div style="margin-top: 6px; font-size: 12px; opacity: 0.8;">{{ t('pages.settings.updateRetryHint') }}</div>
         </NAlert>
         <!-- Check failure (persistent, user can retry) -->
@@ -639,6 +867,7 @@ watch(
           @close="hermesCheckError = ''"
         >
           <div style="word-break: break-word; font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 12px;">{{ hermesCheckError }}</div>
+          <div v-if="updateAdvice" style="margin-top: 6px; font-size: 12px;">{{ updateAdvice }}</div>
           <div style="margin-top: 6px; font-size: 12px; opacity: 0.8;">{{ t('pages.settings.updateRetryHint') }}</div>
         </NAlert>
         <!-- Update available -->
@@ -672,6 +901,9 @@ watch(
         >
           <template #icon><NIcon :component="CloudDownloadOutline" /></template>
           {{ hermesUpdating ? t('pages.settings.updating') : t('pages.settings.updateNow') }}
+        </NButton>
+        <NButton size="small" tag="a" :href="hermesReleaseUrl" target="_blank">
+          打开 Releases
         </NButton>
       </NSpace>
     </NCard>
@@ -814,3 +1046,41 @@ watch(
     </NCard>
   </NSpace>
 </template>
+
+<style scoped>
+.diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.diagnostic-item {
+  border: 1px solid var(--n-border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.diagnostic-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.diagnostic-item-detail {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .diagnostic-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
