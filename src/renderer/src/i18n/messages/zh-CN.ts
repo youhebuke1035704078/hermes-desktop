@@ -1676,15 +1676,16 @@ export default {
       serverPlatform: '平台',
       serverModel: '模型',
       serverLocalOnly:
-        '版本更新、配置编辑、重启等功能需要远程主机上运行 Hermes 管理服务（端口 8643）',
-      mgmtProbing: '正在检测管理接口...',
+        '当前 Hermes Agent 版本暂未暴露远程设置接口，请先在远程主机更新 Agent，或临时使用旧版管理服务（端口 8643）',
+      mgmtProbing: '正在检测设置接口...',
       mgmtNotAvailable: '未检测到远程管理接口',
       mgmtRetryProbe: '重新检测',
+      restSettingsUnavailable: 'Hermes REST 设置接口不可用',
       mgmtInstallHint:
-        '在远程 Hermes 主机上运行 npm run mgmt-server:install 后点击重新检测（当前仅支持 macOS）',
+        '新版 Hermes Agent 会通过当前 8642 接口提供设置管理；旧版可在远程主机运行 npm run mgmt-server:install 后重试（当前仅支持 macOS）',
       mgmtError: {
         'empty-url': '管理接口地址为空，请确认已正确填写服务器 URL。',
-        network: '无法连接到 {url}，可能管理服务未运行或端口 8643 被防火墙拦截。',
+        network: '无法连接到兼容管理接口 {url}，可能服务未运行或端口 8643 被防火墙拦截。',
         timeout: '连接 {url} 超时（5 秒），请检查网络或服务是否存活。',
         http: '{url} 返回了异常 HTTP 状态码，可能端口 8643 被其他服务占用。',
         parse: '{url} 返回的响应不是 JSON，可能端口 8643 被其他服务占用。',

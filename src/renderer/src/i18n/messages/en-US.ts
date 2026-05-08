@@ -1699,16 +1699,17 @@ export default {
       serverPlatform: 'Platform',
       serverModel: 'Model',
       serverLocalOnly:
-        'Version updates, config editing, and restart require the Hermes Management service running on the remote host (port 8643).',
-      mgmtProbing: 'Probing management API...',
+        'This Hermes Agent version does not expose the remote settings API yet. Update the remote Agent, or temporarily use the legacy management service on port 8643.',
+      mgmtProbing: 'Probing settings API...',
       mgmtNotAvailable: 'Remote management API not detected',
       mgmtRetryProbe: 'Retry probe',
+      restSettingsUnavailable: 'Hermes REST settings API is unavailable',
       mgmtInstallHint:
-        'Run `npm run mgmt-server:install` on the remote Hermes host, then click Retry (macOS only for now).',
+        'Newer Hermes Agent builds expose settings through the existing 8642 API. Older remotes can still use `npm run mgmt-server:install` and Retry (macOS only for now).',
       mgmtError: {
         'empty-url': 'Management API URL is empty — please ensure a valid server URL has been set.',
         network:
-          'Cannot reach {url}. The management service may not be running or port 8643 may be blocked by a firewall.',
+          'Cannot reach the compatibility management API at {url}. The service may not be running or port 8643 may be blocked by a firewall.',
         timeout:
           'Connection to {url} timed out (5s). Check network connectivity and whether the service is alive.',
         http: '{url} returned an unexpected HTTP status — port 8643 may be occupied by another service.',

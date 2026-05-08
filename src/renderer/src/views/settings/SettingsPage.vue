@@ -36,6 +36,7 @@ import { useWebSocketStore } from '@/stores/websocket'
 import { useConnectionStore } from '@/stores/connection'
 import { ConnectionState } from '@/api/types'
 import { useMgmtProbe, type MgmtFetchResult } from '@/composables/useMgmtProbe'
+import { hermesRestRequest } from '@/api/hermes-rest-client'
 
 const router = useRouter()
 const themeStore = useThemeStore()
@@ -117,12 +118,20 @@ const mgmtAvailable = mgmtProbe.available
 const mgmtProbing = mgmtProbe.probing
 const mgmtErrorKind = mgmtProbe.errorKind
 const mgmtErrorDetail = mgmtProbe.errorDetail
+const restSettingsAvailable = ref(false)
+const restSettingsProbing = ref(false)
+const restSettingsError = ref('')
 
 /** True if version/config/restart features should be shown */
-const canManage = computed(() => isHermesRest.value && (isLocalServer.value || mgmtAvailable.value))
+const canManage = computed(() =>
+  isHermesRest.value && (isLocalServer.value || restSettingsAvailable.value || mgmtAvailable.value)
+)
+const remoteManageAvailable = computed(() => restSettingsAvailable.value || mgmtAvailable.value)
+const remoteProbeBusy = computed(() => restSettingsProbing.value || mgmtProbing.value)
 
 /** Human-friendly message for the current probe failure, or '' on success. */
 const mgmtErrorMessage = computed(() => {
+  if (restSettingsError.value) return restSettingsError.value
   const kind = mgmtErrorKind.value
   if (!kind || kind === 'empty-url') return ''
   return t(`pages.settings.mgmtError.${kind}`, { url: mgmtUrl.value })
@@ -141,11 +150,50 @@ async function mgmtFetch(path: string, options: { method?: string; body?: string
   return resp.json()
 }
 
+/** Call Hermes Agent REST settings API on the connected :8642 server. */
+async function restSettingsFetch(path: string, options: { method?: string; body?: string } = {}): Promise<any> {
+  return await hermesRestRequest(`/v1/hermes/settings${path}`, {
+    method: options.method || 'GET',
+    headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
+    body: options.body,
+  })
+}
+
+/** Remote settings calls prefer the built-in Hermes REST API and keep 8643 as legacy fallback. */
+async function remoteSettingsFetch(path: string, options: { method?: string; body?: string } = {}): Promise<any> {
+  if (restSettingsAvailable.value) {
+    return await restSettingsFetch(path, options)
+  }
+  return await mgmtFetch(path, options)
+}
+
 /** Probe the mgmt-server and, on success, eagerly populate the feature cards.
  *  Safe to call repeatedly — used by onMounted, the Retry button, and the
  *  connection-status watcher after a reconnect. */
 async function triggerMgmtProbe(): Promise<void> {
   if (isLocalServer.value || !isHermesRest.value) return
+  restSettingsProbing.value = true
+  restSettingsError.value = ''
+  try {
+    const summary = await restSettingsFetch('/summary')
+    if (summary?.ok) {
+      restSettingsAvailable.value = true
+      if (summary.hermesHome) hermesDir.value = summary.hermesHome
+      loadConfigFiles()
+      await fetchHermesVersion()
+      checkHermesUpdate()
+      return
+    }
+    restSettingsError.value = summary?.error || t('pages.settings.restSettingsUnavailable')
+  } catch (e: any) {
+    restSettingsAvailable.value = false
+    restSettingsError.value = e?.message || t('pages.settings.restSettingsUnavailable')
+  } finally {
+    restSettingsProbing.value = false
+  }
+
+  // Legacy compatibility: older Hermes Agent builds used a separate :8643
+  // management service. Keep probing it so old remotes are still manageable.
   await mgmtProbe.probe(mgmtUrl.value)
   if (mgmtAvailable.value) {
     loadConfigFiles()
@@ -206,7 +254,7 @@ async function fetchHermesVersion() {
   try {
     const res = isLocalServer.value && window.api
       ? await window.api.hermesVersion()
-      : await mgmtFetch('/version')
+      : await remoteSettingsFetch('/version')
     if (res.ok) {
       hermesVersion.value = res.version || ''
       hermesDate.value = res.date || ''
@@ -224,7 +272,7 @@ async function checkHermesUpdate() {
   try {
     const res = isLocalServer.value && window.api
       ? await window.api.hermesCheckUpdate()
-      : await mgmtFetch('/check-update')
+      : await remoteSettingsFetch('/check-update')
     if (res.ok) {
       hermesCurrentTag.value = res.current || ''
       hermesLatestTag.value = res.latest || ''
@@ -262,7 +310,7 @@ async function doHermesUpdate() {
   try {
     const res = isLocalServer.value && window.api
       ? await window.api.hermesUpdate()
-      : await mgmtFetch('/update', { method: 'POST' })
+      : await remoteSettingsFetch('/update', { method: 'POST' })
     if (res.ok) {
       message.success(t('pages.settings.updateSuccess'))
       hermesUpdateAvailable.value = false
@@ -287,7 +335,7 @@ async function loadConfigFiles() {
     if (!window.api) return
     hermesDir.value = (await window.api.getHomedir()) + '/.hermes'
   } else {
-    hermesDir.value = '~/.hermes'
+    hermesDir.value = hermesDir.value || '~/.hermes'
   }
 
   // Load config.yaml
@@ -297,7 +345,7 @@ async function loadConfigFiles() {
   try {
     const res = isLocalServer.value && window.api
       ? await window.api.fsReadFile(`${hermesDir.value}/config.yaml`)
-      : await mgmtFetch('/config/yaml')
+      : await remoteSettingsFetch('/config/yaml')
     if (res.ok) {
       configYaml.value = res.content || ''
       if (res.notFound) configYamlNotFound.value = true
@@ -320,7 +368,7 @@ async function loadConfigFiles() {
   try {
     const res = isLocalServer.value && window.api
       ? await window.api.fsReadFile(`${hermesDir.value}/.env`)
-      : await mgmtFetch('/config/env')
+      : await remoteSettingsFetch('/config/env')
     if (res.ok) {
       envContent.value = res.content || ''
       if (res.notFound) envNotFound.value = true
@@ -342,7 +390,7 @@ async function saveConfigYaml() {
   try {
     const res = isLocalServer.value && window.api
       ? await window.api.fsWriteFile(`${hermesDir.value}/config.yaml`, configYaml.value)
-      : await mgmtFetch('/config/yaml', { method: 'PUT', body: JSON.stringify({ content: configYaml.value }) })
+      : await remoteSettingsFetch('/config/yaml', { method: 'PUT', body: JSON.stringify({ content: configYaml.value }) })
     if (res.ok) {
       message.success(t('pages.settings.saveSuccess'))
       configYamlNotFound.value = false
@@ -361,7 +409,7 @@ async function saveEnv() {
   try {
     const res = isLocalServer.value && window.api
       ? await window.api.fsWriteFile(`${hermesDir.value}/.env`, envContent.value)
-      : await mgmtFetch('/config/env', { method: 'PUT', body: JSON.stringify({ content: envContent.value }) })
+      : await remoteSettingsFetch('/config/env', { method: 'PUT', body: JSON.stringify({ content: envContent.value }) })
     if (res.ok) {
       message.success(t('pages.settings.saveSuccess'))
       envNotFound.value = false
@@ -380,7 +428,7 @@ async function restartHermes() {
   try {
     const res = isLocalServer.value && window.api
       ? await window.api.hermesRestart()
-      : await mgmtFetch('/restart', { method: 'POST' })
+      : await remoteSettingsFetch('/restart', { method: 'POST' })
     if (res.ok) {
       message.success(t('pages.settings.restartSuccess'))
     } else {
@@ -471,7 +519,7 @@ watch(() => connectionStore.status, (newStatus, oldStatus) => {
     </NCard>
 
     <!-- Server Info (remote without management API — basic fallback) -->
-    <NCard class="app-card" v-if="isHermesRest && !isLocalServer && !mgmtAvailable">
+    <NCard class="app-card" v-if="isHermesRest && !isLocalServer && !remoteManageAvailable">
       <template #header>
         <NSpace align="center" :size="8">
           <NIcon :component="InformationCircleOutline" size="18" />
@@ -492,12 +540,12 @@ watch(() => connectionStore.status, (newStatus, oldStatus) => {
 
       <!-- Probe status / diagnostic + Retry -->
       <div style="margin-top: 12px;">
-        <NAlert v-if="mgmtProbing" type="default" :closable="false">
+        <NAlert v-if="remoteProbeBusy" type="default" :closable="false">
           <template #icon><NSpin :size="14" /></template>
           {{ t('pages.settings.mgmtProbing') }}
         </NAlert>
         <NAlert
-          v-else-if="mgmtErrorKind && mgmtErrorKind !== 'empty-url'"
+          v-else-if="restSettingsError || (mgmtErrorKind && mgmtErrorKind !== 'empty-url')"
           type="info"
           :closable="false"
           :title="t('pages.settings.mgmtNotAvailable')"
@@ -519,7 +567,7 @@ watch(() => connectionStore.status, (newStatus, oldStatus) => {
       </div>
 
       <NSpace style="margin-top: 12px;" :size="8">
-        <NButton size="small" :loading="mgmtProbing" @click="triggerMgmtProbe">
+        <NButton size="small" :loading="remoteProbeBusy" @click="triggerMgmtProbe">
           <template #icon><NIcon :component="RefreshOutline" /></template>
           {{ t('pages.settings.mgmtRetryProbe') }}
         </NButton>

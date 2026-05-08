@@ -27,14 +27,22 @@ function buildQuery(params?: Record<string, unknown>): string {
   return text ? `?${text}` : ''
 }
 
-export async function hermesRestGet<T>(path: string, params?: Record<string, unknown>): Promise<T> {
+export async function hermesRestRequest<T>(
+  path: string,
+  options: { method?: string; body?: string; headers?: Record<string, string> } = {},
+  params?: Record<string, unknown>,
+): Promise<T> {
   const base = hermesRestBase()
   if (!base) throw new Error('Hermes REST server is not connected')
 
   const url = `${base}${path}${buildQuery(params)}`
-  const headers = hermesRestHeaders()
+  const headers = { ...hermesRestHeaders(), ...(options.headers || {}) }
   if (window.api?.httpFetch) {
-    const response = await window.api.httpFetch(url, { headers })
+    const response = await window.api.httpFetch(url, {
+      method: options.method || 'GET',
+      headers,
+      body: options.body,
+    })
     if (!response.ok) {
       throw new Error(response.body || `${path} returned HTTP ${response.status}`)
     }
@@ -42,11 +50,17 @@ export async function hermesRestGet<T>(path: string, params?: Record<string, unk
   }
 
   const response = await fetch(url, {
+    method: options.method || 'GET',
     headers,
+    body: options.body,
     signal: AbortSignal.timeout(15000),
   })
   if (!response.ok) {
     throw new Error((await response.text()) || `${path} returned HTTP ${response.status}`)
   }
   return await response.json() as T
+}
+
+export async function hermesRestGet<T>(path: string, params?: Record<string, unknown>): Promise<T> {
+  return hermesRestRequest<T>(path, {}, params)
 }
