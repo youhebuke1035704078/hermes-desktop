@@ -211,6 +211,11 @@ export default {
       statusAll: 'All',
       statusEnabled: 'Enabled',
       statusDisabled: 'Disabled',
+      source: {
+        server: 'Server Skills',
+        local: 'Local Skills',
+        fallback: 'Failed to load server skills; showing local scan instead: {error}'
+      },
       columns: {
         name: 'Name',
         category: 'Category',

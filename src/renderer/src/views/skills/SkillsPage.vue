@@ -31,6 +31,13 @@ const statusOptions = computed(() => [
   { label: t('pages.skills.statusDisabled'), value: 'disabled' },
 ])
 
+const sourceType = computed(() => (skillStore.source === 'server' ? 'success' : 'warning'))
+const sourceLabel = computed(() =>
+  skillStore.source === 'server'
+    ? t('pages.skills.source.server')
+    : t('pages.skills.source.local'),
+)
+
 const filteredSkills = computed(() => {
   let list = skillStore.skills
   if (searchQuery.value) {
@@ -247,10 +254,15 @@ function rowProps(row: SkillMeta) {
         </NSpace>
       </template>
       <template #header-extra>
-        <NButton secondary size="small" @click="skillStore.fetchSkills()" :loading="skillStore.loading">
-          <template #icon><NIcon :component="RefreshOutline" /></template>
-          {{ t('pages.skills.refresh') }}
-        </NButton>
+        <NSpace align="center" :size="8">
+          <NTag size="small" :type="sourceType" round>
+            {{ sourceLabel }}
+          </NTag>
+          <NButton secondary size="small" @click="skillStore.fetchSkills()" :loading="skillStore.loading">
+            <template #icon><NIcon :component="RefreshOutline" /></template>
+            {{ t('pages.skills.refresh') }}
+          </NButton>
+        </NSpace>
       </template>
 
       <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="10" :y-gap="10">
@@ -309,6 +321,9 @@ function rowProps(row: SkillMeta) {
           style="width: 140px;"
         />
       </div>
+      <NText v-if="skillStore.sourceError" type="warning" style="font-size: 12px; margin-top: 8px; display: block;">
+        {{ t('pages.skills.source.fallback', { error: skillStore.sourceError }) }}
+      </NText>
     </NCard>
 
     <!-- Empty state -->

@@ -205,6 +205,11 @@ export default {
       statusAll: '全部',
       statusEnabled: '已启用',
       statusDisabled: '已禁用',
+      source: {
+        server: '服务端 Skill',
+        local: '本机 Skill',
+        fallback: '服务端 Skill 读取失败，已显示本机扫描结果：{error}'
+      },
       columns: {
         name: '名称',
         category: '分类',

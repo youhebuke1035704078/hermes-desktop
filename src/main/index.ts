@@ -608,7 +608,15 @@ function registerIpcHandlers(): void {
         return true
       })
 
-      return { ok: true, skills, disabled, configValues, externalDirs }
+      return {
+        ok: true,
+        source: 'local',
+        rootDir: skillsDir,
+        skills,
+        disabled,
+        configValues,
+        externalDirs
+      }
     } catch (e: any) {
       return {
         ok: false,

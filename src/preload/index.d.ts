@@ -101,6 +101,8 @@ interface HermesAPI {
     disabled: string[]
     configValues: Record<string, any>
     externalDirs: string[]
+    source?: 'local' | 'server'
+    rootDir?: string
     error?: string
   }>
   hermesSkillsConfig(action: string, payload: any): Promise<{ ok: boolean; error?: string }>
