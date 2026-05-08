@@ -105,7 +105,19 @@ const orderedMenuItems = computed<MenuItem[]>(() => {
     .map((x) => x.item)
 })
 
-const activeKey = computed(() => route.name as string)
+const activeParentMap: Record<string, string> = {
+  Sessions: 'Chat',
+  SessionDetail: 'Chat',
+  Insights: 'Dashboard',
+  Channels: 'Settings',
+  Logs: 'Settings',
+  Backup: 'Settings',
+}
+
+const activeKey = computed(() => {
+  const name = route.name as string
+  return activeParentMap[name] || name
+})
 
 function handleSelect(key: string) {
   router.push({ name: key })

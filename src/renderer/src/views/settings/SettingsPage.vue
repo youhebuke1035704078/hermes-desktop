@@ -29,6 +29,8 @@ import {
   RocketOutline,
   CloudDownloadOutline,
   InformationCircleOutline,
+  PaperPlaneOutline,
+  CogOutline,
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore, type ThemeMode } from '@/stores/theme'
@@ -216,6 +218,18 @@ async function handleDisconnect() {
 
 function handleSwitchServer() {
   router.push({ name: 'Connection', query: { manual: '1' } })
+}
+
+function goChannels() {
+  router.push({ name: 'Channels' })
+}
+
+function goLogs() {
+  router.push({ name: 'Logs' })
+}
+
+function goBackup() {
+  router.push({ name: 'Backup' })
 }
 
 // ── Config file editors ──
@@ -700,6 +714,33 @@ watch(
         </NButton>
         <NButton size="small" type="error" quaternary @click="handleDisconnect">
           {{ t('pages.settings.disconnect') }}
+        </NButton>
+      </NSpace>
+    </NCard>
+
+    <!-- Secondary maintenance entry points -->
+    <NCard class="app-card">
+      <template #header>
+        <NSpace align="center" :size="8">
+          <NIcon :component="CogOutline" size="18" />
+          <span>维护与诊断入口</span>
+        </NSpace>
+      </template>
+      <NText depth="3" style="display: block; margin-bottom: 12px; font-size: 13px;">
+        低频配置和排障工具已收纳到这里，保持侧边栏聚焦日常主流程。
+      </NText>
+      <NSpace :size="8" wrap>
+        <NButton size="small" secondary @click="goChannels">
+          <template #icon><NIcon :component="PaperPlaneOutline" /></template>
+          {{ t('routes.channels') }}
+        </NButton>
+        <NButton size="small" secondary @click="goLogs">
+          <template #icon><NIcon :component="DocumentTextOutline" /></template>
+          {{ t('routes.logs') }}
+        </NButton>
+        <NButton size="small" secondary @click="goBackup">
+          <template #icon><NIcon :component="SaveOutline" /></template>
+          {{ t('routes.backup') }}
         </NButton>
       </NSpace>
     </NCard>

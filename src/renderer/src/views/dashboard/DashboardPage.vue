@@ -614,6 +614,7 @@ async function handleRefresh() {
 function goSessions() { router.push({ name: 'Sessions' }) }
 function goCron() { router.push({ name: 'Cron' }) }
 function goChat() { router.push({ name: 'Chat' }) }
+function goInsights() { router.push({ name: 'Insights' }) }
 
 onMounted(() => {
   if (cronStore.jobs.length === 0) cronStore.fetchJobs()
@@ -657,6 +658,7 @@ onMounted(() => {
             {{ t('routes.chat') }}
           </NButton>
           <NButton secondary size="small" @click="goSessions">{{ t('routes.sessions') }}</NButton>
+          <NButton secondary size="small" @click="goInsights">{{ t('routes.insights') }}</NButton>
           <NButton secondary size="small" @click="goCron">{{ t('routes.cron') }}</NButton>
         </NSpace>
 

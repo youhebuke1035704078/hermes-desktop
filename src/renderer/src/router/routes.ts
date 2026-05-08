@@ -32,7 +32,7 @@ export const routes: RouteRecordRaw[] = [
         path: 'sessions',
         name: 'Sessions',
         component: () => import('@/views/sessions/SessionsPage.vue'),
-        meta: { titleKey: 'routes.sessions', icon: 'ChatbubblesOutline' },
+        meta: { titleKey: 'routes.sessions', icon: 'ChatbubblesOutline', hidden: true },
       },
       {
         path: 'sessions/:key',
@@ -50,13 +50,13 @@ export const routes: RouteRecordRaw[] = [
         path: 'insights',
         name: 'Insights',
         component: () => import('@/views/insights/InsightsPage.vue'),
-        meta: { titleKey: 'routes.insights', icon: 'AnalyticsOutline' },
+        meta: { titleKey: 'routes.insights', icon: 'AnalyticsOutline', hidden: true },
       },
       {
         path: 'channels',
         name: 'Channels',
         component: () => import('@/views/channels/ChannelsPage.vue'),
-        meta: { titleKey: 'routes.channels', icon: 'PaperPlaneOutline' },
+        meta: { titleKey: 'routes.channels', icon: 'PaperPlaneOutline', hidden: true },
       },
       {
         path: 'skills',
@@ -68,13 +68,13 @@ export const routes: RouteRecordRaw[] = [
         path: 'logs',
         name: 'Logs',
         component: () => import('@/views/logs/LogsPage.vue'),
-        meta: { titleKey: 'routes.logs', icon: 'DocumentTextOutline' },
+        meta: { titleKey: 'routes.logs', icon: 'DocumentTextOutline', hidden: true },
       },
       {
         path: 'backup',
         name: 'Backup',
         component: () => import('@/views/backup/BackupPage.vue'),
-        meta: { titleKey: 'routes.backup', icon: 'SaveOutline' },
+        meta: { titleKey: 'routes.backup', icon: 'SaveOutline', hidden: true },
       },
       {
         path: 'settings',
