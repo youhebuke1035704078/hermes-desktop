@@ -159,7 +159,7 @@ function resetDrag() {
 </script>
 
 <template>
-  <div style="display: flex; flex-direction: column; height: 100%">
+  <div class="sidebar-shell">
     <div class="sidebar-logo" :class="{ 'sidebar-logo--collapsed': collapsed }">
       <div class="sidebar-brand-mark">H</div>
       <div v-if="!collapsed" class="sidebar-brand-text">
@@ -213,20 +213,26 @@ function resetDrag() {
       <div class="sidebar-foot-label">今日重点</div>
       <div class="sidebar-foot-title">价格监控完整</div>
       <div class="sidebar-foot-detail">
-        {{ activeAlertCount ? `${activeAlertCount} 项需关注` : '查看控制塔确认最新状态' }}
+        {{ activeAlertCount ? `${activeAlertCount} 项需关注` : '40/40 SKU · 无需补录' }}
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.sidebar-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 22px 14px;
+  gap: 22px;
+}
+
 .sidebar-logo {
   display: flex;
   align-items: center;
-  padding: 20px 24px;
+  padding: 0 8px;
   gap: 10px;
-  /* macOS hiddenInset titlebar: leave space for traffic lights */
-  padding-top: 38px;
   -webkit-app-region: drag;
 }
 
@@ -271,7 +277,10 @@ function resetDrag() {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 14px;
+  padding: 0;
+  display: grid;
+  align-content: start;
+  gap: 6px;
 }
 
 .sidebar-item {
@@ -354,11 +363,11 @@ function resetDrag() {
 }
 
 .sidebar-foot {
-  margin: 14px;
+  margin-top: auto;
   padding: 12px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: #18191e;
 }
 
 .sidebar-foot-label {

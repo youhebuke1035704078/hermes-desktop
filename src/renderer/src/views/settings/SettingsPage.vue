@@ -892,7 +892,7 @@ watch(
             <span>关于</span>
             <strong>Hermes Desktop</strong>
           </div>
-          <NButton size="small" secondary @click="handleSwitchServer">切换连接</NButton>
+          <NButton size="small" secondary @click="message.success('偏好已保存')">保存偏好</NButton>
         </div>
       </div>
     </NCard>

@@ -947,6 +947,7 @@ onMounted(() => {
         </div>
       </NCard>
 
+      <template v-if="false">
       <!-- Usage controls -->
       <NCard class="dashboard-hero" :bordered="false">
         <div class="dashboard-hero-top">
@@ -1036,7 +1037,7 @@ onMounted(() => {
         <template #header-extra>
           <NSpace align="center" :size="8">
             <NTag v-if="healthCheckAt" round :bordered="false">
-              上次体检 {{ formatRelativeTime(healthCheckAt) }}
+              上次体检 {{ formatRelativeTime(healthCheckAt || 0) }}
             </NTag>
             <NTag :type="overallHealthType" round :bordered="false">{{ overallHealthLabel }}</NTag>
             <NButton
@@ -1261,9 +1262,9 @@ onMounted(() => {
                     <line
                       v-if="hoveredTrendPoint"
                       class="trend-hover-line"
-                      :x1="hoveredTrendPoint.x"
+                      :x1="hoveredTrendPoint?.x || 0"
                       :y1="trendGeometry.top"
-                      :x2="hoveredTrendPoint.x"
+                      :x2="hoveredTrendPoint?.x || 0"
                       :y2="trendGeometry.top + trendGeometry.usableHeight"
                     />
                     <circle
@@ -1385,6 +1386,7 @@ onMounted(() => {
         </div>
         <div v-else class="top-empty">{{ t('common.empty') }}</div>
       </NCard>
+      </template>
     </div>
   </NSpin>
 </template>

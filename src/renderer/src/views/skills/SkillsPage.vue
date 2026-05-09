@@ -12,8 +12,16 @@ import { ExtensionPuzzleOutline, RefreshOutline, AddOutline, TrashOutline, LinkO
 import { useSkillStore } from '@/stores/skill'
 import { useCronStore } from '@/stores/cron'
 import { writeTextToClipboard } from '@/utils/clipboard'
-import { formatDate, formatRelativeTime } from '@/utils/format'
 import type { CronJob, SkillMeta } from '@/api/types'
+
+type SkillProcessStatusType = 'success' | 'warning' | 'error' | 'info' | 'default'
+interface SkillProcessRow {
+  key: string
+  label: string
+  detail: string
+  type: SkillProcessStatusType
+  status: string
+}
 
 const { t } = useI18n()
 const message = useMessage()
@@ -81,14 +89,50 @@ function findPriceJob(pattern: RegExp): CronJob | undefined {
   return priceMonitorJobs.value.find(job => pattern.test(job.name))
 }
 
-const priceLifecycleStages = computed(() => [
-  { key: 'gate', label: '验证门控', job: findPriceJob(/verification-gate|gate|07:20|07：20/i) },
-  { key: 'daily', label: '主采集', job: findPriceJob(/jd-tongrentang-price-watch(?!.*backfill)/i) },
-  { key: 'backfill', label: '补录', job: findPriceJob(/backfill|补录|17:00|17：00/i) },
-  { key: 'health', label: '健康检查', job: findPriceJob(/cron-health|health|健康/i) },
-  { key: 'backup', label: '备份', job: findPriceJob(/backup|备份/i) },
-])
 const priceBackfillJob = computed(() => findPriceJob(/backfill|补录|17:00|17：00/i))
+const skillProcessRows = computed<SkillProcessRow[]>(() => {
+  const gate = findPriceJob(/verification-gate|gate|07:20|07：20/i)
+  const daily = findPriceJob(/jd-tongrentang-price-watch(?!.*backfill)/i)
+  const watchdog = findPriceJob(/watchdog|11:00|11：00/i)
+  const backfill = priceBackfillJob.value
+  const alarm = findPriceJob(/evening|alarm|告警|17:30|17：30/i)
+  const backup = findPriceJob(/backup|备份/i)
+  const combinedIssue = (...jobs: Array<CronJob | undefined>) =>
+    jobs.find(job => job?.enabled && job.state?.lastStatus === 'error')
+  const combinedOk = (...jobs: Array<CronJob | undefined>) =>
+    jobs.some(job => job?.enabled && job.state?.lastStatus === 'ok')
+
+  return [
+    {
+      key: 'gate',
+      label: '验证门控',
+      detail: '检测是否需要人工解锁，不自动绕过验证。',
+      type: gate ? priceJobStatus(gate).type : 'warning',
+      status: gate ? priceJobStatus(gate).label : '未配置',
+    },
+    {
+      key: 'collect',
+      label: '采集与入库',
+      detail: '采集 SKU 价格，落 SQLite，生成报告。',
+      type: daily ? priceJobStatus(daily).type : 'warning',
+      status: daily ? priceJobStatus(daily).label : '未配置',
+    },
+    {
+      key: 'recover',
+      label: '巡检与补录',
+      detail: '缺数据才补录；已齐全直接确认退出。',
+      type: combinedIssue(watchdog, backfill) ? 'error' : combinedOk(watchdog, backfill) ? 'success' : 'warning',
+      status: combinedIssue(watchdog, backfill) ? '观察' : combinedOk(watchdog, backfill) ? 'OK' : '待确认',
+    },
+    {
+      key: 'ops',
+      label: '告警与备份',
+      detail: '缺口通知飞书，夜间备份 SQLite。',
+      type: combinedIssue(alarm, backup) ? 'error' : combinedOk(alarm, backup) ? 'success' : 'warning',
+      status: combinedIssue(alarm, backup) ? '需处理' : combinedOk(alarm, backup) ? 'OK' : '待确认',
+    },
+  ]
+})
 
 const filteredSkills = computed(() => {
   let list = skillStore.skills
@@ -156,11 +200,6 @@ onUnmounted(() => {
 function selectSkill(name: string) {
   skillStore.selectedSkillName = name
   if (isNarrow.value) drawerVisible.value = true
-}
-
-function selectPriceWatchSkill() {
-  if (!priceWatchSkill.value) return
-  selectSkill(priceWatchSkill.value.name)
 }
 
 function goPriceWorkflow() {
@@ -417,9 +456,7 @@ function rowProps(row: SkillMeta) {
             <template #icon><NIcon :component="CopyOutline" /></template>
             复制 Skill 路径
           </NButton>
-          <NButton block secondary :disabled="!priceWatchSkill" @click="selectPriceWatchSkill">
-            查看 Skill 定义
-          </NButton>
+          <NButton block secondary @click="router.push({ name: 'Settings' })">导出诊断包</NButton>
         </NSpace>
       </NCard>
     </div>
@@ -428,31 +465,17 @@ function rowProps(row: SkillMeta) {
       <template #header>Skill 生命周期</template>
       <div class="skill-process-list">
         <div
-          v-for="(stage, index) in priceLifecycleStages.slice(0, 4)"
-          :key="stage.key"
+          v-for="(row, index) in skillProcessRows"
+          :key="row.key"
           class="skill-process-row"
         >
           <div class="skill-step-index">{{ index + 1 }}</div>
           <div class="skill-process-main">
-            <NText strong>{{ stage.label }}</NText>
-            <NText depth="3" class="skill-process-detail">
-              <template v-if="stage.job">
-                上次 {{ stage.job.state?.lastRunAtMs ? formatRelativeTime(stage.job.state.lastRunAtMs) : '-' }}
-                · 下次 {{ stage.job.nextRun ? formatDate(stage.job.nextRun) : '-' }}
-              </template>
-              <template v-else>未发现关联 Cron 任务</template>
-            </NText>
-            <NText v-if="stage.job?.state?.lastError" type="error" class="skill-process-detail">
-              {{ stage.job.state.lastError }}
-            </NText>
+            <NText strong>{{ row.label }}</NText>
+            <NText depth="3" class="skill-process-detail">{{ row.detail }}</NText>
           </div>
-          <NTag
-            size="small"
-            :type="stage.job ? priceJobStatus(stage.job).type : 'warning'"
-            round
-            :bordered="false"
-          >
-            {{ stage.job ? priceJobStatus(stage.job).label : '未配置' }}
+          <NTag size="small" :type="row.type" round :bordered="false">
+            {{ row.status }}
           </NTag>
         </div>
       </div>

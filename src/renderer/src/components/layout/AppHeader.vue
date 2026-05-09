@@ -2,34 +2,22 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NBreadcrumb, NBreadcrumbItem, NBadge, NButton, NIcon, NSpace, NTag, NTooltip } from 'naive-ui'
-import {
-  SunnyOutline,
-  MoonOutline,
-  LogOutOutline,
-  LanguageOutline,
-  ExpandOutline,
-  ContractOutline,
-  NotificationsOutline
-} from '@vicons/ionicons5'
+import { NotificationsOutline } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
-import { useTheme } from '@/composables/useTheme'
 import { useConnectionStore } from '@/stores/connection'
 import { useLocaleStore } from '@/stores/locale'
 import { useModelStore } from '@/stores/model'
 import { useOpsStore } from '@/stores/ops'
-import { useWideModeStore } from '@/stores/wideMode'
 import ConnectionStatus from '@/components/common/ConnectionStatus.vue'
 import ModelStateBadge from './ModelStateBadge.vue'
 import { shouldShowModelBadge } from './modelBadgeVisibility'
 
 const route = useRoute()
 const router = useRouter()
-const { isDark, toggle } = useTheme()
 const connectionStore = useConnectionStore()
 const modelStore = useModelStore()
 const localeStore = useLocaleStore()
 const opsStore = useOpsStore()
-const wideModeStore = useWideModeStore()
 const { t } = useI18n()
 
 // Bug 4 fix: keep the badge mounted during disconnect so the stale
@@ -68,16 +56,7 @@ const pageTitle = computed(() => {
   return currentRouteLabel.value
 })
 
-const languageToggleTarget = computed(() =>
-  localeStore.locale === 'zh-CN' ? t('common.languageEn') : t('common.languageZh')
-)
-
 const fallbackModelLabel = computed(() => modelStore.state.fallbackChain[0] || '')
-
-async function handleLogout() {
-  await connectionStore.disconnect()
-  router.push({ name: 'Connection' })
-}
 
 function goNotifications() {
   router.push({ name: 'Settings' })
@@ -127,52 +106,6 @@ function goNotifications() {
           </NBadge>
         </template>
         通知中心
-      </NTooltip>
-
-      <NTooltip>
-        <template #trigger>
-          <NButton quaternary circle @click="toggle">
-            <template #icon>
-              <NIcon :component="isDark ? SunnyOutline : MoonOutline" />
-            </template>
-          </NButton>
-        </template>
-        {{ isDark ? t('common.switchToLight') : t('common.switchToDark') }}
-      </NTooltip>
-
-      <NTooltip>
-        <template #trigger>
-          <NButton quaternary circle @click="wideModeStore.toggle">
-            <template #icon>
-              <NIcon :component="wideModeStore.isWideMode ? ContractOutline : ExpandOutline" />
-            </template>
-          </NButton>
-        </template>
-        {{
-          wideModeStore.isWideMode ? t('common.switchToNormalWidth') : t('common.switchToWideMode')
-        }}
-      </NTooltip>
-
-      <NTooltip>
-        <template #trigger>
-          <NButton quaternary circle @click="localeStore.toggle">
-            <template #icon>
-              <NIcon :component="LanguageOutline" />
-            </template>
-          </NButton>
-        </template>
-        {{ t('common.toggleLanguage', { target: languageToggleTarget }) }}
-      </NTooltip>
-
-      <NTooltip>
-        <template #trigger>
-          <NButton quaternary circle @click="handleLogout">
-            <template #icon>
-              <NIcon :component="LogOutOutline" />
-            </template>
-          </NButton>
-        </template>
-        {{ t('common.logout') }}
       </NTooltip>
     </NSpace>
   </div>

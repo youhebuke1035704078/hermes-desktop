@@ -24,12 +24,9 @@ import {
   AddOutline,
   CopyOutline,
   CreateOutline,
-  RefreshOutline,
   SendOutline,
   StopCircleOutline,
-  TrashOutline,
-  ChevronBackOutline,
-  ChevronForwardOutline
+  TrashOutline
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -306,56 +303,6 @@ function formatTokenCount(value: number): string {
     Math.max(0, value)
   )
 }
-
-const sessionTokenMetricTags = computed(() => {
-  const usage = currentSessionTokenUsage.value
-  if (!usage) return []
-
-  const tags = [
-    {
-      key: 'total',
-      label: t('pages.chat.tokens.total'),
-      value: formatTokenCount(usage.total),
-      highlight: true
-    },
-    {
-      key: 'input',
-      label: t('pages.chat.tokens.input'),
-      value: formatTokenCount(usage.input),
-      highlight: false
-    },
-    {
-      key: 'output',
-      label: t('pages.chat.tokens.output'),
-      value: formatTokenCount(usage.output),
-      highlight: false
-    }
-  ]
-  // Only show cache metrics when they have non-zero values (REST API doesn't report them)
-  if (usage.cacheRead > 0) {
-    tags.push({
-      key: 'cacheRead',
-      label: t('pages.chat.tokens.cacheRead'),
-      value: formatTokenCount(usage.cacheRead),
-      highlight: false
-    })
-  }
-  if (usage.cacheWrite > 0) {
-    tags.push({
-      key: 'cacheWrite',
-      label: t('pages.chat.tokens.cacheWrite'),
-      value: formatTokenCount(usage.cacheWrite),
-      highlight: false
-    })
-  }
-  return tags
-})
-
-const sessionTokenStatusText = computed(() =>
-  sessionTokenUsageLoading.value
-    ? t('pages.chat.tokens.loading')
-    : t('pages.chat.tokens.unavailable')
-)
 
 function resolveUsageSession(
   sessions: SessionsUsageSession[],
@@ -895,7 +842,6 @@ const subagentsSubcommandPresets = computed<SubagentsSubcommandPreset[]>(() => [
   }
 ])
 const transcriptLoading = computed(() => chatStore.loading && messageList.value.length === 0)
-const refreshingChatData = computed(() => sessionStore.loading || chatStore.loading)
 const syncHint = computed(() => {
   if (chatStore.syncing) return t('pages.chat.sync.syncing')
   if (chatStore.lastSyncedAt) {
@@ -2700,13 +2646,6 @@ const hermesConvStats = computed(() => {
   }
 })
 
-async function handleRefreshChatData() {
-  if (!isHermesRest.value) {
-    await sessionStore.fetchSessions()
-  }
-  await loadHistoryForKey(ensureSessionKey(), { force: true })
-}
-
 async function handleSend() {
   const content = draft.value.trim()
   if (!content) return
@@ -2747,52 +2686,7 @@ async function handleSend() {
 
 <template>
   <div class="chat-page">
-    <NCard :title="t('pages.chat.title')" class="app-card chat-root-card">
-      <template #header-extra>
-        <NSpace :size="8" class="app-toolbar">
-          <!-- Token metrics (both ACP and Hermes REST) -->
-          <template v-if="sessionTokenMetricTags.length">
-            <div class="chat-token-metrics">
-              <NTag
-                v-for="metric in sessionTokenMetricTags"
-                :key="metric.key"
-                size="small"
-                :bordered="false"
-                round
-                class="chat-token-chip"
-                :class="{ 'chat-token-chip--total': metric.highlight }"
-              >
-                <span class="chat-token-chip__label">{{ metric.label }}</span>
-                <span class="chat-token-chip__value">{{ metric.value }}</span>
-              </NTag>
-            </div>
-          </template>
-          <!-- Hermes REST: model indicator (when no token data yet) -->
-          <NTag v-else-if="isHermesRest" size="small" :bordered="false" round type="info">
-            {{ connectionStore.hermesRealModel || hermesModel }}
-          </NTag>
-          <!-- ACP: loading/unavailable state -->
-          <NTag
-            v-else
-            size="small"
-            :bordered="false"
-            round
-            class="chat-token-chip chat-token-chip--loading"
-          >
-            {{ sessionTokenStatusText }}
-          </NTag>
-          <NButton
-            size="small"
-            class="app-toolbar-btn app-toolbar-btn--refresh"
-            :loading="refreshingChatData"
-            @click="handleRefreshChatData"
-          >
-            <template #icon><NIcon :component="RefreshOutline" /></template>
-            {{ t('pages.chat.actions.refreshChat') }}
-          </NButton>
-        </NSpace>
-      </template>
-
+    <NCard class="app-card chat-root-card">
       <NGrid
         cols="1 l:4"
         responsive="screen"
@@ -2807,12 +2701,13 @@ async function handleSend() {
           class="chat-grid-side"
           :class="{ 'chat-grid-side--collapsed': sideCollapsed }"
         >
-          <div class="chat-side-collapse-btn" @click="sideCollapsed = !sideCollapsed">
-            <NIcon :component="ChevronBackOutline" size="14" />
-          </div>
-
           <NCard v-show="!sideCollapsed" embedded :bordered="false" class="chat-side-card">
             <NSpace vertical :size="12">
+              <div class="chat-side-heading">
+                <NText strong class="chat-side-heading-title">会话管理</NText>
+                <NText depth="3" class="chat-side-heading-note">会话不再是独立主入口。</NText>
+              </div>
+
               <!-- Hermes REST: New conversation button -->
               <NButton
                 v-if="isHermesRest"
@@ -2986,11 +2881,6 @@ async function handleSend() {
         </NGridItem>
 
         <NGridItem :span="2" class="chat-grid-main">
-          <!-- 展开按钮（侧边栏折叠时显示） -->
-          <div v-if="sideCollapsed" class="chat-side-expand-btn" @click="sideCollapsed = false">
-            <NIcon :component="ChevronForwardOutline" size="14" />
-          </div>
-
           <div class="chat-main-column">
             <NCard embedded :bordered="false" class="chat-transcript-card">
               <NSpace
@@ -4008,6 +3898,21 @@ async function handleSend() {
   border-radius: var(--radius);
 }
 
+.chat-side-heading {
+  padding: 2px 2px 4px;
+}
+
+.chat-side-heading-title {
+  display: block;
+  font-size: 15px;
+}
+
+.chat-side-heading-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
 .chat-tools-card {
   border-radius: var(--radius);
 }
@@ -4311,7 +4216,6 @@ async function handleSend() {
 }
 
 .chat-compose-card {
-  order: -1;
   flex-shrink: 0;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
