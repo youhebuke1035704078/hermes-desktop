@@ -8,14 +8,9 @@ import { useAlertNotifier } from '@/composables/useAlertNotifier'
 import {
   GridOutline,
   ChatboxEllipsesOutline,
-  ChatbubblesOutline,
   CogOutline,
   CalendarOutline,
   ExtensionPuzzleOutline,
-  AnalyticsOutline,
-  PaperPlaneOutline,
-  DocumentTextOutline,
-  SaveOutline,
 } from '@vicons/ionicons5'
 import { routes } from '@/router/routes'
 import { useConnectionStore } from '@/stores/connection'
@@ -32,19 +27,15 @@ const { activeAlertCount } = useAlertNotifier()
 /** Routes that require ACP WebSocket — hide in Hermes REST mode */
 const WS_ONLY_ROUTES = new Set<string>([])
 const HERMES_ONLY_ROUTES = new Set(['Dashboard', 'Skills'])
+const PRIMARY_MENU_ORDER = ['Dashboard', 'Chat', 'Cron', 'Skills', 'Settings']
 const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
 const iconMap: Record<string, any> = {
   GridOutline,
   ChatboxEllipsesOutline,
-  ChatbubblesOutline,
   CogOutline,
   CalendarOutline,
   ExtensionPuzzleOutline,
-  AnalyticsOutline,
-  PaperPlaneOutline,
-  DocumentTextOutline,
-  SaveOutline,
 }
 
 interface MenuItem {
@@ -69,10 +60,15 @@ const baseMenuItems = computed<MenuItem[]>(() => {
       titleKey: child.meta?.titleKey as string,
       iconName: child.meta?.icon as string,
     }))
+    .sort((a, b) => {
+      const ai = PRIMARY_MENU_ORDER.indexOf(a.key)
+      const bi = PRIMARY_MENU_ORDER.indexOf(b.key)
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+    })
 })
 
 // ── Persisted drag order ──
-const STORAGE_KEY = 'sidebar-menu-order'
+const STORAGE_KEY = 'sidebar-menu-order-v2'
 
 function loadOrder(): string[] {
   try {
