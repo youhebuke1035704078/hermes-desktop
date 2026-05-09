@@ -442,7 +442,7 @@ function rowProps(row: SkillMeta) {
             <NText depth="3" style="font-size: 12px;">定位</NText>
             <div style="font-size: 14px; font-weight: 600; margin-top: 6px;">流程知识沉淀</div>
             <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
-              说明采集脚本、补录、巡检、告警和备份如何协作。
+              说明验证门控、采集脚本、补录、巡检、告警和备份如何协作。
             </NText>
           </NCard>
         </NGridItem>

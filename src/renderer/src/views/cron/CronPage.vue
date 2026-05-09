@@ -105,10 +105,11 @@ const priceMonitorJobs = computed(() =>
 
 function findPriceStageJob(key: string): CronJob | undefined {
   const jobs = priceMonitorJobs.value
+  if (key === 'gate') return jobs.find(job => /verification-gate|验证门控|gate|07:20|07：20/i.test(job.name))
   if (key === 'daily') {
     return jobs.find(job =>
       /jd-tongrentang-price-watch/i.test(job.name) &&
-      !/backfill|watchdog|evening|alarm|backup|health/i.test(job.name),
+      !/verification-gate|gate|backfill|watchdog|evening|alarm|backup|health/i.test(job.name),
     )
   }
   if (key === 'watchdog') return jobs.find(job => /watchdog|11:00|11：00/i.test(job.name))
@@ -139,6 +140,7 @@ function priceStageDetail(job: CronJob | undefined, hint: string): string {
 
 const priceWorkflowStages = computed<PriceWorkflowStage[]>(() => {
   const defs = [
+    { key: 'gate', label: '07:20 验证门控', hint: '检测京东快速验证' },
     { key: 'daily', label: '07:30 价格获取', hint: '主采集任务' },
     { key: 'watchdog', label: '11:00 巡检', hint: '上午缺口检查' },
     { key: 'backfill', label: '17:00 补录', hint: '失败数据补采' },
