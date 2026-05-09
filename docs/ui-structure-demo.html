@@ -1,0 +1,1133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hermes Desktop UI Structure Demo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #121214;
+      --panel: #19191d;
+      --panel-2: #202126;
+      --line: #303139;
+      --text: #ececf0;
+      --muted: #a3a6ad;
+      --soft: #747984;
+      --green: #60d7ac;
+      --green-bg: #123326;
+      --amber: #e2b85a;
+      --amber-bg: #3a2d16;
+      --red: #ef7d82;
+      --red-bg: #3a2024;
+      --blue: #78b7ff;
+      --blue-bg: #17304c;
+      --violet: #bda3ff;
+      --shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      letter-spacing: 0;
+    }
+
+    button, input {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      color: var(--text);
+      background: #24252b;
+      border-radius: 8px;
+      min-height: 34px;
+      padding: 0 12px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: #4b4d56;
+      background: #2b2c33;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--line);
+      background: #15161a;
+      padding: 22px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 8px;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #60d7ac, #78b7ff);
+      display: grid;
+      place-items: center;
+      color: #111;
+      font-weight: 800;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 760;
+      line-height: 1.1;
+    }
+
+    .brand-subtitle {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .nav {
+      display: grid;
+      gap: 6px;
+    }
+
+    .nav button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      border: 0;
+      background: transparent;
+      color: #c9ccd3;
+      padding: 10px 12px;
+    }
+
+    .nav button.active {
+      color: var(--green);
+      background: rgba(96, 215, 172, 0.12);
+    }
+
+    .nav-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .sidebar-foot {
+      margin-top: auto;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #18191e;
+    }
+
+    .main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      height: 68px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: rgba(25, 25, 29, 0.96);
+      position: sticky;
+      top: 0;
+      z-index: 8;
+    }
+
+    .crumb {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .title {
+      font-size: 20px;
+      font-weight: 780;
+      margin-top: 3px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 30px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #24252a;
+      font-size: 13px;
+      color: #d9dbe1;
+      white-space: nowrap;
+    }
+
+    .pill.green { color: var(--green); background: var(--green-bg); border-color: rgba(96, 215, 172, 0.3); }
+    .pill.amber { color: var(--amber); background: var(--amber-bg); border-color: rgba(226, 184, 90, 0.35); }
+    .pill.red { color: var(--red); background: var(--red-bg); border-color: rgba(239, 125, 130, 0.35); }
+    .pill.blue { color: var(--blue); background: var(--blue-bg); border-color: rgba(120, 183, 255, 0.34); }
+
+    .icon-btn {
+      width: 36px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    .badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: var(--red);
+      color: #21090b;
+      font-size: 11px;
+      font-weight: 760;
+      display: grid;
+      place-items: center;
+    }
+
+    .content {
+      padding: 22px 24px 34px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .page {
+      display: none;
+      gap: 14px;
+    }
+
+    .page.active {
+      display: grid;
+    }
+
+    .section {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .section.flat {
+      box-shadow: none;
+      background: transparent;
+      padding: 0;
+      border: 0;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-size: 17px;
+      font-weight: 760;
+    }
+
+    .section-note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .card-title {
+      font-weight: 720;
+      line-height: 1.25;
+    }
+
+    .card-detail {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin-top: 8px;
+    }
+
+    .metric {
+      font-size: 26px;
+      font-weight: 780;
+      line-height: 1;
+      margin-top: 10px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 14px;
+    }
+
+    .hero-control {
+      display: grid;
+      grid-template-columns: 1.1fr 1.4fr;
+      gap: 16px;
+    }
+
+    .big-status {
+      padding: 18px;
+      border-radius: 8px;
+      background: #101816;
+      border: 1px solid rgba(96, 215, 172, 0.28);
+    }
+
+    .big-status h2 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.15;
+    }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .mini {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .mini-label {
+      color: var(--soft);
+      font-size: 12px;
+    }
+
+    .mini-value {
+      margin-top: 5px;
+      font-weight: 720;
+    }
+
+    .todo {
+      display: grid;
+      gap: 8px;
+    }
+
+    .todo-row {
+      display: grid;
+      grid-template-columns: 10px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .todo-row:last-child { border-bottom: 0; }
+
+    .severity {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--green);
+    }
+
+    .severity.amber { background: var(--amber); }
+    .severity.red { background: var(--red); }
+    .severity.blue { background: var(--blue); }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stage {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--panel-2);
+      min-height: 154px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stage-time {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .stage-name {
+      font-weight: 760;
+      margin-top: 6px;
+    }
+
+    .stage-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      margin: 8px 0 12px;
+    }
+
+    .stage button {
+      margin-top: auto;
+      width: 100%;
+    }
+
+    .task-workbench {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .tabs {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .tabs button {
+      width: 100%;
+      justify-content: flex-start;
+      text-align: left;
+      display: grid;
+      gap: 4px;
+      padding: 12px;
+    }
+
+    .tabs button strong {
+      font-size: 14px;
+    }
+
+    .tabs button span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 620;
+    }
+
+    .tabs button.active {
+      color: var(--green);
+      border-color: rgba(96, 215, 172, 0.42);
+      background: rgba(96, 215, 172, 0.1);
+    }
+
+    .tabs button.active span {
+      color: rgba(176, 255, 226, 0.74);
+    }
+
+    .task-panel {
+      min-width: 0;
+    }
+
+    .job-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .job-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 130px 120px auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
+
+    .skill-hero {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 14px;
+    }
+
+    .process-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .process-row {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
+
+    .step-index {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: #2b2c33;
+      color: var(--green);
+      font-weight: 760;
+      font-size: 13px;
+    }
+
+    .settings-groups {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .settings-group {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .settings-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .settings-row:last-child { border-bottom: 0; }
+
+    .chat-layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr) 280px;
+      gap: 12px;
+      min-height: 640px;
+    }
+
+    .chat-list, .chat-main, .chat-tools {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 12px;
+    }
+
+    .chat-item {
+      padding: 10px;
+      border-radius: 8px;
+      background: var(--panel-2);
+      margin-bottom: 8px;
+    }
+
+    .bubble {
+      max-width: 72%;
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .bubble.user {
+      margin-left: auto;
+      background: #102d24;
+      border: 1px solid rgba(96, 215, 172, 0.35);
+    }
+
+    .bubble.assistant {
+      background: #172131;
+      border: 1px solid rgba(120, 183, 255, 0.28);
+    }
+
+    .compose {
+      margin-top: auto;
+      display: flex;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .compose input {
+      flex: 1;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      min-height: 40px;
+      border-radius: 8px;
+      padding: 0 12px;
+    }
+
+    .drawer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .drawer::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0);
+      transition: background 0.2s ease;
+    }
+
+    .drawer.open {
+      pointer-events: auto;
+    }
+
+    .drawer.open::before {
+      background: rgba(0, 0, 0, 0.38);
+    }
+
+    .drawer-panel {
+      position: absolute;
+      right: 0;
+      top: 0;
+      height: 100%;
+      width: min(440px, 92vw);
+      background: #17181c;
+      border-left: 1px solid var(--line);
+      transform: translateX(100%);
+      transition: transform 0.2s ease;
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .drawer.open .drawer-panel {
+      transform: translateX(0);
+    }
+
+    .drawer-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .event-row {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--panel-2);
+      margin-bottom: 10px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .small {
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 1280px) {
+      .hero-control,
+      .split,
+      .skill-hero,
+      .chat-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline,
+      .cols-5 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .cols-4,
+      .settings-groups {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding: 12px;
+      }
+
+      .nav {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+
+      .nav button {
+        justify-content: center;
+        padding: 8px;
+        font-size: 12px;
+      }
+
+      .nav-dot,
+      .sidebar-foot,
+      .brand-subtitle {
+        display: none;
+      }
+
+      .topbar {
+        height: auto;
+        padding: 14px;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .top-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .content {
+        padding: 14px;
+      }
+
+      .timeline,
+      .cols-2,
+      .cols-3,
+      .cols-4,
+      .cols-5,
+      .settings-groups,
+      .status-strip,
+      .task-workbench {
+        grid-template-columns: 1fr;
+      }
+
+      .job-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">H</div>
+        <div>
+          <div class="brand-title">Hermes Desktop</div>
+          <div class="brand-subtitle">控制塔原型</div>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="主导航">
+        <button class="active" data-page="dashboard"><span class="nav-dot"></span>控制塔</button>
+        <button data-page="chat"><span class="nav-dot"></span>在线对话</button>
+        <button data-page="tasks"><span class="nav-dot"></span>任务计划</button>
+        <button data-page="skills"><span class="nav-dot"></span>技能管理</button>
+        <button data-page="settings"><span class="nav-dot"></span>系统设置</button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="small muted">今日重点</div>
+        <div style="margin-top: 8px; font-weight: 720;">价格监控完整</div>
+        <div class="small muted" style="margin-top: 4px;">40/40 SKU · 无需补录</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="crumb">首页 / <span id="crumb-current">控制塔</span></div>
+          <div class="title" id="page-title">今日控制塔</div>
+        </div>
+        <div class="top-actions">
+          <span class="pill green">主模型 gpt-5.4</span>
+          <span class="pill blue">备用 gemini-3-flash-preview</span>
+          <span class="pill">Desktop v0.5.31</span>
+          <button class="icon-btn" id="notification-button" aria-label="打开通知中心">N<span class="badge">3</span></button>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="page active" id="page-dashboard">
+          <div class="hero-control">
+            <div class="big-status">
+              <div class="small muted">当前总览</div>
+              <h2>系统可用<br />价格监控完整</h2>
+              <div class="section-note">首页只回答一个问题：今天有没有需要你处理的事。</div>
+              <div class="status-strip">
+                <div class="mini"><div class="mini-label">连接</div><div class="mini-value">正常</div></div>
+                <div class="mini"><div class="mini-label">模型</div><div class="mini-value">主备可用</div></div>
+                <div class="mini"><div class="mini-label">Cron</div><div class="mini-value">7 启用</div></div>
+                <div class="mini"><div class="mini-label">价格</div><div class="mini-value">40/40</div></div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-head">
+                <div>
+                  <div class="section-title">现在最该处理</div>
+                  <div class="section-note">控制塔只展示会阻塞今日工作的事项。</div>
+                </div>
+                <button data-page-target="tasks">查看任务</button>
+              </div>
+              <div class="todo">
+                <div class="todo-row">
+                  <span class="severity amber"></span>
+                  <div>
+                    <div class="card-title">17:00 补录任务有历史假失败</div>
+                    <div class="small muted">业务已成功，脚本变量边界已修复，等待下一次成功覆盖状态。</div>
+                  </div>
+                  <span class="pill amber">需确认</span>
+                </div>
+                <div class="todo-row">
+                  <span class="severity blue"></span>
+                  <div>
+                    <div class="card-title">Desktop 有新诊断包能力</div>
+                    <div class="small muted">系统设置可导出模型、通知、配置审计摘要。</div>
+                  </div>
+                  <span class="pill blue">新功能</span>
+                </div>
+                <div class="todo-row">
+                  <span class="severity"></span>
+                  <div>
+                    <div class="card-title">价格监控今日完整</div>
+                    <div class="small muted">今日无需人工解锁，验证门控和采集均正常。</div>
+                  </div>
+                  <span class="pill green">OK</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <div>
+                <div class="section-title">业务闭环摘要</div>
+                <div class="section-note">把同仁堂价格监控放在首页第一屏，而不是藏在 Cron 表里。</div>
+              </div>
+              <button data-page-target="skills">打开 Skill</button>
+            </div>
+            <div class="timeline">
+              <div class="stage">
+                <span class="stage-time">07:20</span>
+                <div class="stage-name">验证门控</div>
+                <div class="stage-meta">京东快速验证检测，今日未拦截。</div>
+                <span class="pill green">OK</span>
+              </div>
+              <div class="stage">
+                <span class="stage-time">07:30</span>
+                <div class="stage-name">价格获取</div>
+                <div class="stage-meta">主采集完成，40 个 SKU 入库。</div>
+                <span class="pill green">OK</span>
+              </div>
+              <div class="stage">
+                <span class="stage-time">11:00</span>
+                <div class="stage-name">巡检</div>
+                <div class="stage-meta">上午检查通过，无缺口。</div>
+                <span class="pill green">OK</span>
+              </div>
+              <div class="stage">
+                <span class="stage-time">17:00</span>
+                <div class="stage-name">补录</div>
+                <div class="stage-meta">数据已齐，脚本假失败已修。</div>
+                <span class="pill amber">观察</span>
+              </div>
+              <div class="stage">
+                <span class="stage-time">17:30</span>
+                <div class="stage-name">告警</div>
+                <div class="stage-meta">完整时静默，缺失时通知。</div>
+                <span class="pill green">OK</span>
+              </div>
+              <div class="stage">
+                <span class="stage-time">23:00</span>
+                <div class="stage-name">健康检查</div>
+                <div class="stage-meta">避免误报未到点任务。</div>
+                <span class="pill green">OK</span>
+              </div>
+              <div class="stage">
+                <span class="stage-time">03:00</span>
+                <div class="stage-name">数据备份</div>
+                <div class="stage-meta">SQLite 自动备份。</div>
+                <span class="pill green">OK</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="page-chat">
+          <div class="chat-layout">
+            <aside class="chat-list">
+              <div class="section-head">
+                <div>
+                  <div class="section-title">会话管理</div>
+                  <div class="section-note">会话不再是独立主入口。</div>
+                </div>
+              </div>
+              <div class="chat-item"><strong>价格监控排障</strong><div class="small muted">32 条消息 · 刚刚</div></div>
+              <div class="chat-item"><strong>模型配置确认</strong><div class="small muted">18 条消息 · 今天</div></div>
+              <div class="chat-item"><strong>任务计划优化</strong><div class="small muted">41 条消息 · 昨天</div></div>
+            </aside>
+            <section class="chat-main" style="display: flex; flex-direction: column;">
+              <div class="bubble user">为什么 17:00 补录会反馈失败？</div>
+              <div class="bubble assistant">业务已经成功，失败来自脚本收尾 echo 的变量边界问题。建议修成 ${COUNT}/${TOTAL} 并补一次 dry-run。</div>
+              <div class="compose">
+                <input value="继续检查相关脚本" aria-label="输入消息" />
+                <button>发送</button>
+              </div>
+            </section>
+            <aside class="chat-tools">
+              <div class="section-title">右侧调试抽屉</div>
+              <div class="card-detail">模型、Skill、token、工具调用详情集中到这里，不挤占聊天主区域。</div>
+              <div class="grid" style="margin-top: 12px;">
+                <div class="mini"><div class="mini-label">当前模型</div><div class="mini-value">gpt-5.4</div></div>
+                <div class="mini"><div class="mini-label">Skill</div><div class="mini-value">jd-tongrentang</div></div>
+                <div class="mini"><div class="mini-label">Token</div><div class="mini-value">12.8K</div></div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="page" id="page-tasks">
+          <div class="section">
+            <div class="section-head">
+              <div>
+                <div class="section-title">任务计划按业务流分组</div>
+                <div class="section-note">默认看业务闭环，点开再看 Cron 技术表。</div>
+              </div>
+              <button>新建任务</button>
+            </div>
+            <div class="task-workbench">
+              <div class="tabs" role="tablist" aria-label="任务业务分组">
+                <button class="active"><strong>价格监控</strong><span>验证 / 采集 / 补录</span></button>
+                <button><strong>系统巡检</strong><span>Gateway / Cron / 版本</span></button>
+                <button><strong>通知告警</strong><span>飞书推送与升级</span></button>
+                <button><strong>数据备份</strong><span>SQLite 与导出</span></button>
+                <button><strong>其他任务</strong><span>低频维护</span></button>
+              </div>
+              <div class="task-panel">
+                <div class="job-list">
+                  <div class="job-row">
+                    <div><strong>07:20 验证门控</strong><div class="small muted">检测快速验证，必要时提醒人工解锁。</div></div>
+                    <span class="pill green">OK</span>
+                    <span class="muted small">明天 07:20</span>
+                    <button>运行</button>
+                  </div>
+                  <div class="job-row">
+                    <div><strong>17:00 补录</strong><div class="small muted">如果入库未齐，启动补录；如果已齐，发确认并退出。</div></div>
+                    <span class="pill amber">观察</span>
+                    <span class="muted small">明天 17:00</span>
+                    <button>补跑</button>
+                  </div>
+                  <div class="job-row">
+                    <div><strong>23:00 健康检查</strong><div class="small muted">只检查已到运行时间的关键任务，避免白天误报。</div></div>
+                    <span class="pill green">OK</span>
+                    <span class="muted small">今晚 23:00</span>
+                    <button>详情</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="page-skills">
+          <div class="skill-hero">
+            <div class="section">
+              <div class="section-head">
+                <div>
+                  <div class="section-title">jd-tongrentang-price-watch</div>
+                  <div class="section-note">自建 Skill 按“小应用”呈现，而不是普通列表项。</div>
+                </div>
+                <span class="pill green">已启用</span>
+              </div>
+              <div class="grid cols-4">
+                <div class="mini"><div class="mini-label">今日入库</div><div class="mini-value">40/40</div></div>
+                <div class="mini"><div class="mini-label">关联任务</div><div class="mini-value">7</div></div>
+                <div class="mini"><div class="mini-label">最近失败</div><div class="mini-value">假失败已修</div></div>
+                <div class="mini"><div class="mini-label">路径</div><div class="mini-value">可复制</div></div>
+              </div>
+              <div class="section-note" style="margin-top: 14px;">标准流程、手动补跑、关联 Cron 和文件位置都收在这个产品页。</div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">快捷动作</div>
+              <div class="grid" style="margin-top: 12px;">
+                <button>补跑 17:00</button>
+                <button>打开任务闭环</button>
+                <button>复制 Skill 路径</button>
+                <button>导出诊断包</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Skill 生命周期</div>
+            <div class="process-list" style="margin-top: 12px;">
+              <div class="process-row">
+                <div class="step-index">1</div>
+                <div><strong>验证门控</strong><div class="small muted">检测是否需要人工解锁，不自动绕过验证。</div></div>
+                <span class="pill green">OK</span>
+              </div>
+              <div class="process-row">
+                <div class="step-index">2</div>
+                <div><strong>采集与入库</strong><div class="small muted">采集 SKU 价格，落 SQLite，生成报告。</div></div>
+                <span class="pill green">40/40</span>
+              </div>
+              <div class="process-row">
+                <div class="step-index">3</div>
+                <div><strong>巡检与补录</strong><div class="small muted">缺数据才补录；已齐全直接确认退出。</div></div>
+                <span class="pill amber">观察</span>
+              </div>
+              <div class="process-row">
+                <div class="step-index">4</div>
+                <div><strong>告警与备份</strong><div class="small muted">缺口通知飞书，夜间备份 SQLite。</div></div>
+                <span class="pill green">OK</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="page-settings">
+          <div class="section">
+            <div class="section-head">
+              <div>
+                <div class="section-title">系统设置分区</div>
+                <div class="section-note">按排障顺序重排：先连接与模型，再运维维护，最后偏好。</div>
+              </div>
+              <button>导出诊断包</button>
+            </div>
+            <div class="settings-groups">
+              <div class="settings-group">
+                <div class="card-title">连接与模型</div>
+                <div class="settings-row"><span>服务器</span><strong>100.84.113.118</strong></div>
+                <div class="settings-row"><span>访问令牌</span><strong>已配置</strong></div>
+                <div class="settings-row"><span>主模型</span><strong>gpt-5.4</strong></div>
+                <div class="settings-row"><span>备用模型</span><strong>Gemini 可用</strong></div>
+                <button>运行诊断</button>
+              </div>
+              <div class="settings-group">
+                <div class="card-title">运维维护</div>
+                <div class="settings-row"><span>版本更新</span><strong>v0.5.31</strong></div>
+                <div class="settings-row"><span>系统日志</span><strong>可打开</strong></div>
+                <div class="settings-row"><span>数据备份</span><strong>最近 03:00</strong></div>
+                <div class="settings-row"><span>配置审计</span><strong>2 条</strong></div>
+                <button>打开维护工具</button>
+              </div>
+              <div class="settings-group">
+                <div class="card-title">偏好设置</div>
+                <div class="settings-row"><span>主题</span><strong>深色</strong></div>
+                <div class="settings-row"><span>语言</span><strong>中文</strong></div>
+                <div class="settings-row"><span>侧栏</span><strong>默认宽度</strong></div>
+                <div class="settings-row"><span>关于</span><strong>Hermes Desktop</strong></div>
+                <button>保存偏好</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="drawer" id="drawer">
+    <div class="drawer-panel">
+      <div class="drawer-head">
+        <div>
+          <div class="section-title">通知中心</div>
+          <div class="section-note">首页只显示最重要 3 条，其余收进抽屉。</div>
+        </div>
+        <button id="drawer-close">关闭</button>
+      </div>
+      <div class="event-row">
+        <div class="card-head"><strong>17:00 补录假失败</strong><span class="pill amber">需确认</span></div>
+        <div class="card-detail">脚本变量边界已修复，下一次运行会覆盖状态。</div>
+      </div>
+      <div class="event-row">
+        <div class="card-head"><strong>模型诊断通过</strong><span class="pill green">OK</span></div>
+        <div class="card-detail">主模型和备用模型均可响应。</div>
+      </div>
+      <div class="event-row">
+        <div class="card-head"><strong>配置审计</strong><span class="pill blue">记录</span></div>
+        <div class="card-detail">保存 .env / config.yaml 后记录字段摘要和是否需重启。</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const labels = {
+      dashboard: ["控制塔", "今日控制塔"],
+      chat: ["在线对话", "在线对话工作台"],
+      tasks: ["任务计划", "任务计划"],
+      skills: ["技能管理", "Skill 产品页"],
+      settings: ["系统设置", "系统设置"]
+    };
+
+    function switchPage(page) {
+      document.querySelectorAll(".page").forEach((el) => el.classList.remove("active"));
+      document.querySelector(`#page-${page}`).classList.add("active");
+      document.querySelectorAll(".nav button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.page === page);
+      });
+      document.querySelector("#crumb-current").textContent = labels[page][0];
+      document.querySelector("#page-title").textContent = labels[page][1];
+    }
+
+    document.querySelectorAll(".nav button").forEach((btn) => {
+      btn.addEventListener("click", () => switchPage(btn.dataset.page));
+    });
+
+    document.querySelectorAll("[data-page-target]").forEach((btn) => {
+      btn.addEventListener("click", () => switchPage(btn.dataset.pageTarget));
+    });
+
+    const drawer = document.querySelector("#drawer");
+    document.querySelector("#notification-button").addEventListener("click", () => drawer.classList.add("open"));
+    document.querySelector("#drawer-close").addEventListener("click", () => drawer.classList.remove("open"));
+    drawer.addEventListener("click", (event) => {
+      if (event.target === drawer) drawer.classList.remove("open");
+    });
+  </script>
+</body>
+</html>

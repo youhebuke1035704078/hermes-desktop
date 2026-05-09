@@ -25,6 +25,7 @@ const cronStore = useCronStore()
 const route = useRoute()
 
 type CronTone = 'success' | 'warning' | 'error' | 'info' | 'default'
+type TaskGroupKey = 'price' | 'system' | 'alert' | 'backup' | 'other'
 
 interface PriceWorkflowStage {
   key: string
@@ -37,11 +38,33 @@ interface PriceWorkflowStage {
   nextRun: string
 }
 
+interface TaskGroupDefinition {
+  key: TaskGroupKey
+  label: string
+  description: string
+}
+
+interface TaskGroupSummary extends TaskGroupDefinition {
+  count: number
+  issueCount: number
+  statusType: CronTone
+  nextRunText: string
+}
+
 // ── State ──
 const search = ref('')
 const showModal = ref(false)
 const editingJob = ref<CronJob | null>(null)
 const priceWorkflowSectionRef = ref<HTMLElement | null>(null)
+const activeTaskGroup = ref<TaskGroupKey>('price')
+
+const TASK_GROUP_DEFS: TaskGroupDefinition[] = [
+  { key: 'price', label: '价格监控', description: '验证 / 采集 / 补录 / 告警' },
+  { key: 'system', label: '系统巡检', description: 'Gateway / Cron / 版本健康' },
+  { key: 'alert', label: '通知告警', description: '飞书推送与异常升级' },
+  { key: 'backup', label: '数据备份', description: 'SQLite 备份与导出恢复' },
+  { key: 'other', label: '其他任务', description: '低频维护与未归类任务' },
+]
 
 // Form
 const form = ref({
@@ -54,8 +77,8 @@ const form = ref({
 // ── Computed ──
 const filteredJobs = computed(() => {
   const q = search.value.toLowerCase()
-  if (!q) return cronStore.jobs
-  return cronStore.jobs.filter(j =>
+  if (!q) return currentGroupJobs.value
+  return currentGroupJobs.value.filter(j =>
     j.name.toLowerCase().includes(q) ||
     (j.description || '').toLowerCase().includes(q) ||
     (j.command || '').toLowerCase().includes(q)
@@ -100,8 +123,52 @@ const recentJobs = computed(() =>
     .slice(0, 6),
 )
 
+function jobIndexText(job: CronJob): string {
+  return `${job.name} ${job.description || ''} ${job.command || ''}`.toLowerCase()
+}
+
+function classifyTaskGroup(job: CronJob): TaskGroupKey {
+  const text = jobIndexText(job)
+  if (/jd-tongrentang-price-watch|tongrentang|price-watch|价格监控|同仁堂/.test(text)) return 'price'
+  if (/backup|sqlite|restore|dump|export|备份|恢复|导出/.test(text)) return 'backup'
+  if (/alarm|alert|notify|notification|feishu|webhook|飞书|通知|告警/.test(text)) return 'alert'
+  if (/health|watchdog|gateway|mgmt|probe|diagnostic|version|update|巡检|健康|诊断|版本|网关/.test(text)) return 'system'
+  return 'other'
+}
+
+function jobHasIssue(job: CronJob): boolean {
+  return Boolean(job.enabled && (job.state?.lastStatus === 'error' || job.state?.lastStatus === 'skipped'))
+}
+
+const taskGroupSummaries = computed<TaskGroupSummary[]>(() =>
+  TASK_GROUP_DEFS.map(def => {
+    const jobs = cronStore.jobs.filter(job => classifyTaskGroup(job) === def.key)
+    const issueCount = jobs.filter(jobHasIssue).length
+    const next = jobs
+      .filter(job => job.enabled && job.nextRun)
+      .map(job => new Date(job.nextRun!).getTime())
+      .filter(ms => Number.isFinite(ms))
+      .sort((a, b) => a - b)[0]
+    return {
+      ...def,
+      count: jobs.length,
+      issueCount,
+      statusType: issueCount ? 'error' : jobs.length ? 'success' : 'default',
+      nextRunText: next ? formatDate(next) : '-',
+    }
+  }),
+)
+
+const currentTaskGroup = computed<TaskGroupSummary>(() =>
+  taskGroupSummaries.value.find(group => group.key === activeTaskGroup.value) || taskGroupSummaries.value[0]!,
+)
+
+const currentGroupJobs = computed(() =>
+  cronStore.jobs.filter(job => classifyTaskGroup(job) === activeTaskGroup.value),
+)
+
 const priceMonitorJobs = computed(() =>
-  cronStore.jobs.filter(job => /jd-tongrentang-price-watch|tongrentang|cron-health/i.test(job.name)),
+  cronStore.jobs.filter(job => classifyTaskGroup(job) === 'price'),
 )
 
 function findPriceStageJob(key: string): CronJob | undefined {
@@ -178,10 +245,6 @@ const priceWorkflowStages = computed<PriceWorkflowStage[]>(() => {
     }
   })
 })
-
-const priceWorkflowIssueCount = computed(() =>
-  priceWorkflowStages.value.filter(stage => stage.type === 'error' || stage.type === 'warning' || !stage.job).length,
-)
 
 // Soonest next run
 const nextRunText = computed(() => {
@@ -457,8 +520,14 @@ function handleTemplate(template: { name: string; schedule: string; prompt: stri
   showModal.value = true
 }
 
+function selectTaskGroup(key: TaskGroupKey) {
+  activeTaskGroup.value = key
+  search.value = ''
+}
+
 async function scrollToPriceWorkflowIfRequested(): Promise<void> {
   if (route.query.focus !== 'price-monitor') return
+  activeTaskGroup.value = 'price'
   await nextTick()
   priceWorkflowSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -587,51 +656,96 @@ watch(
         </div>
       </NCard>
 
-      <!-- Price monitor workflow -->
-      <div ref="priceWorkflowSectionRef" class="cron-section-anchor">
-        <NCard embedded :bordered="false" size="small" style="border-radius: 10px; margin-bottom: 16px;">
-          <template #header>
-            <NSpace align="center" :size="8">
-              <NText strong>价格监控闭环</NText>
+      <!-- Task workbench -->
+      <div ref="priceWorkflowSectionRef" class="cron-section-anchor task-workbench">
+        <div class="task-group-nav" role="tablist" aria-label="任务业务分组">
+          <button
+            v-for="group in taskGroupSummaries"
+            :key="group.key"
+            type="button"
+            class="task-group-button"
+            :class="{ 'task-group-button--active': activeTaskGroup === group.key }"
+            role="tab"
+            :aria-selected="activeTaskGroup === group.key"
+            @click="selectTaskGroup(group.key)"
+          >
+            <span class="task-group-main">
+              <span class="task-group-title">{{ group.label }}</span>
+              <NTag size="small" :type="group.statusType" round :bordered="false">
+                {{ group.issueCount ? `${group.issueCount} 异常` : group.count ? 'OK' : '空' }}
+              </NTag>
+            </span>
+            <span class="task-group-desc">{{ group.description }}</span>
+            <span class="task-group-meta">{{ group.count }} 个任务 · 下次 {{ group.nextRunText }}</span>
+          </button>
+        </div>
+
+        <div class="task-group-panel" role="tabpanel">
+          <div class="task-panel-head">
+            <div>
+              <NText strong class="task-panel-title">{{ currentTaskGroup.label }}</NText>
+              <NText depth="3" class="task-panel-note">{{ currentTaskGroup.description }}</NText>
+            </div>
+            <NSpace :size="8">
               <NTag
                 size="small"
-                :type="priceWorkflowIssueCount ? 'warning' : 'success'"
+                :type="currentTaskGroup.issueCount ? 'warning' : currentTaskGroup.count ? 'success' : 'default'"
                 round
                 :bordered="false"
               >
-                {{ priceWorkflowIssueCount ? `${priceWorkflowIssueCount} 项需关注` : '运行正常' }}
+                {{ currentTaskGroup.issueCount ? `${currentTaskGroup.issueCount} 项需关注` : `${currentTaskGroup.count} 个任务` }}
               </NTag>
+              <NButton
+                v-if="activeTaskGroup === 'price' && priceMonitorJobs.length"
+                size="small"
+                secondary
+                @click="search = 'jd-tongrentang'"
+              >
+                筛选任务
+              </NButton>
             </NSpace>
-          </template>
-          <template #header-extra>
-            <NButton
-              v-if="priceMonitorJobs.length"
-              size="small"
-              secondary
-              @click="search = 'jd-tongrentang'"
-            >
-              筛选任务
-            </NButton>
-          </template>
-
-          <div class="price-workflow-grid">
-            <div v-for="stage in priceWorkflowStages" :key="stage.key" class="price-workflow-card">
-              <div class="price-workflow-head">
-                <NText strong>{{ stage.label }}</NText>
-                <NTag size="small" :type="stage.type" round :bordered="false">{{ stage.status }}</NTag>
-              </div>
-              <NText depth="3" class="price-workflow-hint">{{ stage.hint }}</NText>
-              <NText class="price-workflow-detail" :type="stage.type === 'error' ? 'error' : undefined">
-                {{ stage.detail }}
-              </NText>
-              <NText depth="3" class="price-workflow-next">下次 {{ stage.nextRun }}</NText>
-            </div>
           </div>
 
-          <NAlert v-if="!priceMonitorJobs.length" type="warning" :closable="false" style="margin-top: 12px;">
-            未发现 jd-tongrentang-price-watch 相关 Cron 任务。请先确认自建 skill 已同步，并检查 Cron jobs 配置。
-          </NAlert>
-        </NCard>
+          <template v-if="activeTaskGroup === 'price'">
+            <div class="price-workflow-grid">
+              <div v-for="stage in priceWorkflowStages" :key="stage.key" class="price-workflow-card">
+                <div class="price-workflow-head">
+                  <NText strong>{{ stage.label }}</NText>
+                  <NTag size="small" :type="stage.type" round :bordered="false">{{ stage.status }}</NTag>
+                </div>
+                <NText depth="3" class="price-workflow-hint">{{ stage.hint }}</NText>
+                <NText class="price-workflow-detail" :type="stage.type === 'error' ? 'error' : undefined">
+                  {{ stage.detail }}
+                </NText>
+                <NText depth="3" class="price-workflow-next">下次 {{ stage.nextRun }}</NText>
+              </div>
+            </div>
+
+            <NAlert v-if="!priceMonitorJobs.length" type="warning" :closable="false" style="margin-top: 12px;">
+              未发现 jd-tongrentang-price-watch 相关 Cron 任务。请先确认自建 skill 已同步，并检查 Cron jobs 配置。
+            </NAlert>
+          </template>
+
+          <div v-else class="task-group-job-list">
+            <div v-if="currentGroupJobs.length" class="task-group-jobs">
+              <div v-for="job in currentGroupJobs" :key="`group-${job.id}`" class="cron-mini-row">
+                <div class="cron-mini-main">
+                  <NText strong class="cron-mini-name">{{ job.name }}</NText>
+                  <NTag size="small" :type="cronStatusType(job)" round :bordered="false">{{ cronStatusLabel(job) }}</NTag>
+                </div>
+                <NText depth="3" class="cron-mini-detail">
+                  下次 {{ job.nextRun ? formatDate(job.nextRun) : '-' }} · 上次 {{ cronRelativeTime(job.state?.lastRunAtMs) }}
+                </NText>
+                <NText v-if="job.state?.lastError" type="error" class="cron-mini-error">
+                  {{ job.state.lastError }}
+                </NText>
+              </div>
+            </div>
+            <NAlert v-else type="default" :closable="false">
+              当前分组暂无任务。新建任务后会按名称、描述和命令自动归类到这里。
+            </NAlert>
+          </div>
+        </div>
       </div>
 
       <!-- Operational health -->
@@ -701,10 +815,20 @@ watch(
         </NGridItem>
       </NGrid>
 
+      <div class="table-context">
+        <div>
+          <NText strong>{{ currentTaskGroup.label }}技术表</NText>
+          <NText depth="3" class="table-context-note">用于查看和编辑当前业务分组下的 Cron 原始配置。</NText>
+        </div>
+        <NButton v-if="activeTaskGroup !== 'price'" size="small" secondary @click="selectTaskGroup('price')">
+          回到价格监控
+        </NButton>
+      </div>
+
       <!-- Search -->
       <NInput
         v-model:value="search"
-        :placeholder="t('pages.cron.jobs.searchPlaceholder')"
+        :placeholder="`${currentTaskGroup.label}内搜索任务`"
         clearable
         size="small"
         style="margin-bottom: 12px;"
@@ -775,6 +899,103 @@ watch(
 <style scoped>
 .cron-section-anchor {
   scroll-margin-top: 16px;
+}
+
+.task-workbench {
+  display: grid;
+  grid-template-columns: 218px minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+
+.task-group-nav {
+  display: grid;
+  gap: 8px;
+}
+
+.task-group-button {
+  appearance: none;
+  border: 1px solid var(--n-border-color);
+  border-radius: 10px;
+  background: var(--n-card-color);
+  color: var(--n-text-color);
+  padding: 12px;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+}
+
+.task-group-button:hover {
+  border-color: rgba(99, 226, 183, 0.42);
+  background: rgba(99, 226, 183, 0.06);
+}
+
+.task-group-button--active {
+  border-color: rgba(99, 226, 183, 0.64);
+  background: rgba(99, 226, 183, 0.12);
+}
+
+.task-group-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.task-group-title {
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 0;
+}
+
+.task-group-desc,
+.task-group-meta {
+  display: block;
+  color: var(--n-text-color-3);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.task-group-panel {
+  border: 1px solid var(--n-border-color);
+  border-radius: 12px;
+  background: var(--n-card-color);
+  padding: 14px;
+  min-width: 0;
+}
+
+.task-panel-head,
+.table-context {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.task-panel-title,
+.task-panel-note,
+.table-context-note {
+  display: block;
+}
+
+.task-panel-note,
+.table-context-note {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.task-group-job-list {
+  min-width: 0;
+}
+
+.task-group-jobs {
+  display: grid;
+  gap: 2px;
 }
 
 .price-workflow-grid {
@@ -878,6 +1099,10 @@ watch(
 }
 
 @media (max-width: 900px) {
+  .task-workbench {
+    grid-template-columns: 1fr;
+  }
+
   .price-workflow-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -890,6 +1115,11 @@ watch(
 @media (max-width: 560px) {
   .price-workflow-grid {
     grid-template-columns: 1fr;
+  }
+
+  .task-panel-head,
+  .table-context {
+    display: grid;
   }
 }
 </style>
