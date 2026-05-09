@@ -5,8 +5,6 @@ import {
   NButton,
   NCard,
   NEmpty,
-  NGrid,
-  NGridItem,
   NIcon,
   NInput,
   NModal,
@@ -63,17 +61,6 @@ const { t, locale } = useI18n()
 
 /** True when connected to Hermes Agent REST API (local or remote — no WebSocket) */
 const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
-/** True when connected server is localhost */
-const isLocalServer = computed(() => {
-  const url = connectionStore.currentServer?.url
-  if (!url) return false
-  try {
-    const host = new URL(url).hostname
-    return host === 'localhost' || host === '127.0.0.1' || host === '::1'
-  } catch {
-    return false
-  }
-})
 
 /** Hermes REST mode — model name */
 const hermesModel = ref('hermes-agent')
@@ -90,9 +77,6 @@ const showAgentDetails = ref(false)
 const aborting = ref(false)
 const nowMs = ref(Date.now())
 let nowTimer: ReturnType<typeof setInterval> | null = null
-
-// 侧边栏折叠状态
-const sideCollapsed = ref(false)
 
 // Full-form model chain (`<provider>/<model>`) pulled from the main-process
 // `hermes:config` IPC. The gateway's RPC getConfig() returns a normalized
@@ -2686,515 +2670,393 @@ async function handleSend() {
 
 <template>
   <div class="chat-page">
-    <NCard class="app-card chat-root-card">
-      <NGrid
-        cols="1 l:4"
-        responsive="screen"
-        :x-gap="12"
-        :y-gap="12"
-        class="chat-grid"
-        :class="{ 'chat-grid--collapsed': sideCollapsed }"
-      >
-        <!-- Unified sidebar — adapts between Hermes REST and ACP WebSocket modes -->
-        <NGridItem
-          :span="1"
-          class="chat-grid-side"
-          :class="{ 'chat-grid-side--collapsed': sideCollapsed }"
-        >
-          <NCard v-show="!sideCollapsed" embedded :bordered="false" class="chat-side-card">
-            <NSpace vertical :size="12">
-              <div class="chat-side-heading">
-                <NText strong class="chat-side-heading-title">会话管理</NText>
-                <NText depth="3" class="chat-side-heading-note">会话不再是独立主入口。</NText>
-              </div>
+    <div class="chat-layout">
+      <aside class="chat-list">
+        <NSpace vertical :size="12">
+          <div class="chat-side-heading">
+            <NText strong class="chat-side-heading-title">会话管理</NText>
+            <NText depth="3" class="chat-side-heading-note">会话不再是独立主入口。</NText>
+          </div>
 
-              <!-- Hermes REST: New conversation button -->
-              <NButton
-                v-if="isHermesRest"
-                type="primary"
-                block
-                size="small"
-                :disabled="agentBusy"
-                @click="handleNewConversation"
+          <!-- Hermes REST: New conversation button -->
+          <NButton
+            v-if="isHermesRest"
+            type="primary"
+            block
+            size="small"
+            :disabled="agentBusy"
+            @click="handleNewConversation"
+          >
+            <template #icon><NIcon :component="AddOutline" /></template>
+            {{ t('pages.chat.hermes.newConversation') }}
+          </NButton>
+
+          <!-- ACP: Session key -->
+          <div v-if="!isHermesRest">
+            <NText depth="3" style="font-size: 12px">{{ t('pages.chat.sessionKey') }}</NText>
+            <NSelect
+              v-model:value="sessionKeyInput"
+              :options="sessionOptions"
+              filterable
+              tag
+              :placeholder="t('pages.chat.sessionKeyPlaceholder')"
+              style="min-width: 240px; margin-top: 6px"
+              @update:value="handleSessionKeyChange"
+            />
+          </div>
+
+          <!-- Hermes REST: Conversation list -->
+          <div v-if="isHermesRest" class="hermes-conv-list">
+            <div
+              v-for="conv in hermesChatStore.conversations"
+              :key="conv.id"
+              class="hermes-conv-item"
+              :class="{
+                'hermes-conv-item--active': conv.id === hermesChatStore.activeId,
+                'hermes-conv-item--disabled': agentBusy
+              }"
+              @click="handleSwitchConversation(conv.id)"
+            >
+              <NInput
+                v-if="editingConvId === conv.id"
+                v-model:value="editingConvTitle"
+                size="tiny"
+                autofocus
+                class="hermes-conv-title-input"
+                @keyup.enter="handleConfirmEditTitle"
+                @keyup.escape="handleCancelEditTitle"
+                @blur="handleConfirmEditTitle"
+                @click.stop
+              />
+              <div
+                v-else
+                class="hermes-conv-title"
+                @dblclick.stop="handleStartEditTitle(conv.id, conv.title || '')"
               >
-                <template #icon><NIcon :component="AddOutline" /></template>
-                {{ t('pages.chat.hermes.newConversation') }}
-              </NButton>
-
-              <!-- Stats -->
-              <div class="chat-side-stats">
-                <div class="chat-stat-item">
-                  <span class="chat-stat-label">{{ t('pages.chat.stats.total') }}</span>
-                  <strong>{{ isHermesRest ? hermesConvStats.total : stats.total }}</strong>
-                </div>
-                <div class="chat-stat-item">
-                  <span class="chat-stat-label">{{ t('pages.chat.stats.assistant') }}</span>
-                  <strong>{{ isHermesRest ? hermesConvStats.assistant : stats.assistant }}</strong>
-                </div>
-                <div v-if="!isHermesRest" class="chat-stat-item">
-                  <span class="chat-stat-label">{{ t('pages.chat.stats.lastMessage') }}</span>
-                  <strong>{{ stats.lastMessageAt }}</strong>
-                </div>
+                {{ conv.title || t('pages.chat.hermes.untitled') }}
               </div>
-
-              <!-- Hermes REST: Model selector + resolved model display -->
-              <div v-if="isHermesRest">
-                <NText depth="3" style="font-size: 12px">{{ t('pages.chat.hermes.model') }}</NText>
-                <NInput
-                  v-model:value="hermesModel"
-                  size="small"
-                  placeholder="hermes-agent"
-                  style="margin-top: 4px"
-                  @blur="handleHermesModelChange"
-                />
-                <div v-if="connectionStore.hermesRealModel" style="margin-top: 4px">
-                  <NTag size="small" :bordered="false" round type="success">
-                    {{ connectionStore.hermesRealModel }}
-                  </NTag>
-                </div>
-                <div
-                  v-else-if="isHermesRest && connectionStore.currentServer && !isLocalServer"
-                  style="margin-top: 4px"
-                >
-                  <NText depth="3" style="font-size: 11px">
-                    {{ t('pages.chat.hermes.remoteModelHint') }}
-                  </NText>
-                </div>
-              </div>
-
-              <!-- ACP: Session key -->
-              <div v-if="!isHermesRest">
-                <NText depth="3" style="font-size: 12px">{{ t('pages.chat.sessionKey') }}</NText>
-                <NSelect
-                  v-model:value="sessionKeyInput"
-                  :options="sessionOptions"
-                  filterable
-                  tag
-                  :placeholder="t('pages.chat.sessionKeyPlaceholder')"
-                  style="min-width: 240px; margin-top: 6px"
-                  @update:value="handleSessionKeyChange"
-                />
-              </div>
-
-              <!-- Common: auto-follow & message filter -->
-              <div class="chat-side-switches">
-                <NSpace justify="space-between" align="center">
-                  <NText>{{ t('pages.chat.preferences.autoFollow') }}</NText>
-                  <NSwitch v-model:value="autoFollowBottom" />
-                </NSpace>
-                <NSpace justify="space-between" align="center" style="margin-top: 8px">
-                  <NText>{{ t('pages.chat.filters.title') }}</NText>
-                  <NSelect
-                    v-model:value="roleFilter"
-                    size="small"
-                    :options="roleFilterOptions"
-                    style="width: 132px"
-                  />
-                </NSpace>
-              </div>
-
-              <!-- Hermes REST: Conversation list -->
-              <div v-if="isHermesRest" class="hermes-conv-list">
-                <div class="chat-side-section-title">
-                  <NText strong>会话管理</NText>
-                  <NText depth="3">{{ hermesChatStore.conversations.length }} 个对话</NText>
-                </div>
-                <div
-                  v-for="conv in hermesChatStore.conversations"
-                  :key="conv.id"
-                  class="hermes-conv-item"
-                  :class="{
-                    'hermes-conv-item--active': conv.id === hermesChatStore.activeId,
-                    'hermes-conv-item--disabled': agentBusy
-                  }"
-                  @click="handleSwitchConversation(conv.id)"
-                >
-                  <NInput
-                    v-if="editingConvId === conv.id"
-                    v-model:value="editingConvTitle"
-                    size="tiny"
-                    autofocus
-                    class="hermes-conv-title-input"
-                    @keyup.enter="handleConfirmEditTitle"
-                    @keyup.escape="handleCancelEditTitle"
-                    @blur="handleConfirmEditTitle"
-                    @click.stop
-                  />
-                  <div
-                    v-else
-                    class="hermes-conv-title"
-                    @dblclick.stop="handleStartEditTitle(conv.id, conv.title || '')"
-                  >
-                    {{ conv.title || t('pages.chat.hermes.untitled') }}
-                  </div>
-                  <div class="hermes-conv-meta">
-                    <NText depth="3" style="font-size: 11px">
-                      {{ conv.messages.length }} {{ t('pages.chat.hermes.msgCount') }}
-                    </NText>
-                    <NText depth="3" style="font-size: 11px">
-                      {{ formatRelativeTime(conv.updatedAt) }}
-                    </NText>
-                  </div>
-                  <NButton
-                    v-if="editingConvId !== conv.id"
-                    size="tiny"
-                    text
-                    class="hermes-conv-edit"
-                    :disabled="agentBusy"
-                    @click.stop="handleStartEditTitle(conv.id, conv.title || '')"
-                  >
-                    <template #icon><NIcon :component="CreateOutline" :size="14" /></template>
-                  </NButton>
-                  <NButton
-                    v-if="hermesChatStore.conversations.length > 1 && editingConvId !== conv.id"
-                    size="tiny"
-                    text
-                    class="hermes-conv-delete"
-                    :disabled="agentBusy"
-                    @click.stop="handleDeleteConversation(conv.id)"
-                  >
-                    <template #icon><NIcon :component="TrashOutline" :size="14" /></template>
-                  </NButton>
-                </div>
-              </div>
-
-              <!-- ACP: Metadata tags -->
-              <div v-if="!isHermesRest" class="chat-meta-bar">
-                <NTag v-if="selectedSession?.label" size="small" :bordered="false" round>
-                  {{ t('pages.chat.session.label') }}: {{ selectedSession.label }}
-                </NTag>
-                <NTag size="small" :bordered="false" round type="info">
-                  Agent: {{ selectedSession?.agentId || sessionMeta.agent }}
-                </NTag>
-                <NTag size="small" :bordered="false" round>
-                  Channel: {{ sessionChannelDisplay }}
-                </NTag>
-                <NTag size="small" :bordered="false" round>
-                  Peer: {{ selectedSession?.peer || sessionMeta.peer || '-' }}
-                </NTag>
-                <NTag size="small" :bordered="false" round type="default">
-                  {{ t('pages.chat.session.model') }}: {{ selectedSession?.model || '-' }}
-                </NTag>
-              </div>
-            </NSpace>
-          </NCard>
-        </NGridItem>
-
-        <NGridItem :span="2" class="chat-grid-main">
-          <div class="chat-main-column">
-            <NCard embedded :bordered="false" class="chat-transcript-card">
-              <NSpace
-                v-if="!isHermesRest"
-                justify="space-between"
-                align="center"
-                style="margin-bottom: 10px"
-              >
-                <NSpace align="center" :size="8">
-                  <NTag size="small" type="info" :bordered="false" round>
-                    {{ t('pages.chat.sessionTag', { key: normalizedSessionKey }) }}
-                  </NTag>
-                  <NTag size="small" :type="syncTagType" :bordered="false" round>
-                    {{ syncHint }}
-                  </NTag>
-                </NSpace>
-                <NText depth="3" style="font-size: 12px">
-                  {{
-                    t('pages.chat.stats.breakdown', {
-                      user: stats.user,
-                      assistant: stats.assistant,
-                      system: stats.system
-                    })
-                  }}
+              <div class="hermes-conv-meta">
+                <NText depth="3" style="font-size: 11px">
+                  {{ conv.messages.length }} {{ t('pages.chat.hermes.msgCount') }}
                 </NText>
-              </NSpace>
+                <NText depth="3" style="font-size: 11px">
+                  {{ formatRelativeTime(conv.updatedAt) }}
+                </NText>
+              </div>
+              <NButton
+                v-if="editingConvId !== conv.id"
+                size="tiny"
+                text
+                class="hermes-conv-edit"
+                :disabled="agentBusy"
+                @click.stop="handleStartEditTitle(conv.id, conv.title || '')"
+              >
+                <template #icon><NIcon :component="CreateOutline" :size="14" /></template>
+              </NButton>
+              <NButton
+                v-if="hermesChatStore.conversations.length > 1 && editingConvId !== conv.id"
+                size="tiny"
+                text
+                class="hermes-conv-delete"
+                :disabled="agentBusy"
+                @click.stop="handleDeleteConversation(conv.id)"
+              >
+                <template #icon><NIcon :component="TrashOutline" :size="14" /></template>
+              </NButton>
+            </div>
+          </div>
 
-              <div class="chat-transcript-shell">
-                <NSpin :show="transcriptLoading" class="chat-transcript-spin">
-                  <div ref="transcriptRef" class="chat-transcript" @scroll="handleTranscriptScroll">
-                    <template v-if="renderedMessages.length">
-                      <div
-                        v-for="entry in renderedMessages"
-                        :key="entry.key"
-                        class="chat-bubble"
-                        :class="[`is-${entry.item.role}`, { 'is-error': entry.item.isError }]"
+          <!-- ACP: Metadata tags -->
+          <div v-if="!isHermesRest" class="chat-meta-bar">
+            <NTag v-if="selectedSession?.label" size="small" :bordered="false" round>
+              {{ t('pages.chat.session.label') }}: {{ selectedSession.label }}
+            </NTag>
+            <NTag size="small" :bordered="false" round type="info">
+              Agent: {{ selectedSession?.agentId || sessionMeta.agent }}
+            </NTag>
+            <NTag size="small" :bordered="false" round> Channel: {{ sessionChannelDisplay }} </NTag>
+            <NTag size="small" :bordered="false" round>
+              Peer: {{ selectedSession?.peer || sessionMeta.peer || '-' }}
+            </NTag>
+            <NTag size="small" :bordered="false" round type="default">
+              {{ t('pages.chat.session.model') }}: {{ selectedSession?.model || '-' }}
+            </NTag>
+          </div>
+        </NSpace>
+      </aside>
+
+      <section class="chat-main">
+        <div class="chat-main-column">
+          <NCard embedded :bordered="false" class="chat-transcript-card">
+            <NSpace
+              v-if="!isHermesRest"
+              justify="space-between"
+              align="center"
+              style="margin-bottom: 10px"
+            >
+              <NSpace align="center" :size="8">
+                <NTag size="small" type="info" :bordered="false" round>
+                  {{ t('pages.chat.sessionTag', { key: normalizedSessionKey }) }}
+                </NTag>
+                <NTag size="small" :type="syncTagType" :bordered="false" round>
+                  {{ syncHint }}
+                </NTag>
+              </NSpace>
+              <NText depth="3" style="font-size: 12px">
+                {{
+                  t('pages.chat.stats.breakdown', {
+                    user: stats.user,
+                    assistant: stats.assistant,
+                    system: stats.system
+                  })
+                }}
+              </NText>
+            </NSpace>
+
+            <div class="chat-transcript-shell">
+              <NSpin :show="transcriptLoading" class="chat-transcript-spin">
+                <div ref="transcriptRef" class="chat-transcript" @scroll="handleTranscriptScroll">
+                  <template v-if="renderedMessages.length">
+                    <div
+                      v-for="entry in renderedMessages"
+                      :key="entry.key"
+                      class="chat-bubble"
+                      :class="[`is-${entry.item.role}`, { 'is-error': entry.item.isError }]"
+                    >
+                      <NSpace
+                        justify="space-between"
+                        align="center"
+                        class="chat-bubble-meta"
+                        :size="8"
                       >
-                        <NSpace
-                          justify="space-between"
-                          align="center"
-                          class="chat-bubble-meta"
-                          :size="8"
-                        >
-                          <NSpace align="center" :size="6">
-                            <NTag
-                              size="small"
-                              :type="roleType(entry.item.role)"
-                              :bordered="false"
-                              round
-                            >
-                              {{ roleLabel(entry.item.role) }}
-                            </NTag>
-                            <FallbackChip
-                              v-if="entry.item.role === 'assistant' && entry.item.fromFallback"
-                              :model="entry.item.model"
-                              :from="entry.item.fallbackFrom"
-                              :reason-text="entry.item.fallbackReasonText"
-                            />
-                            <NText v-if="entry.item.name" depth="3" style="font-size: 12px">
-                              {{ entry.item.name }}
-                            </NText>
-                          </NSpace>
-                          <NText v-if="entry.item.timestamp" depth="3" style="font-size: 12px">
-                            {{ formatDate(entry.item.timestamp) }}
+                        <NSpace align="center" :size="6">
+                          <NTag
+                            size="small"
+                            :type="roleType(entry.item.role)"
+                            :bordered="false"
+                            round
+                          >
+                            {{ roleLabel(entry.item.role) }}
+                          </NTag>
+                          <FallbackChip
+                            v-if="entry.item.role === 'assistant' && entry.item.fromFallback"
+                            :model="entry.item.model"
+                            :from="entry.item.fallbackFrom"
+                            :reason-text="entry.item.fallbackReasonText"
+                          />
+                          <NText v-if="entry.item.name" depth="3" style="font-size: 12px">
+                            {{ entry.item.name }}
                           </NText>
                         </NSpace>
+                        <NText v-if="entry.item.timestamp" depth="3" style="font-size: 12px">
+                          {{ formatDate(entry.item.timestamp) }}
+                        </NText>
+                      </NSpace>
 
-                        <div v-if="entry.structured" class="structured-message-list">
-                          <div v-if="entry.structured.toolCalls.length" class="tool-call-list">
-                            <div
-                              v-for="(tool, toolIndex) in entry.structured.toolCalls"
-                              :key="`${entry.key}-tool-${toolIndex}`"
-                              class="tool-call-card"
-                            >
-                              <NSpace align="center" justify="space-between">
-                                <NSpace align="center" :size="6">
-                                  <NTag size="small" type="warning" :bordered="false" round>{{
-                                    t('pages.chat.structured.toolCall')
-                                  }}</NTag>
-                                  <NText strong>{{ tool.name }}</NText>
-                                </NSpace>
-                                <NSpace align="center" :size="8">
-                                  <NText v-if="tool.timeout" depth="3" style="font-size: 12px">
-                                    {{
-                                      t('pages.chat.structured.timeout', { seconds: tool.timeout })
-                                    }}
-                                  </NText>
-                                  <NButton
-                                    v-if="tool.argumentsJson"
-                                    size="tiny"
-                                    text
-                                    @click="toggleToolCallExpand(`${entry.key}-tool-${toolIndex}`)"
-                                  >
-                                    {{
-                                      expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)
-                                        ? t('pages.chat.structured.hideArgs')
-                                        : t('pages.chat.structured.viewArgs')
-                                    }}
-                                  </NButton>
-                                </NSpace>
-                              </NSpace>
-
-                              <div v-if="tool.command || tool.workdir" class="tool-call-meta">
-                                <code v-if="tool.command" class="tool-call-meta__code">{{
-                                  tool.command
-                                }}</code>
-                                <code v-if="tool.workdir" class="tool-call-meta__code">{{
-                                  tool.workdir
-                                }}</code>
-                              </div>
-
-                              <div
-                                v-if="
-                                  tool.argumentsJson &&
-                                  expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)
-                                "
-                                class="tool-call-args"
-                              >
-                                <pre class="tool-call-args__content">{{ tool.argumentsJson }}</pre>
-                              </div>
-
-                              <details v-if="tool.partialJson" class="tool-call-details">
-                                <summary>{{ t('pages.chat.structured.viewPartialJson') }}</summary>
-                                <pre>{{ tool.partialJson }}</pre>
-                              </details>
-                            </div>
-                          </div>
-
-                          <div v-if="entry.structured.toolResults.length" class="tool-result-list">
-                            <div
-                              v-for="(result, resultIndex) in entry.structured.toolResults"
-                              :key="`${entry.key}-tool-result-${resultIndex}`"
-                              class="tool-result-card"
-                            >
-                              <NSpace align="center" justify="space-between">
-                                <NSpace align="center" :size="6">
-                                  <NTag size="small" type="success" :bordered="false" round>{{
-                                    t('pages.chat.structured.toolResult')
-                                  }}</NTag>
-                                  <NText strong>{{ result.name || 'unknown' }}</NText>
-                                </NSpace>
-                                <NSpace align="center" :size="8">
-                                  <NText v-if="result.status" depth="3" style="font-size: 12px">
-                                    {{ result.status }}
-                                  </NText>
-                                  <NButton
-                                    size="tiny"
-                                    text
-                                    @click="
-                                      toggleToolResultExpand(`${entry.key}-result-${resultIndex}`)
-                                    "
-                                  >
-                                    {{
-                                      expandedToolResults.has(`${entry.key}-result-${resultIndex}`)
-                                        ? t('pages.chat.structured.hideArgs')
-                                        : t('pages.chat.structured.viewArgs')
-                                    }}
-                                  </NButton>
-                                </NSpace>
-                              </NSpace>
-
-                              <div
-                                v-if="expandedToolResults.has(`${entry.key}-result-${resultIndex}`)"
-                                class="tool-call-grid"
-                              >
-                                <span class="tool-call-label">{{
-                                  t('pages.chat.structured.callId')
-                                }}</span>
-                                <div class="tool-call-value-wrapper">
-                                  <code>{{ result.id || '-' }}</code>
-                                  <NTooltip>
-                                    <template #trigger>
-                                      <NButton
-                                        quaternary
-                                        size="tiny"
-                                        class="tool-value-copy-btn"
-                                        @click="copyToClipboard(result.id || '-')"
-                                      >
-                                        <template #icon>
-                                          <NIcon :component="CopyOutline" />
-                                        </template>
-                                      </NButton>
-                                    </template>
-                                    {{ t('common.copy') }}
-                                  </NTooltip>
-                                </div>
-                                <span class="tool-call-label">{{
-                                  t('pages.chat.structured.content')
-                                }}</span>
-                                <div class="tool-call-value-wrapper tool-result-content-wrapper">
-                                  <pre class="tool-result-content">{{ result.content }}</pre>
-                                  <NTooltip>
-                                    <template #trigger>
-                                      <NButton
-                                        quaternary
-                                        size="tiny"
-                                        class="tool-value-copy-btn"
-                                        @click="copyToClipboard(result.content)"
-                                      >
-                                        <template #icon>
-                                          <NIcon :component="CopyOutline" />
-                                        </template>
-                                      </NButton>
-                                    </template>
-                                    {{ t('common.copy') }}
-                                  </NTooltip>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
+                      <div v-if="entry.structured" class="structured-message-list">
+                        <div v-if="entry.structured.toolCalls.length" class="tool-call-list">
                           <div
-                            v-if="entry.structured.validationErrors.length"
-                            class="validation-error-list"
+                            v-for="(tool, toolIndex) in entry.structured.toolCalls"
+                            :key="`${entry.key}-tool-${toolIndex}`"
+                            class="tool-call-card"
                           >
-                            <div
-                              v-for="(validation, validationIndex) in entry.structured
-                                .validationErrors"
-                              :key="`${entry.key}-validation-${validationIndex}`"
-                              class="validation-error-card"
-                            >
-                              <NSpace align="center" justify="space-between">
-                                <NSpace align="center" :size="6">
-                                  <NTag size="small" type="warning" :bordered="false" round>{{
-                                    t('pages.chat.structured.validationFailed')
-                                  }}</NTag>
-                                  <NText strong>{{ validation.toolName }}</NText>
-                                </NSpace>
-                                <NText depth="3" style="font-size: 12px">
+                            <NSpace align="center" justify="space-between">
+                              <NSpace align="center" :size="6">
+                                <NTag size="small" type="warning" :bordered="false" round>{{
+                                  t('pages.chat.structured.toolCall')
+                                }}</NTag>
+                                <NText strong>{{ tool.name }}</NText>
+                              </NSpace>
+                              <NSpace align="center" :size="8">
+                                <NText v-if="tool.timeout" depth="3" style="font-size: 12px">
                                   {{
-                                    t('pages.chat.structured.issuesCount', {
-                                      count: validation.issues.length
-                                    })
+                                    t('pages.chat.structured.timeout', { seconds: tool.timeout })
                                   }}
                                 </NText>
+                                <NButton
+                                  v-if="tool.argumentsJson"
+                                  size="tiny"
+                                  text
+                                  @click="toggleToolCallExpand(`${entry.key}-tool-${toolIndex}`)"
+                                >
+                                  {{
+                                    expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)
+                                      ? t('pages.chat.structured.hideArgs')
+                                      : t('pages.chat.structured.viewArgs')
+                                  }}
+                                </NButton>
                               </NSpace>
+                            </NSpace>
 
-                              <div class="tool-call-grid">
-                                <span class="tool-call-label">{{
-                                  t('pages.chat.structured.issues')
-                                }}</span>
-                                <div class="validation-issues">
-                                  <div v-if="validation.issues.length === 0">-</div>
-                                  <div
-                                    v-for="(issue, issueIndex) in validation.issues"
-                                    :key="issueIndex"
-                                  >
-                                    - {{ issue }}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <details v-if="validation.argumentsText" class="tool-call-details">
-                                <summary>{{ t('pages.chat.structured.viewArgs') }}</summary>
-                                <pre>{{ validation.argumentsText }}</pre>
-                              </details>
+                            <div v-if="tool.command || tool.workdir" class="tool-call-meta">
+                              <code v-if="tool.command" class="tool-call-meta__code">{{
+                                tool.command
+                              }}</code>
+                              <code v-if="tool.workdir" class="tool-call-meta__code">{{
+                                tool.workdir
+                              }}</code>
                             </div>
-                          </div>
 
-                          <div
-                            v-if="entry.structured.plainTexts.length"
-                            class="chat-bubble-content-wrapper"
-                          >
                             <div
-                              class="chat-bubble-content structured-plain-text chat-markdown"
-                              v-html="
-                                renderChatMarkdown(
-                                  entry.structured.plainTexts.join('\n'),
-                                  entry.item.role
-                                )
+                              v-if="
+                                tool.argumentsJson &&
+                                expandedToolCalls.has(`${entry.key}-tool-${toolIndex}`)
                               "
-                            ></div>
-                            <div class="chat-content-copy-btn">
-                              <NTooltip>
-                                <template #trigger>
-                                  <NButton
-                                    quaternary
-                                    size="tiny"
-                                    @click="copyMessageContent(entry)"
-                                  >
-                                    <template #icon>
-                                      <NIcon :component="CopyOutline" />
-                                    </template>
-                                  </NButton>
-                                </template>
-                                {{ t('common.copy') }}
-                              </NTooltip>
-                            </div>
-                          </div>
-
-                          <div v-if="entry.structured.images.length" class="chat-images-container">
-                            <div
-                              v-for="(img, imgIndex) in entry.structured.images"
-                              :key="`${entry.key}-img-${imgIndex}`"
-                              class="chat-image-wrapper"
+                              class="tool-call-args"
                             >
-                              <img
-                                v-if="img.url"
-                                :src="img.url"
-                                class="chat-image"
-                                loading="lazy"
-                                @click="openImagePreview(img.url)"
-                              />
-                              <span v-else class="chat-image-placeholder">{{
-                                t('pages.chat.image.unavailable')
+                              <pre class="tool-call-args__content">{{ tool.argumentsJson }}</pre>
+                            </div>
+
+                            <details v-if="tool.partialJson" class="tool-call-details">
+                              <summary>{{ t('pages.chat.structured.viewPartialJson') }}</summary>
+                              <pre>{{ tool.partialJson }}</pre>
+                            </details>
+                          </div>
+                        </div>
+
+                        <div v-if="entry.structured.toolResults.length" class="tool-result-list">
+                          <div
+                            v-for="(result, resultIndex) in entry.structured.toolResults"
+                            :key="`${entry.key}-tool-result-${resultIndex}`"
+                            class="tool-result-card"
+                          >
+                            <NSpace align="center" justify="space-between">
+                              <NSpace align="center" :size="6">
+                                <NTag size="small" type="success" :bordered="false" round>{{
+                                  t('pages.chat.structured.toolResult')
+                                }}</NTag>
+                                <NText strong>{{ result.name || 'unknown' }}</NText>
+                              </NSpace>
+                              <NSpace align="center" :size="8">
+                                <NText v-if="result.status" depth="3" style="font-size: 12px">
+                                  {{ result.status }}
+                                </NText>
+                                <NButton
+                                  size="tiny"
+                                  text
+                                  @click="
+                                    toggleToolResultExpand(`${entry.key}-result-${resultIndex}`)
+                                  "
+                                >
+                                  {{
+                                    expandedToolResults.has(`${entry.key}-result-${resultIndex}`)
+                                      ? t('pages.chat.structured.hideArgs')
+                                      : t('pages.chat.structured.viewArgs')
+                                  }}
+                                </NButton>
+                              </NSpace>
+                            </NSpace>
+
+                            <div
+                              v-if="expandedToolResults.has(`${entry.key}-result-${resultIndex}`)"
+                              class="tool-call-grid"
+                            >
+                              <span class="tool-call-label">{{
+                                t('pages.chat.structured.callId')
                               }}</span>
+                              <div class="tool-call-value-wrapper">
+                                <code>{{ result.id || '-' }}</code>
+                                <NTooltip>
+                                  <template #trigger>
+                                    <NButton
+                                      quaternary
+                                      size="tiny"
+                                      class="tool-value-copy-btn"
+                                      @click="copyToClipboard(result.id || '-')"
+                                    >
+                                      <template #icon>
+                                        <NIcon :component="CopyOutline" />
+                                      </template>
+                                    </NButton>
+                                  </template>
+                                  {{ t('common.copy') }}
+                                </NTooltip>
+                              </div>
+                              <span class="tool-call-label">{{
+                                t('pages.chat.structured.content')
+                              }}</span>
+                              <div class="tool-call-value-wrapper tool-result-content-wrapper">
+                                <pre class="tool-result-content">{{ result.content }}</pre>
+                                <NTooltip>
+                                  <template #trigger>
+                                    <NButton
+                                      quaternary
+                                      size="tiny"
+                                      class="tool-value-copy-btn"
+                                      @click="copyToClipboard(result.content)"
+                                    >
+                                      <template #icon>
+                                        <NIcon :component="CopyOutline" />
+                                      </template>
+                                    </NButton>
+                                  </template>
+                                  {{ t('common.copy') }}
+                                </NTooltip>
+                              </div>
                             </div>
                           </div>
                         </div>
 
-                        <div v-else class="chat-bubble-content-wrapper">
+                        <div
+                          v-if="entry.structured.validationErrors.length"
+                          class="validation-error-list"
+                        >
                           <div
-                            class="chat-bubble-content chat-markdown"
-                            v-html="renderChatMarkdown(entry.item.content, entry.item.role)"
+                            v-for="(validation, validationIndex) in entry.structured
+                              .validationErrors"
+                            :key="`${entry.key}-validation-${validationIndex}`"
+                            class="validation-error-card"
+                          >
+                            <NSpace align="center" justify="space-between">
+                              <NSpace align="center" :size="6">
+                                <NTag size="small" type="warning" :bordered="false" round>{{
+                                  t('pages.chat.structured.validationFailed')
+                                }}</NTag>
+                                <NText strong>{{ validation.toolName }}</NText>
+                              </NSpace>
+                              <NText depth="3" style="font-size: 12px">
+                                {{
+                                  t('pages.chat.structured.issuesCount', {
+                                    count: validation.issues.length
+                                  })
+                                }}
+                              </NText>
+                            </NSpace>
+
+                            <div class="tool-call-grid">
+                              <span class="tool-call-label">{{
+                                t('pages.chat.structured.issues')
+                              }}</span>
+                              <div class="validation-issues">
+                                <div v-if="validation.issues.length === 0">-</div>
+                                <div
+                                  v-for="(issue, issueIndex) in validation.issues"
+                                  :key="issueIndex"
+                                >
+                                  - {{ issue }}
+                                </div>
+                              </div>
+                            </div>
+
+                            <details v-if="validation.argumentsText" class="tool-call-details">
+                              <summary>{{ t('pages.chat.structured.viewArgs') }}</summary>
+                              <pre>{{ validation.argumentsText }}</pre>
+                            </details>
+                          </div>
+                        </div>
+
+                        <div
+                          v-if="entry.structured.plainTexts.length"
+                          class="chat-bubble-content-wrapper"
+                        >
+                          <div
+                            class="chat-bubble-content structured-plain-text chat-markdown"
+                            v-html="
+                              renderChatMarkdown(
+                                entry.structured.plainTexts.join('\n'),
+                                entry.item.role
+                              )
+                            "
                           ></div>
                           <div class="chat-content-copy-btn">
                             <NTooltip>
@@ -3209,398 +3071,452 @@ async function handleSend() {
                             </NTooltip>
                           </div>
                         </div>
-                      </div>
-                    </template>
 
-                    <NEmpty
-                      v-else
-                      :description="
-                        visibleMessageEntries.length
-                          ? t('pages.chat.messages.emptyFiltered')
-                          : t('common.noMessages')
-                      "
-                      style="padding: 72px 0"
-                    />
-                  </div>
-                </NSpin>
-              </div>
-            </NCard>
-
-            <NCard embedded :bordered="false" class="chat-compose-card">
-              <NSpace vertical :size="10">
-                <NInput
-                  v-model:value="draft"
-                  type="textarea"
-                  :autosize="{ minRows: 3, maxRows: 8 }"
-                  :placeholder="t('pages.chat.input.placeholder')"
-                  @keydown="handleDraftKeydown"
-                />
-
-                <div v-if="slashMode" class="chat-slash-panel">
-                  <div class="chat-slash-head">
-                    <NText depth="3" style="font-size: 12px">{{
-                      t('pages.chat.slash.title')
-                    }}</NText>
-                    <NText depth="3" style="font-size: 12px">{{
-                      t('pages.chat.slash.hint')
-                    }}</NText>
-                  </div>
-                  <div v-if="slashSuggestions.length" class="chat-slash-list">
-                    <button
-                      v-for="(item, index) in slashSuggestions"
-                      :key="item.key"
-                      class="chat-slash-item"
-                      :class="{ 'is-active': index === selectedSlashCommandIndex }"
-                      type="button"
-                      @mouseenter="selectedSlashCommandIndex = index"
-                      @mousedown.prevent
-                      @click="applySlashSuggestion(item)"
-                    >
-                      <div v-if="item.kind === 'command' && item.preset">
-                        <div class="chat-slash-line">
-                          <span class="chat-slash-command">{{ item.preset.command }}</span>
-                          <span v-if="item.preset.usage" class="chat-slash-usage">{{
-                            item.preset.usage
-                          }}</span>
-                          <NTag size="tiny" :bordered="false" round>{{
-                            item.preset.category
-                          }}</NTag>
-                        </div>
-                        <div class="chat-slash-line chat-slash-desc">
-                          <span>{{ item.preset.description }}</span>
-                          <span v-if="item.preset.requiresFlag" class="chat-slash-flag">
-                            {{
-                              t('pages.chat.slash.requiresFlag', { flag: item.preset.requiresFlag })
-                            }}
-                          </span>
-                        </div>
-                      </div>
-                      <div v-else-if="item.kind === 'skill' && item.skill">
-                        <div class="chat-slash-line">
-                          <span class="chat-slash-command">/skill {{ item.skill.name }}</span>
-                          <NTag size="tiny" type="success" :bordered="false" round>
-                            {{ skillSourceLabel(item.skill.source) }}
-                          </NTag>
-                        </div>
-                        <div class="chat-slash-line chat-slash-desc">
-                          <span>{{ item.skill.description || t('common.noDescription') }}</span>
-                          <span v-if="item.skill.version" class="chat-slash-flag"
-                            >v{{ item.skill.version }}</span
+                        <div v-if="entry.structured.images.length" class="chat-images-container">
+                          <div
+                            v-for="(img, imgIndex) in entry.structured.images"
+                            :key="`${entry.key}-img-${imgIndex}`"
+                            class="chat-image-wrapper"
                           >
+                            <img
+                              v-if="img.url"
+                              :src="img.url"
+                              class="chat-image"
+                              loading="lazy"
+                              @click="openImagePreview(img.url)"
+                            />
+                            <span v-else class="chat-image-placeholder">{{
+                              t('pages.chat.image.unavailable')
+                            }}</span>
+                          </div>
                         </div>
                       </div>
-                      <div v-else-if="item.kind === 'model' && item.model">
-                        <div class="chat-slash-line">
-                          <span class="chat-slash-command">/model {{ item.model.modelRef }}</span>
-                          <NTag size="tiny" type="info" :bordered="false" round>
-                            {{ item.model.providerId }}
-                          </NTag>
-                        </div>
-                        <div class="chat-slash-line chat-slash-desc">
-                          <span>{{ item.model.modelId }}</span>
-                          <span class="chat-slash-flag">{{
-                            t('pages.chat.slash.fromConfig')
-                          }}</span>
-                        </div>
-                      </div>
-                      <div v-else-if="item.kind === 'new-model' && item.model">
-                        <div class="chat-slash-line">
-                          <span class="chat-slash-command">/new {{ item.model.modelRef }}</span>
-                          <NTag size="tiny" type="info" :bordered="false" round>
-                            {{ item.model.providerId }}
-                          </NTag>
-                        </div>
-                        <div class="chat-slash-line chat-slash-desc">
-                          <span>{{ item.model.modelId }}</span>
-                          <span class="chat-slash-flag">{{
-                            t('pages.chat.slash.fromConfig')
-                          }}</span>
+
+                      <div v-else class="chat-bubble-content-wrapper">
+                        <div
+                          class="chat-bubble-content chat-markdown"
+                          v-html="renderChatMarkdown(entry.item.content, entry.item.role)"
+                        ></div>
+                        <div class="chat-content-copy-btn">
+                          <NTooltip>
+                            <template #trigger>
+                              <NButton quaternary size="tiny" @click="copyMessageContent(entry)">
+                                <template #icon>
+                                  <NIcon :component="CopyOutline" />
+                                </template>
+                              </NButton>
+                            </template>
+                            {{ t('common.copy') }}
+                          </NTooltip>
                         </div>
                       </div>
-                      <div
-                        v-else-if="item.kind === 'subagents-subcommand' && item.subagentsSubcommand"
-                      >
-                        <div class="chat-slash-line">
-                          <span class="chat-slash-command"
-                            >/subagents {{ item.subagentsSubcommand.subcommand }}</span
-                          >
-                          <span v-if="item.subagentsSubcommand.usage" class="chat-slash-usage">{{
-                            item.subagentsSubcommand.usage
-                          }}</span>
-                          <NTag size="tiny" type="info" :bordered="false" round> subagents </NTag>
-                        </div>
-                        <div class="chat-slash-line chat-slash-desc">
-                          <span>{{ item.subagentsSubcommand.description }}</span>
-                        </div>
-                      </div>
-                      <div v-else-if="item.kind === 'subagents-agent' && item.agent">
-                        <div class="chat-slash-line">
-                          <span class="chat-slash-command">{{ item.agent.id }}</span>
-                          <NTag size="tiny" type="info" :bordered="false" round>
-                            {{ t('pages.chat.slash.subagents.agentTag') }}
-                          </NTag>
-                        </div>
-                        <div class="chat-slash-line chat-slash-desc">
-                          <span>{{ item.agent.model?.primary || '-' }}</span>
-                          <span class="chat-slash-flag">{{
-                            t('pages.chat.slash.fromConfig')
-                          }}</span>
-                        </div>
-                      </div>
-                      <div v-else-if="item.kind === 'new-default'">
-                        <div class="chat-slash-line">
-                          <span class="chat-slash-command">/new</span>
-                          <NTag size="tiny" type="default" :bordered="false" round>
-                            {{ t('pages.chat.slash.commands.new.defaultLabel') }}
-                          </NTag>
-                        </div>
-                        <div class="chat-slash-line chat-slash-desc">
-                          <span>{{ t('pages.chat.slash.commands.new.defaultDesc') }}</span>
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                  <div v-else class="chat-slash-empty">
-                    <template v-if="slashSkillMode">
-                      {{
-                        skillStore.loading
-                          ? t('pages.chat.slash.skills.loading')
-                          : t('pages.chat.slash.skills.noMatch')
-                      }}
-                    </template>
-                    <template v-else-if="slashSubagentsMode">
-                      {{
-                        configStore.loading
-                          ? t('pages.chat.slash.subagents.loading')
-                          : t('pages.chat.slash.subagents.noMatch')
-                      }}
-                    </template>
-                    <template v-else-if="slashModelMode || slashNewMode">
-                      {{
-                        configStore.loading
-                          ? t('pages.chat.slash.models.loading')
-                          : t('pages.chat.slash.models.noMatch')
-                      }}
-                    </template>
-                    <template v-else>
-                      {{ t('pages.chat.slash.commands.noMatch') }}
-                    </template>
-                  </div>
+                    </div>
+                  </template>
+
+                  <NEmpty
+                    v-else
+                    :description="
+                      visibleMessageEntries.length
+                        ? t('pages.chat.messages.emptyFiltered')
+                        : t('common.noMessages')
+                    "
+                    style="padding: 72px 0"
+                  />
                 </div>
+              </NSpin>
+            </div>
+          </NCard>
 
-                <div class="chat-compose-status-line">
-                  <NSpace align="center" justify="space-between" style="width: 100%">
-                    <NTag
-                      size="small"
-                      :type="agentStatusTagType"
-                      :bordered="false"
-                      round
-                      class="chat-agent-status-tag"
-                    >
-                      {{ agentStatusText }}
-                    </NTag>
-                    <NButton
-                      v-if="hasAgentDetails"
-                      size="tiny"
-                      text
-                      @click="showAgentDetails = !showAgentDetails"
-                    >
-                      {{
-                        showAgentDetails
-                          ? t('pages.chat.agentDetails.hide')
-                          : t('pages.chat.agentDetails.show')
-                      }}
-                    </NButton>
-                  </NSpace>
+          <NCard embedded :bordered="false" class="chat-compose-card">
+            <NSpace vertical :size="10">
+              <NInput
+                v-model:value="draft"
+                type="textarea"
+                :autosize="{ minRows: 2, maxRows: 6 }"
+                :placeholder="t('pages.chat.input.placeholder')"
+                @keydown="handleDraftKeydown"
+              />
+
+              <div v-if="slashMode" class="chat-slash-panel">
+                <div class="chat-slash-head">
+                  <NText depth="3" style="font-size: 12px">{{ t('pages.chat.slash.title') }}</NText>
+                  <NText depth="3" style="font-size: 12px">{{ t('pages.chat.slash.hint') }}</NText>
                 </div>
-
-                <div v-if="showAgentDetails && hasAgentDetails" class="chat-agent-details">
-                  <NSpace vertical :size="6">
-                    <NText depth="3" style="font-size: 12px">
-                      {{
-                        t('pages.chat.agentDetails.phaseDuration', {
-                          duration: formatDurationMs(nowMs - currentAgentStatus.sinceMs)
-                        })
-                      }}
-                    </NText>
-
+                <div v-if="slashSuggestions.length" class="chat-slash-list">
+                  <button
+                    v-for="(item, index) in slashSuggestions"
+                    :key="item.key"
+                    class="chat-slash-item"
+                    :class="{ 'is-active': index === selectedSlashCommandIndex }"
+                    type="button"
+                    @mouseenter="selectedSlashCommandIndex = index"
+                    @mousedown.prevent
+                    @click="applySlashSuggestion(item)"
+                  >
+                    <div v-if="item.kind === 'command' && item.preset">
+                      <div class="chat-slash-line">
+                        <span class="chat-slash-command">{{ item.preset.command }}</span>
+                        <span v-if="item.preset.usage" class="chat-slash-usage">{{
+                          item.preset.usage
+                        }}</span>
+                        <NTag size="tiny" :bordered="false" round>{{ item.preset.category }}</NTag>
+                      </div>
+                      <div class="chat-slash-line chat-slash-desc">
+                        <span>{{ item.preset.description }}</span>
+                        <span v-if="item.preset.requiresFlag" class="chat-slash-flag">
+                          {{
+                            t('pages.chat.slash.requiresFlag', { flag: item.preset.requiresFlag })
+                          }}
+                        </span>
+                      </div>
+                    </div>
+                    <div v-else-if="item.kind === 'skill' && item.skill">
+                      <div class="chat-slash-line">
+                        <span class="chat-slash-command">/skill {{ item.skill.name }}</span>
+                        <NTag size="tiny" type="success" :bordered="false" round>
+                          {{ skillSourceLabel(item.skill.source) }}
+                        </NTag>
+                      </div>
+                      <div class="chat-slash-line chat-slash-desc">
+                        <span>{{ item.skill.description || t('common.noDescription') }}</span>
+                        <span v-if="item.skill.version" class="chat-slash-flag"
+                          >v{{ item.skill.version }}</span
+                        >
+                      </div>
+                    </div>
+                    <div v-else-if="item.kind === 'model' && item.model">
+                      <div class="chat-slash-line">
+                        <span class="chat-slash-command">/model {{ item.model.modelRef }}</span>
+                        <NTag size="tiny" type="info" :bordered="false" round>
+                          {{ item.model.providerId }}
+                        </NTag>
+                      </div>
+                      <div class="chat-slash-line chat-slash-desc">
+                        <span>{{ item.model.modelId }}</span>
+                        <span class="chat-slash-flag">{{ t('pages.chat.slash.fromConfig') }}</span>
+                      </div>
+                    </div>
+                    <div v-else-if="item.kind === 'new-model' && item.model">
+                      <div class="chat-slash-line">
+                        <span class="chat-slash-command">/new {{ item.model.modelRef }}</span>
+                        <NTag size="tiny" type="info" :bordered="false" round>
+                          {{ item.model.providerId }}
+                        </NTag>
+                      </div>
+                      <div class="chat-slash-line chat-slash-desc">
+                        <span>{{ item.model.modelId }}</span>
+                        <span class="chat-slash-flag">{{ t('pages.chat.slash.fromConfig') }}</span>
+                      </div>
+                    </div>
                     <div
-                      v-if="chatStore.agentSteps.get(currentAgentId)?.length"
-                      class="chat-agent-steps"
+                      v-else-if="item.kind === 'subagents-subcommand' && item.subagentsSubcommand"
                     >
-                      <div
-                        v-for="(step, index) in chatStore.agentSteps.get(currentAgentId)"
-                        :key="`step-${step.ts}-${index}`"
-                        class="chat-agent-step"
-                      >
-                        <span class="chat-agent-step__time">{{ formatClock(step.ts) }}</span>
-                        <span class="chat-agent-step__label">{{ step.label }}</span>
+                      <div class="chat-slash-line">
+                        <span class="chat-slash-command"
+                          >/subagents {{ item.subagentsSubcommand.subcommand }}</span
+                        >
+                        <span v-if="item.subagentsSubcommand.usage" class="chat-slash-usage">{{
+                          item.subagentsSubcommand.usage
+                        }}</span>
+                        <NTag size="tiny" type="info" :bordered="false" round> subagents </NTag>
+                      </div>
+                      <div class="chat-slash-line chat-slash-desc">
+                        <span>{{ item.subagentsSubcommand.description }}</span>
                       </div>
                     </div>
-
-                    <div v-if="currentToolProgress" class="chat-tool-progress">
-                      <div class="chat-tool-progress__title">
-                        <span>{{
-                          t('pages.chat.agentDetails.tool', { name: currentToolProgress.name })
-                        }}</span>
-                        <span v-if="currentToolProgress.meta" class="chat-tool-progress__meta">{{
-                          currentToolProgress.meta
-                        }}</span>
+                    <div v-else-if="item.kind === 'subagents-agent' && item.agent">
+                      <div class="chat-slash-line">
+                        <span class="chat-slash-command">{{ item.agent.id }}</span>
+                        <NTag size="tiny" type="info" :bordered="false" round>
+                          {{ t('pages.chat.slash.subagents.agentTag') }}
+                        </NTag>
                       </div>
-                      <div class="chat-tool-progress__kv">
-                        <span class="chat-tool-progress__k">{{
-                          t('pages.chat.structured.callId')
-                        }}</span>
-                        <code class="chat-tool-progress__v">{{
-                          currentToolProgress.toolCallId
-                        }}</code>
-                        <span class="chat-tool-progress__k">{{
-                          t('pages.chat.agentDetails.phase')
-                        }}</span>
-                        <code class="chat-tool-progress__v">{{ currentToolProgress.phase }}</code>
-                        <span class="chat-tool-progress__k">{{
-                          t('pages.chat.agentDetails.elapsed')
-                        }}</span>
-                        <code class="chat-tool-progress__v">
-                          {{ formatDurationMs(toolElapsedMs) }}
-                        </code>
+                      <div class="chat-slash-line chat-slash-desc">
+                        <span>{{ item.agent.model?.primary || '-' }}</span>
+                        <span class="chat-slash-flag">{{ t('pages.chat.slash.fromConfig') }}</span>
                       </div>
-
-                      <details
-                        v-if="currentToolProgress.argsPreview"
-                        class="chat-tool-progress__details"
-                      >
-                        <summary>{{ t('pages.chat.structured.viewArgs') }}</summary>
-                        <pre>{{ currentToolProgress.argsPreview }}</pre>
-                      </details>
-
-                      <details
-                        v-if="currentToolProgress.partialPreview"
-                        class="chat-tool-progress__details"
-                      >
-                        <summary>{{ t('pages.chat.agentDetails.viewPartialResult') }}</summary>
-                        <pre>{{ currentToolProgress.partialPreview }}</pre>
-                      </details>
-
-                      <details
-                        v-if="currentToolProgress.resultPreview"
-                        class="chat-tool-progress__details"
-                      >
-                        <summary>{{ t('pages.chat.agentDetails.viewResult') }}</summary>
-                        <pre>{{ currentToolProgress.resultPreview }}</pre>
-                      </details>
-
-                      <NText
-                        v-if="currentToolProgress.isError === true"
-                        depth="3"
-                        style="font-size: 12px; color: var(--danger-color)"
-                      >
-                        {{ t('pages.chat.agentDetails.toolFailed') }}
-                      </NText>
                     </div>
-                  </NSpace>
+                    <div v-else-if="item.kind === 'new-default'">
+                      <div class="chat-slash-line">
+                        <span class="chat-slash-command">/new</span>
+                        <NTag size="tiny" type="default" :bordered="false" round>
+                          {{ t('pages.chat.slash.commands.new.defaultLabel') }}
+                        </NTag>
+                      </div>
+                      <div class="chat-slash-line chat-slash-desc">
+                        <span>{{ t('pages.chat.slash.commands.new.defaultDesc') }}</span>
+                      </div>
+                    </div>
+                  </button>
                 </div>
+                <div v-else class="chat-slash-empty">
+                  <template v-if="slashSkillMode">
+                    {{
+                      skillStore.loading
+                        ? t('pages.chat.slash.skills.loading')
+                        : t('pages.chat.slash.skills.noMatch')
+                    }}
+                  </template>
+                  <template v-else-if="slashSubagentsMode">
+                    {{
+                      configStore.loading
+                        ? t('pages.chat.slash.subagents.loading')
+                        : t('pages.chat.slash.subagents.noMatch')
+                    }}
+                  </template>
+                  <template v-else-if="slashModelMode || slashNewMode">
+                    {{
+                      configStore.loading
+                        ? t('pages.chat.slash.models.loading')
+                        : t('pages.chat.slash.models.noMatch')
+                    }}
+                  </template>
+                  <template v-else>
+                    {{ t('pages.chat.slash.commands.noMatch') }}
+                  </template>
+                </div>
+              </div>
 
-                <NSpace justify="space-between" align="center">
+              <div class="chat-compose-status-line">
+                <NSpace align="center" justify="space-between" style="width: 100%">
+                  <NTag
+                    size="small"
+                    :type="agentStatusTagType"
+                    :bordered="false"
+                    round
+                    class="chat-agent-status-tag"
+                  >
+                    {{ agentStatusText }}
+                  </NTag>
+                  <NButton
+                    v-if="hasAgentDetails"
+                    size="tiny"
+                    text
+                    @click="showAgentDetails = !showAgentDetails"
+                  >
+                    {{
+                      showAgentDetails
+                        ? t('pages.chat.agentDetails.hide')
+                        : t('pages.chat.agentDetails.show')
+                    }}
+                  </NButton>
+                </NSpace>
+              </div>
+
+              <div v-if="showAgentDetails && hasAgentDetails" class="chat-agent-details">
+                <NSpace vertical :size="6">
                   <NText depth="3" style="font-size: 12px">
-                    {{ t('pages.chat.input.sendHint', { key: normalizedSessionKey }) }}
+                    {{
+                      t('pages.chat.agentDetails.phaseDuration', {
+                        duration: formatDurationMs(nowMs - currentAgentStatus.sinceMs)
+                      })
+                    }}
                   </NText>
-                  <NSpace :size="8">
-                    <NButton size="small" secondary :disabled="!draft" @click="draft = ''">
-                      {{ t('pages.chat.actions.clearInput') }}
-                    </NButton>
-                    <NButton
-                      v-if="agentBusy"
-                      size="small"
-                      type="warning"
-                      secondary
-                      :loading="aborting"
-                      :disabled="aborting"
-                      @click="handleAbort"
+
+                  <div
+                    v-if="chatStore.agentSteps.get(currentAgentId)?.length"
+                    class="chat-agent-steps"
+                  >
+                    <div
+                      v-for="(step, index) in chatStore.agentSteps.get(currentAgentId)"
+                      :key="`step-${step.ts}-${index}`"
+                      class="chat-agent-step"
                     >
-                      <template #icon><NIcon :component="StopCircleOutline" /></template>
-                      {{ t('pages.chat.actions.stop') }}
-                    </NButton>
-                    <NButton
-                      size="small"
-                      type="primary"
-                      :loading="agentBusy"
-                      :disabled="agentBusy"
-                      @click="handleSend"
+                      <span class="chat-agent-step__time">{{ formatClock(step.ts) }}</span>
+                      <span class="chat-agent-step__label">{{ step.label }}</span>
+                    </div>
+                  </div>
+
+                  <div v-if="currentToolProgress" class="chat-tool-progress">
+                    <div class="chat-tool-progress__title">
+                      <span>{{
+                        t('pages.chat.agentDetails.tool', { name: currentToolProgress.name })
+                      }}</span>
+                      <span v-if="currentToolProgress.meta" class="chat-tool-progress__meta">{{
+                        currentToolProgress.meta
+                      }}</span>
+                    </div>
+                    <div class="chat-tool-progress__kv">
+                      <span class="chat-tool-progress__k">{{
+                        t('pages.chat.structured.callId')
+                      }}</span>
+                      <code class="chat-tool-progress__v">{{
+                        currentToolProgress.toolCallId
+                      }}</code>
+                      <span class="chat-tool-progress__k">{{
+                        t('pages.chat.agentDetails.phase')
+                      }}</span>
+                      <code class="chat-tool-progress__v">{{ currentToolProgress.phase }}</code>
+                      <span class="chat-tool-progress__k">{{
+                        t('pages.chat.agentDetails.elapsed')
+                      }}</span>
+                      <code class="chat-tool-progress__v">
+                        {{ formatDurationMs(toolElapsedMs) }}
+                      </code>
+                    </div>
+
+                    <details
+                      v-if="currentToolProgress.argsPreview"
+                      class="chat-tool-progress__details"
                     >
-                      <template #icon><NIcon :component="SendOutline" /></template>
-                      {{ t('pages.chat.actions.send') }}
-                    </NButton>
-                  </NSpace>
+                      <summary>{{ t('pages.chat.structured.viewArgs') }}</summary>
+                      <pre>{{ currentToolProgress.argsPreview }}</pre>
+                    </details>
+
+                    <details
+                      v-if="currentToolProgress.partialPreview"
+                      class="chat-tool-progress__details"
+                    >
+                      <summary>{{ t('pages.chat.agentDetails.viewPartialResult') }}</summary>
+                      <pre>{{ currentToolProgress.partialPreview }}</pre>
+                    </details>
+
+                    <details
+                      v-if="currentToolProgress.resultPreview"
+                      class="chat-tool-progress__details"
+                    >
+                      <summary>{{ t('pages.chat.agentDetails.viewResult') }}</summary>
+                      <pre>{{ currentToolProgress.resultPreview }}</pre>
+                    </details>
+
+                    <NText
+                      v-if="currentToolProgress.isError === true"
+                      depth="3"
+                      style="font-size: 12px; color: var(--danger-color)"
+                    >
+                      {{ t('pages.chat.agentDetails.toolFailed') }}
+                    </NText>
+                  </div>
+                </NSpace>
+              </div>
+
+              <NSpace justify="space-between" align="center">
+                <NText depth="3" style="font-size: 12px">
+                  {{ t('pages.chat.input.sendHint', { key: normalizedSessionKey }) }}
+                </NText>
+                <NSpace :size="8">
+                  <NButton size="small" secondary :disabled="!draft" @click="draft = ''">
+                    {{ t('pages.chat.actions.clearInput') }}
+                  </NButton>
+                  <NButton
+                    v-if="agentBusy"
+                    size="small"
+                    type="warning"
+                    secondary
+                    :loading="aborting"
+                    :disabled="aborting"
+                    @click="handleAbort"
+                  >
+                    <template #icon><NIcon :component="StopCircleOutline" /></template>
+                    {{ t('pages.chat.actions.stop') }}
+                  </NButton>
+                  <NButton
+                    size="small"
+                    type="primary"
+                    :loading="agentBusy"
+                    :disabled="agentBusy"
+                    @click="handleSend"
+                  >
+                    <template #icon><NIcon :component="SendOutline" /></template>
+                    {{ t('pages.chat.actions.send') }}
+                  </NButton>
                 </NSpace>
               </NSpace>
-            </NCard>
-          </div>
-        </NGridItem>
-
-        <NGridItem :span="1" class="chat-grid-tools">
-          <NCard embedded :bordered="false" class="chat-tools-card">
-            <NSpace vertical :size="12">
-              <div>
-                <NText strong class="chat-tools-title">右侧调试抽屉</NText>
-                <NText depth="3" class="chat-tools-note">
-                  模型、Skill、token、工具调用详情集中在这里，不挤占聊天主区域。
-                </NText>
-              </div>
-
-              <div class="chat-tools-grid">
-                <div class="chat-tools-mini">
-                  <span>当前模型</span>
-                  <strong>{{ connectionStore.hermesRealModel || hermesModel }}</strong>
-                </div>
-                <div class="chat-tools-mini">
-                  <span>Skill</span>
-                  <strong>{{ skillStore.userCreatedCount ? `${skillStore.userCreatedCount} 自建` : '-' }}</strong>
-                </div>
-                <div class="chat-tools-mini">
-                  <span>Token</span>
-                  <strong>
-                    {{
-                      currentSessionTokenUsage
-                        ? formatTokenCount(currentSessionTokenUsage.total)
-                        : '-'
-                    }}
-                  </strong>
-                </div>
-              </div>
-
-              <div class="chat-tools-section">
-                <div class="chat-tools-row">
-                  <span>会话</span>
-                  <strong>{{ isHermesRest ? hermesChatStore.conversations.length : sessionOptions.length }}</strong>
-                </div>
-                <div class="chat-tools-row">
-                  <span>当前消息</span>
-                  <strong>{{ messageList.length }}</strong>
-                </div>
-                <div class="chat-tools-row">
-                  <span>筛选</span>
-                  <strong>{{ roleFilter }}</strong>
-                </div>
-                <div class="chat-tools-row">
-                  <span>跟随最新</span>
-                  <strong>{{ autoFollowBottom ? '开启' : '关闭' }}</strong>
-                </div>
-              </div>
             </NSpace>
           </NCard>
-        </NGridItem>
-      </NGrid>
+        </div>
+      </section>
 
-      <NAlert
-        v-if="chatStore.lastError"
-        type="error"
-        :show-icon="true"
-        style="margin-top: 12px; border-radius: var(--radius)"
-      >
-        {{ chatStore.lastError }}
-      </NAlert>
-    </NCard>
+      <aside class="chat-tools">
+        <NSpace vertical :size="12">
+          <div>
+            <NText strong class="chat-tools-title">右侧调试抽屉</NText>
+            <NText depth="3" class="chat-tools-note">
+              模型、Skill、token、工具调用详情集中在这里，不挤占聊天主区域。
+            </NText>
+          </div>
+
+          <div class="chat-tools-grid">
+            <div class="chat-tools-mini">
+              <span>当前模型</span>
+              <strong>{{ connectionStore.hermesRealModel || hermesModel }}</strong>
+            </div>
+            <div class="chat-tools-mini">
+              <span>Skill</span>
+              <strong>{{
+                skillStore.userCreatedCount ? `${skillStore.userCreatedCount} 自建` : '-'
+              }}</strong>
+            </div>
+            <div class="chat-tools-mini">
+              <span>Token</span>
+              <strong>
+                {{
+                  currentSessionTokenUsage ? formatTokenCount(currentSessionTokenUsage.total) : '-'
+                }}
+              </strong>
+            </div>
+          </div>
+
+          <div class="chat-tools-section">
+            <div class="chat-tools-row">
+              <span>会话</span>
+              <strong>{{
+                isHermesRest ? hermesChatStore.conversations.length : sessionOptions.length
+              }}</strong>
+            </div>
+            <div class="chat-tools-row">
+              <span>当前消息</span>
+              <strong>{{ hermesConvStats.total }}</strong>
+            </div>
+            <div class="chat-tools-row">
+              <span>用户 / 助手</span>
+              <strong>{{ hermesConvStats.user }} / {{ hermesConvStats.assistant }}</strong>
+            </div>
+            <div class="chat-tools-row">
+              <span>跟随最新</span>
+              <strong>{{ autoFollowBottom ? '开启' : '关闭' }}</strong>
+            </div>
+          </div>
+
+          <div class="chat-tools-controls">
+            <div v-if="isHermesRest" class="chat-tools-control">
+              <NText depth="3" class="chat-tools-control-label">模型</NText>
+              <NInput
+                v-model:value="hermesModel"
+                size="small"
+                placeholder="hermes-agent"
+                @blur="handleHermesModelChange"
+                @keyup.enter="handleHermesModelChange"
+              />
+            </div>
+            <div class="chat-tools-control">
+              <NSpace justify="space-between" align="center">
+                <NText depth="3" class="chat-tools-control-label">自动跟随最新消息</NText>
+                <NSwitch v-model:value="autoFollowBottom" size="small" />
+              </NSpace>
+            </div>
+            <div class="chat-tools-control">
+              <NText depth="3" class="chat-tools-control-label">消息筛选</NText>
+              <NSelect
+                v-model:value="roleFilter"
+                :options="roleFilterOptions"
+                size="small"
+                style="margin-top: 6px"
+              />
+            </div>
+          </div>
+        </NSpace>
+      </aside>
+    </div>
+
+    <NAlert
+      v-if="chatStore.lastError"
+      type="error"
+      :show-icon="true"
+      style="margin-top: 12px; border-radius: var(--radius)"
+    >
+      {{ chatStore.lastError }}
+    </NAlert>
 
     <NModal
       v-model:show="showImagePreviewModal"
@@ -3624,127 +3540,42 @@ async function handleSend() {
 <style scoped>
 .chat-page {
   min-height: 0;
+  height: calc(100vh - var(--header-height) - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-/* 桌面端：让聊天区尽量占满可用高度，提升 transcript 可视面积 */
-@media (min-width: 1024px) {
-  .chat-page {
-    height: calc(100vh - var(--header-height) - 48px);
-    display: flex;
-    flex-direction: column;
-  }
+.chat-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: stretch;
+}
 
-  :deep(.chat-root-card) {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
+.chat-list,
+.chat-main,
+.chat-tools {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
 
-  :deep(.chat-root-card .n-card__content) {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
+.chat-list,
+.chat-tools {
+  padding: 16px;
+  overflow: auto;
+}
 
-  .chat-grid {
-    flex: 1;
-    min-height: 0;
-    align-content: stretch;
-  }
-
-  .chat-grid-side,
-  .chat-grid-main,
-  .chat-grid-tools {
-    min-height: 0;
-    display: flex;
-    position: relative;
-  }
-
-  /* 折叠按钮样式 */
-  .chat-side-collapse-btn {
-    position: absolute;
-    right: -8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 48px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 0 4px 4px 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    z-index: 10;
-    transition: all 0.2s ease;
-    opacity: 0.6;
-  }
-
-  .chat-side-collapse-btn:hover {
-    background: var(--bg-secondary);
-    opacity: 1;
-  }
-
-  /* 展开按钮样式（主内容区域左侧） */
-  .chat-side-expand-btn {
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 48px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px 0 0 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    z-index: 10;
-    transition: all 0.2s ease;
-    opacity: 0.6;
-  }
-
-  .chat-side-expand-btn:hover {
-    background: var(--bg-secondary);
-    opacity: 1;
-  }
-
-  /* 侧边栏折叠状态 */
-  .chat-grid-side--collapsed {
-    width: 0 !important;
-    min-width: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    overflow: hidden;
-  }
-
-  .chat-grid-side--collapsed .chat-side-card {
-    display: none;
-  }
-
-  .chat-grid-side--collapsed .chat-side-collapse-btn {
-    display: none;
-  }
-
-  .chat-side-card {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-  }
-
-  .chat-main-column {
-    flex: 1;
-    min-height: 0;
-  }
-
-  .chat-tools-card {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-  }
+.chat-main {
+  display: flex;
+  padding: 16px;
+  overflow: hidden;
 }
 
 .chat-token-metrics {
@@ -3894,10 +3725,6 @@ async function handleSend() {
   max-height: 240px;
 }
 
-.chat-side-card {
-  border-radius: var(--radius);
-}
-
 .chat-side-heading {
   padding: 2px 2px 4px;
 }
@@ -3911,10 +3738,6 @@ async function handleSend() {
   display: block;
   margin-top: 4px;
   font-size: 12px;
-}
-
-.chat-tools-card {
-  border-radius: var(--radius);
 }
 
 .chat-tools-title {
@@ -3937,7 +3760,7 @@ async function handleSend() {
 .chat-tools-mini,
 .chat-tools-section {
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--bg-primary);
 }
 
@@ -3983,6 +3806,23 @@ async function handleSend() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chat-tools-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.chat-tools-control {
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.chat-tools-control-label {
+  display: block;
+  font-size: 12px;
 }
 
 /* ── Hermes conversation list ── */
@@ -4087,6 +3927,8 @@ async function handleSend() {
 }
 
 .chat-main-column {
+  flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -4171,13 +4013,19 @@ async function handleSend() {
 
 .chat-transcript-card,
 .chat-compose-card {
-  border-radius: var(--radius);
+  border-radius: 8px;
 }
 
 .chat-transcript-card {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  background: transparent;
+  box-shadow: none;
+}
+
+:deep(.chat-transcript-card.n-card) {
+  background: transparent;
 }
 
 :deep(.chat-transcript-card .n-card__content) {
@@ -4185,6 +4033,7 @@ async function handleSend() {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding: 0 !important;
 }
 
 .chat-transcript-shell {
@@ -4201,25 +4050,27 @@ async function handleSend() {
 }
 
 .chat-transcript {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius);
+  border: 0;
+  border-radius: 0;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px;
+  padding: 4px;
   padding-bottom: 20px;
   overflow-anchor: none;
   overscroll-behavior: contain;
-  background:
-    radial-gradient(circle at top right, rgba(24, 160, 88, 0.06), transparent 30%),
-    var(--bg-primary);
+  background: transparent;
 }
 
 .chat-compose-card {
   flex-shrink: 0;
   border: 1px solid var(--border-color);
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   box-shadow: var(--shadow-sm);
+}
+
+:deep(.chat-compose-card .n-card__content) {
+  padding: 12px !important;
 }
 
 .chat-slash-panel {
@@ -4766,32 +4617,10 @@ async function handleSend() {
   font-size: 12px;
 }
 
-body.wide-mode .chat-grid {
+body.wide-mode .chat-layout {
   display: grid !important;
-  grid-template-columns: 460px minmax(0, 1fr) 300px !important;
+  grid-template-columns: 320px minmax(0, 1fr) 320px !important;
   grid-template-rows: 1fr !important;
-}
-
-body.wide-mode .chat-grid--collapsed {
-  grid-template-columns: minmax(0, 1fr) 300px !important;
-}
-
-body.wide-mode .chat-grid > div {
-  grid-row: 1 !important;
-}
-
-body.wide-mode .chat-grid-side {
-  max-width: 460px;
-  flex-shrink: 0;
-}
-
-body.wide-mode .chat-grid-main {
-  flex: 1;
-  min-width: 0;
-}
-
-body.wide-mode .chat-grid-tools {
-  min-width: 0;
 }
 
 body.wide-mode .chat-bubble {
@@ -4799,8 +4628,21 @@ body.wide-mode .chat-bubble {
 }
 
 @media (max-width: 1200px) {
-  .chat-side-card {
-    min-height: auto;
+  .chat-page {
+    height: auto;
+  }
+
+  .chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-list,
+  .chat-tools {
+    max-height: none;
+  }
+
+  .chat-main {
+    min-height: 560px;
   }
 
   .chat-main-column {
