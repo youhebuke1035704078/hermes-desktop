@@ -31,6 +31,7 @@ import {
   InformationCircleOutline,
   PaperPlaneOutline,
   CogOutline,
+  CopyOutline,
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore, type ThemeMode } from '@/stores/theme'
@@ -40,6 +41,7 @@ import { ConnectionState } from '@/api/types'
 import { useMgmtProbe, type MgmtFetchResult } from '@/composables/useMgmtProbe'
 import { hermesRestRequest } from '@/api/hermes-rest-client'
 import { formatRelativeTime } from '@/utils/format'
+import { writeTextToClipboard } from '@/utils/clipboard'
 
 const router = useRouter()
 const themeStore = useThemeStore()
@@ -299,6 +301,16 @@ const modelDiagnosticCheckedText = computed(() =>
   modelDiagnosticCheckedAt.value ? formatRelativeTime(modelDiagnosticCheckedAt.value) : '尚未运行',
 )
 
+const modelDiagnosticText = computed(() => {
+  if (!modelDiagnosticItems.value.length) return ''
+  return [
+    `服务器：${currentServer.value?.url || '-'}`,
+    `当前识别模型：${connectionStore.hermesRealModel || 'unknown'}`,
+    `上次诊断：${modelDiagnosticCheckedText.value}`,
+    ...modelDiagnosticItems.value.map(item => `- ${item.label}: ${item.value} | ${item.detail}`),
+  ].join('\n')
+})
+
 const updateAdvice = computed(() => {
   const error = hermesUpdateError.value || hermesCheckError.value
   if (!error) return ''
@@ -435,6 +447,19 @@ async function runModelDiagnostic() {
   modelDiagnosticItems.value = items
   modelDiagnosticCheckedAt.value = Date.now()
   modelDiagnosticLoading.value = false
+}
+
+async function copyModelDiagnostic(): Promise<void> {
+  if (!modelDiagnosticText.value) {
+    message.warning('请先运行诊断')
+    return
+  }
+  try {
+    await writeTextToClipboard(modelDiagnosticText.value)
+    message.success('已复制诊断摘要')
+  } catch {
+    message.error(t('common.copyFailed'))
+  }
 }
 
 async function fetchHermesVersion() {
@@ -766,6 +791,10 @@ watch(
           <NButton size="small" :loading="modelDiagnosticLoading" @click="runModelDiagnostic">
             <template #icon><NIcon :component="RefreshOutline" /></template>
             运行诊断
+          </NButton>
+          <NButton v-if="modelDiagnosticItems.length" size="small" secondary @click="copyModelDiagnostic">
+            <template #icon><NIcon :component="CopyOutline" /></template>
+            复制摘要
           </NButton>
         </NSpace>
       </template>

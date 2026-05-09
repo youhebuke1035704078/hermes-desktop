@@ -7,9 +7,10 @@ import {
 } from 'naive-ui'
 import {
   DocumentTextOutline, RefreshOutline, TrashBinOutline,
-  PlayCircleOutline, PauseCircleOutline, ArrowDownOutline,
+  PlayCircleOutline, PauseCircleOutline, ArrowDownOutline, CopyOutline,
 } from '@vicons/ionicons5'
 import { useLogsStore } from '@/stores/logs'
+import { writeTextToClipboard } from '@/utils/clipboard'
 import type { LogEntry, LogLevel } from '@/api/types'
 
 const { t } = useI18n()
@@ -60,6 +61,17 @@ const refreshIntervalOptions = [
   { label: '5s', value: 5000 },
   { label: '10s', value: 10000 },
 ]
+
+const importantEntries = computed(() =>
+  logsStore.entries
+    .filter(entry => entry.level === 'error' || entry.level === 'fatal' || entry.level === 'warn')
+    .slice(-5)
+    .reverse(),
+)
+
+const visibleLogText = computed(() =>
+  logsStore.filteredEntries.map(entry => entry.raw || entry.message || '').filter(Boolean).join('\n'),
+)
 
 // ── Level tag style ──
 function levelType(level: LogLevel | null | undefined): 'default' | 'success' | 'info' | 'warning' | 'error' {
@@ -129,6 +141,24 @@ function handleIntervalChange(val: number): void {
   }
 }
 
+function focusLevel(level: LogLevel | null): void {
+  logsStore.levelFilter = level
+  logsStore.searchQuery = ''
+}
+
+async function copyVisibleLogs(): Promise<void> {
+  if (!visibleLogText.value) {
+    message.warning('当前没有可复制的日志')
+    return
+  }
+  try {
+    await writeTextToClipboard(visibleLogText.value)
+    message.success('已复制当前可见日志')
+  } catch {
+    message.error(t('common.copyFailed'))
+  }
+}
+
 // ── Lifecycle ──
 onMounted(() => {
   logsStore.fetchOnce(true).then(() => scrollToBottom())
@@ -165,6 +195,10 @@ onUnmounted(() => {
                 <NIcon :component="logsStore.autoRefresh ? PauseCircleOutline : PlayCircleOutline" />
               </template>
               {{ logsStore.autoRefresh ? t('pages.logs.pause') : t('pages.logs.autoRefresh') }}
+            </NButton>
+            <NButton secondary size="small" @click="copyVisibleLogs">
+              <template #icon><NIcon :component="CopyOutline" /></template>
+              复制可见日志
             </NButton>
           </NSpace>
         </template>
@@ -234,6 +268,17 @@ onUnmounted(() => {
             <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.autoScroll') }}</NText>
             <NSwitch v-model:value="autoScroll" size="small" />
           </NSpace>
+          <NSpace :size="6" align="center">
+            <NButton size="tiny" secondary :type="logsStore.levelFilter === 'error' ? 'error' : 'default'" @click="focusLevel('error')">
+              只看错误
+            </NButton>
+            <NButton size="tiny" secondary :type="logsStore.levelFilter === 'warn' ? 'warning' : 'default'" @click="focusLevel('warn')">
+              只看警告
+            </NButton>
+            <NButton size="tiny" quaternary @click="focusLevel(null)">
+              全部
+            </NButton>
+          </NSpace>
         </div>
 
         <!-- File info line -->
@@ -242,6 +287,22 @@ onUnmounted(() => {
           <NText v-if="logsStore.error" type="error" style="font-size: 12px; margin-left: 8px;">
             {{ logsStore.error }}
           </NText>
+        </div>
+      </NCard>
+
+      <NCard v-if="importantEntries.length">
+        <template #header>
+          <NSpace align="center" :size="8">
+            <NText strong>最近异常摘要</NText>
+            <NTag size="small" type="warning" round :bordered="false">{{ importantEntries.length }} 条</NTag>
+          </NSpace>
+        </template>
+        <div class="important-log-list">
+          <div v-for="(entry, idx) in importantEntries" :key="`${entry.time ?? ''}:${idx}`" class="important-log-row">
+            <NTag size="tiny" :type="levelType(entry.level)" :bordered="false">{{ levelLabel(entry.level) }}</NTag>
+            <NText depth="3" class="important-log-time">{{ formatEntryTime(entry) || '-' }}</NText>
+            <NText class="important-log-message">{{ entry.message || entry.raw }}</NText>
+          </div>
         </div>
       </NCard>
 
@@ -318,6 +379,34 @@ onUnmounted(() => {
   background: var(--n-color-embedded);
 }
 
+.important-log-list {
+  display: grid;
+  gap: 8px;
+}
+
+.important-log-row {
+  display: grid;
+  grid-template-columns: auto 76px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--n-border-color);
+  border-radius: 8px;
+  background: var(--n-color-embedded);
+}
+
+.important-log-time {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.important-log-message {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .log-line {
   display: flex;
   align-items: flex-start;
@@ -366,5 +455,15 @@ onUnmounted(() => {
   padding: 6px 12px;
   border-top: 1px solid var(--n-border-color);
   background: var(--n-color);
+}
+
+@media (max-width: 640px) {
+  .important-log-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .important-log-time {
+    display: none;
+  }
 }
 </style>

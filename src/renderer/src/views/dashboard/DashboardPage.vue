@@ -63,6 +63,8 @@ const modelsSeen = computed(() => {
 const totalTokens = computed(() => usageData.value?.totals?.totalTokens || 0)
 const inputTokens = computed(() => usageData.value?.totals?.input || 0)
 const outputTokens = computed(() => usageData.value?.totals?.output || 0)
+const cacheReadTokens = computed(() => usageData.value?.totals?.cacheRead || 0)
+const cacheWriteTokens = computed(() => usageData.value?.totals?.cacheWrite || 0)
 
 // ── Health center ──
 const runningJobs = computed(() => cronStore.jobs.filter(j => j.state?.runningAtMs))
@@ -170,6 +172,105 @@ const healthIssues = computed(() => {
   if (priceJobs.value.length === 0) issues.push('未发现 jd-tongrentang-price-watch 自建价格监控任务')
   return issues
 })
+
+const actionItems = computed(() => {
+  const actions: Array<{
+    key: string
+    title: string
+    detail: string
+    type: HealthType
+    actionText: string
+    target: 'settings' | 'cron' | 'price' | 'insights' | 'chat' | 'logs'
+  }> = []
+
+  if (connectionStore.status !== 'connected') {
+    actions.push({
+      key: 'connection',
+      title: '恢复 Hermes 连接',
+      detail: connectionStore.currentServer?.url || '当前未连接到可用服务器',
+      type: connectionStatusType(),
+      actionText: '检查连接',
+      target: 'settings',
+    })
+  }
+  if (!connectionStore.hermesRealModel) {
+    actions.push({
+      key: 'model',
+      title: '确认主模型与凭据',
+      detail: '服务器实际模型尚未识别，建议运行模型与凭据诊断',
+      type: 'warning',
+      actionText: '打开诊断',
+      target: 'settings',
+    })
+  }
+  if (failedJobs.value.length) {
+    actions.push({
+      key: 'cron',
+      title: '处理失败任务',
+      detail: `${failedJobs.value.length} 个启用任务最近执行失败`,
+      type: 'error',
+      actionText: '查看任务',
+      target: 'cron',
+    })
+  }
+  if (priceJobs.value.length === 0 || priceIssueCount.value > 0) {
+    actions.push({
+      key: 'price',
+      title: '检查价格监控闭环',
+      detail: priceJobs.value.length === 0 ? '未发现价格监控任务' : `${priceIssueCount.value} 个环节需关注`,
+      type: 'warning',
+      actionText: '查看闭环',
+      target: 'price',
+    })
+  }
+  if (usageError.value) {
+    actions.push({
+      key: 'usage',
+      title: '核对运营统计接口',
+      detail: usageError.value,
+      type: 'warning',
+      actionText: '看运营洞察',
+      target: 'insights',
+    })
+  }
+
+  if (actions.length === 0) {
+    actions.push({
+      key: 'ready',
+      title: '主流程可用',
+      detail: '连接、任务、模型和用量统计目前没有阻断项',
+      type: 'success',
+      actionText: '进入对话',
+      target: 'chat',
+    })
+  }
+
+  return actions.slice(0, 5)
+})
+
+const usageScopeRows = computed(() => [
+  {
+    label: '统计范围',
+    value: {
+      all: '全部历史',
+      today: '今天',
+      yesterday: '昨天',
+      '7d': '最近 7 天',
+      '15d': '最近 15 天',
+      '30d': '最近 30 天',
+    }[rangePreset.value],
+  },
+  {
+    label: '数据来源',
+    value: isHermesRest.value
+      ? usageError.value ? '本地会话兜底' : 'Hermes Agent insights API'
+      : 'Gateway RPC',
+  },
+  {
+    label: 'Token 口径',
+    value: 'input + output + cache read/write，与运营洞察一致',
+  },
+])
 
 // ── Hero card computeds ──
 const connectionLabel = computed(() => {
@@ -485,7 +586,7 @@ function tsToYmd(ts: number): string {
 }
 
 function segmentWidth(value: number): string {
-  const total = inputTokens.value + outputTokens.value
+  const total = inputTokens.value + outputTokens.value + cacheReadTokens.value + cacheWriteTokens.value
   if (total <= 0 || value <= 0) return '0%'
   return `${(value / total) * 100}%`
 }
@@ -535,7 +636,17 @@ function goSessions() { router.push({ name: 'Sessions' }) }
 function goCron() { router.push({ name: 'Cron' }) }
 function goChat() { router.push({ name: 'Chat' }) }
 function goInsights() { router.push({ name: 'Insights' }) }
+function goSettings() { router.push({ name: 'Settings' }) }
 function goPriceWorkflow() { router.push({ name: 'Cron', query: { focus: 'price-monitor' } }) }
+
+function handleActionItem(target: 'settings' | 'cron' | 'price' | 'insights' | 'chat' | 'logs') {
+  if (target === 'settings') goSettings()
+  else if (target === 'cron') goCron()
+  else if (target === 'price') goPriceWorkflow()
+  else if (target === 'insights') goInsights()
+  else if (target === 'logs') router.push({ name: 'Logs' })
+  else goChat()
+}
 
 onMounted(() => {
   if (cronStore.jobs.length === 0) cronStore.fetchJobs()
@@ -612,6 +723,24 @@ onMounted(() => {
             <div v-for="issue in healthIssues" :key="issue">{{ issue }}</div>
           </div>
         </NAlert>
+      </NCard>
+
+      <!-- Action queue -->
+      <NCard title="待办处置队列" class="dashboard-card">
+        <div class="action-grid">
+          <div v-for="item in actionItems" :key="item.key" class="action-card">
+            <div class="action-card-main">
+              <div>
+                <NText strong>{{ item.title }}</NText>
+                <NText depth="3" class="action-detail">{{ item.detail }}</NText>
+              </div>
+              <NTag size="small" :type="item.type" round :bordered="false">{{ item.key === 'ready' ? '正常' : '待处理' }}</NTag>
+            </div>
+            <NButton size="tiny" secondary class="action-button" @click="handleActionItem(item.target)">
+              {{ item.actionText }}
+            </NButton>
+          </div>
+        </div>
       </NCard>
 
       <!-- Stat row (4 cards) -->
@@ -741,13 +870,21 @@ onMounted(() => {
                 class="segment-item"
                 :style="{ width: segmentWidth(inputTokens), background: '#60a5fa' }"
               />
-              <div
-                class="segment-item"
-                :style="{ width: segmentWidth(outputTokens), background: '#4ade80' }"
-              />
-            </div>
+            <div
+              class="segment-item"
+              :style="{ width: segmentWidth(outputTokens), background: '#4ade80' }"
+            />
+            <div
+              class="segment-item"
+              :style="{ width: segmentWidth(cacheReadTokens), background: '#f0a020' }"
+            />
+            <div
+              class="segment-item"
+              :style="{ width: segmentWidth(cacheWriteTokens), background: '#d03050' }"
+            />
+          </div>
 
-            <div class="segment-list">
+          <div class="segment-list">
               <div class="segment-row">
                 <div class="segment-row-label">
                   <span class="segment-dot" :style="{ background: '#60a5fa' }" />
@@ -761,6 +898,27 @@ onMounted(() => {
                   <span>{{ t('pages.dashboard.usage.segments.output') }}</span>
                 </div>
                 <NText>{{ formatTokens(outputTokens) }}</NText>
+              </div>
+              <div class="segment-row">
+                <div class="segment-row-label">
+                  <span class="segment-dot" :style="{ background: '#f0a020' }" />
+                  <span>Cache Read</span>
+                </div>
+                <NText>{{ formatTokens(cacheReadTokens) }}</NText>
+              </div>
+              <div class="segment-row">
+                <div class="segment-row-label">
+                  <span class="segment-dot" :style="{ background: '#d03050' }" />
+                  <span>Cache Write</span>
+                </div>
+                <NText>{{ formatTokens(cacheWriteTokens) }}</NText>
+              </div>
+            </div>
+
+            <div class="usage-scope-list">
+              <div v-for="row in usageScopeRows" :key="row.label" class="usage-scope-row">
+                <NText depth="3">{{ row.label }}</NText>
+                <NText>{{ row.value }}</NText>
               </div>
             </div>
           </NCard>
@@ -904,6 +1062,39 @@ onMounted(() => {
 
 .health-action {
   margin-top: 8px;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.action-card {
+  border: 1px solid var(--n-border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 0;
+  background: var(--n-card-color);
+}
+
+.action-card-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.action-detail {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.action-button {
+  margin-top: 10px;
 }
 
 .kpi-grid {
@@ -1064,6 +1255,27 @@ onMounted(() => {
   gap: 6px;
 }
 
+.usage-scope-list {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--n-border-color);
+  display: grid;
+  gap: 6px;
+}
+
+.usage-scope-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.usage-scope-row :deep(.n-text:last-child) {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
 .segment-row {
   display: flex;
   justify-content: space-between;
@@ -1140,7 +1352,8 @@ onMounted(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .health-grid {
+  .health-grid,
+  .action-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1150,7 +1363,8 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .health-grid {
+  .health-grid,
+  .action-grid {
     grid-template-columns: 1fr;
   }
 }

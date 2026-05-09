@@ -3,6 +3,7 @@ import { computed, h, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import {
+  NAlert,
   NButton, NCard, NDataTable, NDrawer, NDrawerContent, NGrid, NGridItem,
   NIcon, NInput, NModal, NSelect, NSpace, NTag, NText, useMessage,
 } from 'naive-ui'
@@ -59,6 +60,13 @@ const filteredChannels = computed(() => {
     )
   }
   return list
+})
+
+const channelIssueSummary = computed(() => {
+  if (channelsStore.error) return channelsStore.error
+  if (channelsStore.errorCount > 0) return `${channelsStore.errorCount} 个渠道处于异常状态`
+  if (channelsStore.channels.length === 0) return '当前没有同步到渠道数据'
+  return ''
 })
 
 // ── Status styling ──
@@ -337,15 +345,35 @@ onMounted(() => {
         </div>
       </NCard>
 
+      <NAlert v-if="isHermesRest" type="info" :closable="false">
+        Hermes REST 模式下渠道管理为只读视图；账号绑定、重连和授权仍以 Hermes Agent 端为准。
+      </NAlert>
+
+      <NAlert v-if="channelIssueSummary" :type="channelsStore.error || channelsStore.errorCount ? 'warning' : 'info'" :closable="false">
+        {{ channelIssueSummary }}
+      </NAlert>
+
       <!-- Channel list -->
       <NCard v-if="!channelsStore.loading && channelsStore.channels.length === 0">
         <div style="text-align: center; padding: 40px;">
           <NText depth="3">{{ t('pages.channels.empty') }}</NText>
+          <NSpace justify="center" :size="8" style="margin-top: 12px;">
+            <NButton size="small" secondary :loading="channelsStore.loading" @click="channelsStore.fetchChannels()">
+              {{ t('pages.channels.refresh') }}
+            </NButton>
+            <NButton size="small" secondary @click="handleOpenSettings">
+              {{ t('routes.settings') }}
+            </NButton>
+          </NSpace>
         </div>
       </NCard>
 
       <NCard v-else>
+        <div v-if="filteredChannels.length === 0" style="text-align: center; padding: 18px 0;">
+          <NText depth="3">没有匹配当前筛选条件的渠道</NText>
+        </div>
         <NDataTable
+          v-else
           :columns="columns"
           :data="filteredChannels"
           :row-key="(row: Channel) => row.id"
