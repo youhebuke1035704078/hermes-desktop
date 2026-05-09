@@ -66,6 +66,7 @@ const enabledCount = computed(() => cronStore.jobs.filter(j => j.enabled).length
 const disabledCount = computed(() => cronStore.jobs.filter(j => !j.enabled).length)
 const runningCount = computed(() => cronStore.jobs.filter(j => j.state?.runningAtMs).length)
 const failedCount = computed(() => cronStore.jobs.filter(j => j.enabled && j.state?.lastStatus === 'error').length)
+const failedJobs = computed(() => cronStore.jobs.filter(j => j.enabled && j.state?.lastStatus === 'error'))
 
 function jobActivityMs(job: CronJob): number {
   return Number(job.state?.runningAtMs || job.state?.lastRunAtMs || job.updatedAtMs || job.createdAtMs || 0)
@@ -136,6 +137,23 @@ function priceStageDetail(job: CronJob | undefined, hint: string): string {
   const last = cronRelativeTime(job.state?.lastRunAtMs)
   const duration = job.state?.lastDurationMs != null ? ` · ${(job.state.lastDurationMs / 1000).toFixed(1)}s` : ''
   return `上次 ${last}${duration}`
+}
+
+function recoveryAdvice(job: CronJob): string {
+  const text = `${job.name} ${job.state?.lastError || ''}`.toLowerCase()
+  if (/verification|slider|captcha|验证|滑块/.test(text)) {
+    return '疑似京东快速验证或风控拦截：先运行 07:20 验证门控，人工解锁后补跑采集/补录。'
+  }
+  if (/api key|401|unauthorized|credential|凭据|令牌/.test(text)) {
+    return '疑似凭据失效：先到系统设置运行模型与凭据诊断，再补跑该任务。'
+  }
+  if (/timeout|connection|network|closed|超时|网络/.test(text)) {
+    return '疑似网络或远端服务抖动：确认服务在线后可直接补跑。'
+  }
+  if (/utf-?8|decode|codec|编码/.test(text)) {
+    return '疑似脚本输出编码异常：检查脚本日志编码和终端输出，再补跑验证。'
+  }
+  return '先展开错误详情确认失败阶段；如果是临时错误，可立即补跑。'
 }
 
 const priceWorkflowStages = computed<PriceWorkflowStage[]>(() => {
@@ -540,6 +558,35 @@ watch(
         </NSpace>
       </NAlert>
 
+      <!-- Failure recovery -->
+      <NCard v-if="failedJobs.length" embedded :bordered="false" size="small" style="border-radius: 10px; margin-bottom: 16px;">
+        <template #header>
+          <NSpace align="center" :size="8">
+            <NText strong>失败恢复流程</NText>
+            <NTag size="small" type="error" round :bordered="false">{{ failedJobs.length }} 个失败任务</NTag>
+          </NSpace>
+        </template>
+        <div class="recovery-grid">
+          <div v-for="job in failedJobs" :key="`recovery-${job.id}`" class="recovery-card">
+            <div class="recovery-head">
+              <NText strong>{{ job.name }}</NText>
+              <NTag size="small" type="error" round :bordered="false">失败</NTag>
+            </div>
+            <NText type="error" class="recovery-error">{{ job.state?.lastError || '未知错误' }}</NText>
+            <NText depth="3" class="recovery-advice">{{ recoveryAdvice(job) }}</NText>
+            <NSpace :size="8">
+              <NButton size="tiny" type="primary" secondary @click="handleRun(job)">
+                <template #icon><NIcon :component="PlayOutline" /></template>
+                一键补跑
+              </NButton>
+              <NButton size="tiny" secondary @click="search = job.name">
+                定位任务
+              </NButton>
+            </NSpace>
+          </div>
+        </div>
+      </NCard>
+
       <!-- Price monitor workflow -->
       <div ref="priceWorkflowSectionRef" class="cron-section-anchor">
         <NCard embedded :bordered="false" size="small" style="border-radius: 10px; margin-bottom: 16px;">
@@ -736,6 +783,39 @@ watch(
   gap: 10px;
 }
 
+.recovery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.recovery-card {
+  border: 1px solid var(--n-border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.recovery-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.recovery-error,
+.recovery-advice {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.recovery-advice {
+  margin-bottom: 10px;
+}
+
 .price-workflow-card {
   border: 1px solid var(--n-border-color);
   border-radius: 10px;
@@ -800,6 +880,10 @@ watch(
 @media (max-width: 900px) {
   .price-workflow-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .recovery-grid {
+    grid-template-columns: 1fr;
   }
 }
 

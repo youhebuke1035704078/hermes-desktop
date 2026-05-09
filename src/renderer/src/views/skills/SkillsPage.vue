@@ -8,13 +8,17 @@ import {
   NTag, NText, useMessage,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { ExtensionPuzzleOutline, RefreshOutline, AddOutline, TrashOutline, LinkOutline } from '@vicons/ionicons5'
+import { ExtensionPuzzleOutline, RefreshOutline, AddOutline, TrashOutline, LinkOutline, PlayOutline, CopyOutline } from '@vicons/ionicons5'
 import { useSkillStore } from '@/stores/skill'
-import type { SkillMeta } from '@/api/types'
+import { useCronStore } from '@/stores/cron'
+import { writeTextToClipboard } from '@/utils/clipboard'
+import { formatDate, formatRelativeTime } from '@/utils/format'
+import type { CronJob, SkillMeta } from '@/api/types'
 
 const { t } = useI18n()
 const message = useMessage()
 const skillStore = useSkillStore()
+const cronStore = useCronStore()
 const router = useRouter()
 
 // ── Filters ──
@@ -59,6 +63,38 @@ const priceWatchSkillStatus = computed(() => {
   if (skillStore.isDisabled(skill.name)) return { label: '已停用', type: 'warning' as const }
   return { label: '已启用', type: 'success' as const }
 })
+const priceMonitorJobs = computed(() =>
+  cronStore.jobs.filter(job => /jd-tongrentang-price-watch|tongrentang|cron-health|verification-gate/i.test(job.name)),
+)
+const priceFailedJobs = computed(() => priceMonitorJobs.value.filter(job => job.enabled && job.state?.lastStatus === 'error'))
+const priceRunningJobs = computed(() => priceMonitorJobs.value.filter(job => job.state?.runningAtMs))
+const priceNextRun = computed(() => {
+  const next = priceMonitorJobs.value
+    .filter(job => job.enabled && job.nextRun)
+    .sort((a, b) => new Date(a.nextRun!).getTime() - new Date(b.nextRun!).getTime())[0]
+  return next?.nextRun ? formatDate(next.nextRun) : '-'
+})
+
+function priceJobStatus(job: CronJob): { label: string; type: 'success' | 'warning' | 'error' | 'info' | 'default' } {
+  if (!job.enabled) return { label: '已停用', type: 'default' }
+  if (job.state?.runningAtMs) return { label: '运行中', type: 'info' }
+  if (job.state?.lastStatus === 'ok') return { label: 'OK', type: 'success' }
+  if (job.state?.lastStatus === 'error') return { label: '失败', type: 'error' }
+  if (job.state?.lastStatus === 'skipped') return { label: '跳过', type: 'warning' }
+  return { label: '等待', type: 'default' }
+}
+
+function findPriceJob(pattern: RegExp): CronJob | undefined {
+  return priceMonitorJobs.value.find(job => pattern.test(job.name))
+}
+
+const priceLifecycleStages = computed(() => [
+  { key: 'gate', label: '验证门控', job: findPriceJob(/verification-gate|gate|07:20|07：20/i) },
+  { key: 'daily', label: '主采集', job: findPriceJob(/jd-tongrentang-price-watch(?!.*backfill)/i) },
+  { key: 'backfill', label: '补录', job: findPriceJob(/backfill|补录|17:00|17：00/i) },
+  { key: 'health', label: '健康检查', job: findPriceJob(/cron-health|health|健康/i) },
+  { key: 'backup', label: '备份', job: findPriceJob(/backup|备份/i) },
+])
 
 const filteredSkills = computed(() => {
   let list = skillStore.skills
@@ -112,6 +148,7 @@ function onResize() {
 onMounted(() => {
   window.addEventListener('resize', onResize)
   if (skillStore.skills.length === 0) skillStore.fetchSkills()
+  if (cronStore.jobs.length === 0) cronStore.fetchJobs()
 })
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
@@ -134,6 +171,34 @@ function selectPriceWatchSkill() {
 
 function goPriceWorkflow() {
   router.push({ name: 'Cron', query: { focus: 'price-monitor' } })
+}
+
+async function runPriceJob(job?: CronJob) {
+  if (!job) {
+    message.warning('未找到对应任务')
+    return
+  }
+  const ok = await cronStore.runJob(job.id)
+  if (ok) {
+    message.success(`已触发 ${job.name}`)
+    await cronStore.fetchJobs()
+  } else {
+    message.error(`触发失败：${cronStore.lastError}`)
+  }
+}
+
+async function copyPriceSkillPath() {
+  const path = priceWatchSkill.value?.dirPath
+  if (!path) {
+    message.warning('暂无可复制路径')
+    return
+  }
+  try {
+    await writeTextToClipboard(path)
+    message.success(t('common.copied'))
+  } catch {
+    message.error(t('common.copyFailed'))
+  }
 }
 
 // ── Toggle ──
@@ -436,7 +501,7 @@ function rowProps(row: SkillMeta) {
         </NTag>
       </template>
 
-      <NGrid cols="1 m:3" responsive="screen" :x-gap="10" :y-gap="10">
+      <NGrid cols="1 m:4" responsive="screen" :x-gap="10" :y-gap="10">
         <NGridItem>
           <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
             <NText depth="3" style="font-size: 12px;">定位</NText>
@@ -456,18 +521,65 @@ function rowProps(row: SkillMeta) {
         </NGridItem>
         <NGridItem>
           <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">运行状态归属</NText>
-            <div style="font-size: 14px; font-weight: 600; margin-top: 6px;">任务计划</div>
+            <NText depth="3" style="font-size: 12px;">任务状态</NText>
+            <div style="font-size: 14px; font-weight: 600; margin-top: 6px;">
+              {{ priceMonitorJobs.length }} 个任务
+            </div>
             <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
-              价格监控闭环的执行进度、失败原因和下次运行都在任务计划查看。
+              {{ priceFailedJobs.length ? `${priceFailedJobs.length} 个失败` : priceRunningJobs.length ? `${priceRunningJobs.length} 个运行中` : '闭环任务正常' }}
+            </NText>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <NText depth="3" style="font-size: 12px;">下次运行</NText>
+            <div style="font-size: 14px; font-weight: 600; margin-top: 6px;">{{ priceNextRun }}</div>
+            <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
+              任务计划负责执行，Skill 负责沉淀标准流程。
             </NText>
           </NCard>
         </NGridItem>
       </NGrid>
 
+      <div class="price-skill-lifecycle">
+        <div v-for="stage in priceLifecycleStages" :key="stage.key" class="price-skill-stage">
+          <div class="price-skill-stage-head">
+            <NText strong>{{ stage.label }}</NText>
+            <NTag
+              size="small"
+              :type="stage.job ? priceJobStatus(stage.job).type : 'warning'"
+              round
+              :bordered="false"
+            >
+              {{ stage.job ? priceJobStatus(stage.job).label : '未配置' }}
+            </NTag>
+          </div>
+          <NText depth="3" class="price-skill-stage-detail">
+            <template v-if="stage.job">
+              上次 {{ stage.job.state?.lastRunAtMs ? formatRelativeTime(stage.job.state.lastRunAtMs) : '-' }}
+              · 下次 {{ stage.job.nextRun ? formatDate(stage.job.nextRun) : '-' }}
+            </template>
+            <template v-else>
+              未发现关联 Cron 任务
+            </template>
+          </NText>
+          <NText v-if="stage.job?.state?.lastError" type="error" class="price-skill-stage-detail">
+            {{ stage.job.state.lastError }}
+          </NText>
+          <NButton v-if="stage.job" size="tiny" secondary @click="runPriceJob(stage.job)">
+            <template #icon><NIcon :component="PlayOutline" /></template>
+            补跑
+          </NButton>
+        </div>
+      </div>
+
       <NSpace :size="8" style="margin-top: 12px;">
         <NButton size="small" type="primary" secondary :disabled="!priceWatchSkill" @click="selectPriceWatchSkill">
           查看 Skill 定义
+        </NButton>
+        <NButton size="small" secondary :disabled="!priceWatchSkill?.dirPath" @click="copyPriceSkillPath">
+          <template #icon><NIcon :component="CopyOutline" /></template>
+          复制 Skill 路径
         </NButton>
         <NButton size="small" secondary @click="goPriceWorkflow">
           查看任务闭环
@@ -727,5 +839,46 @@ const SkillDetail = defineComponent({
 <style scoped>
 :deep(.skills-row-selected td) {
   background-color: var(--n-color-hover) !important;
+}
+
+.price-skill-lifecycle {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.price-skill-stage {
+  border: 1px solid var(--n-border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.price-skill-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.price-skill-stage-detail {
+  display: block;
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .price-skill-lifecycle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .price-skill-lifecycle {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

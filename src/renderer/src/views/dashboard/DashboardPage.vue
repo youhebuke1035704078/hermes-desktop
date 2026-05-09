@@ -10,6 +10,8 @@ import { RefreshOutline, ChatboxEllipsesOutline } from '@vicons/ionicons5'
 import { useHermesChatStore } from '@/stores/hermes-chat'
 import { buildHermesRestUsageData, type UsageFilter } from '@/stores/hermes-rest-usage'
 import { useCronStore } from '@/stores/cron'
+import { useSkillStore } from '@/stores/skill'
+import { useOpsStore } from '@/stores/ops'
 import { useConnectionStore } from '@/stores/connection'
 import { useWebSocketStore } from '@/stores/websocket'
 import { hermesRestGet } from '@/api/hermes-rest-client'
@@ -23,6 +25,8 @@ const { t } = useI18n()
 const router = useRouter()
 const hermesChatStore = useHermesChatStore()
 const cronStore = useCronStore()
+const skillStore = useSkillStore()
+const opsStore = useOpsStore()
 const connectionStore = useConnectionStore()
 const wsStore = useWebSocketStore()
 
@@ -33,6 +37,9 @@ const usageError = ref<string | null>(null)
 const lastUpdatedAt = ref<number | null>(null)
 const rangePreset = ref<RangePreset>('all')
 const usageSectionRef = ref<HTMLElement | null>(null)
+const healthCheckRunning = ref(false)
+const healthCheckAt = ref<number | null>(null)
+const healthCheckSummary = ref('')
 
 const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
@@ -597,6 +604,14 @@ function topBarWidth(value: number, max: number): string {
   return `${Math.min(Math.max((value / max) * 100, 8), 100)}%`
 }
 
+function noticeTagType(severity: string): HealthType {
+  if (severity === 'critical') return 'error'
+  if (severity === 'success') return 'success'
+  if (severity === 'info') return 'info'
+  if (severity === 'warning') return 'warning'
+  return 'default'
+}
+
 // ── Actions ──
 async function fetchUsageData() {
   usageLoading.value = true
@@ -631,6 +646,29 @@ async function handleRefresh() {
     await hermesChatStore.loadFromServer()
   }
   await fetchUsageData()
+}
+
+async function runGlobalHealthCheck() {
+  healthCheckRunning.value = true
+  try {
+    await Promise.allSettled([
+      cronStore.fetchJobs(),
+      skillStore.fetchSkills(),
+      hermesChatStore.serverSyncAvailable ? hermesChatStore.loadFromServer() : Promise.resolve(),
+      fetchUsageData(),
+    ])
+    const issues = healthIssues.value
+    healthCheckAt.value = Date.now()
+    healthCheckSummary.value = issues.length ? issues.join('；') : '连接、模型、任务、Skill 和用量统计没有发现阻断项'
+    opsStore.pushNotice({
+      title: issues.length ? '一键体检发现需关注项' : '一键体检通过',
+      detail: healthCheckSummary.value,
+      severity: issues.length ? 'warning' : 'success',
+      source: '健康中心',
+    })
+  } finally {
+    healthCheckRunning.value = false
+  }
 }
 
 function goCron() { router.push({ name: 'Cron' }) }
@@ -704,7 +742,16 @@ onMounted(() => {
       <!-- Global health center -->
       <NCard title="全局健康中心" class="dashboard-card">
         <template #header-extra>
-          <NTag :type="overallHealthType" round :bordered="false">{{ overallHealthLabel }}</NTag>
+          <NSpace align="center" :size="8">
+            <NTag v-if="healthCheckAt" round :bordered="false">
+              上次体检 {{ formatRelativeTime(healthCheckAt) }}
+            </NTag>
+            <NTag :type="overallHealthType" round :bordered="false">{{ overallHealthLabel }}</NTag>
+            <NButton size="small" type="primary" secondary :loading="healthCheckRunning" @click="runGlobalHealthCheck">
+              <template #icon><NIcon :component="RefreshOutline" /></template>
+              一键体检
+            </NButton>
+          </NSpace>
         </template>
 
         <div class="health-grid">
@@ -725,25 +772,60 @@ onMounted(() => {
             <div v-for="issue in healthIssues" :key="issue">{{ issue }}</div>
           </div>
         </NAlert>
+        <NAlert v-else-if="healthCheckSummary" type="success" :bordered="false" style="margin-top: 12px;">
+          {{ healthCheckSummary }}
+        </NAlert>
       </NCard>
 
       <!-- Action queue -->
-      <NCard title="待办处置队列" class="dashboard-card">
-        <div class="action-grid">
-          <div v-for="item in actionItems" :key="item.key" class="action-card">
-            <div class="action-card-main">
-              <div>
-                <NText strong>{{ item.title }}</NText>
-                <NText depth="3" class="action-detail">{{ item.detail }}</NText>
+      <NGrid cols="1 l:2" responsive="screen" :x-gap="12" :y-gap="12">
+        <NGridItem>
+          <NCard title="待办处置队列" class="dashboard-card">
+            <div class="action-grid">
+              <div v-for="item in actionItems" :key="item.key" class="action-card">
+                <div class="action-card-main">
+                  <div>
+                    <NText strong>{{ item.title }}</NText>
+                    <NText depth="3" class="action-detail">{{ item.detail }}</NText>
+                  </div>
+                  <NTag size="small" :type="item.type" round :bordered="false">{{ item.key === 'ready' ? '正常' : '待处理' }}</NTag>
+                </div>
+                <NButton size="tiny" secondary class="action-button" @click="handleActionItem(item.target)">
+                  {{ item.actionText }}
+                </NButton>
               </div>
-              <NTag size="small" :type="item.type" round :bordered="false">{{ item.key === 'ready' ? '正常' : '待处理' }}</NTag>
             </div>
-            <NButton size="tiny" secondary class="action-button" @click="handleActionItem(item.target)">
-              {{ item.actionText }}
-            </NButton>
-          </div>
-        </div>
-      </NCard>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard title="通知中心" class="dashboard-card">
+            <template #header-extra>
+              <NTag size="small" :type="opsStore.activeNotices.length ? 'warning' : 'success'" round :bordered="false">
+                {{ opsStore.activeNotices.length }} 条待处理
+              </NTag>
+            </template>
+            <NSpace v-if="opsStore.recentNotices.length" vertical :size="8">
+              <div v-for="notice in opsStore.recentNotices.slice(0, 5)" :key="notice.id" class="notice-row">
+                <div class="notice-row-main">
+                  <NText strong>{{ notice.title }}</NText>
+                  <NTag size="tiny" :type="noticeTagType(notice.severity)" round :bordered="false">
+                    {{ notice.source }}
+                  </NTag>
+                </div>
+                <NText depth="3" class="notice-detail">{{ notice.detail }}</NText>
+                <NSpace justify="space-between" align="center">
+                  <NText depth="3" style="font-size: 12px;">{{ formatRelativeTime(notice.createdAt) }}</NText>
+                  <NButton v-if="!notice.resolvedAt" size="tiny" secondary @click="opsStore.resolveNotice(notice.id)">
+                    标记已处理
+                  </NButton>
+                  <NTag v-else size="tiny" round :bordered="false">已处理</NTag>
+                </NSpace>
+              </div>
+            </NSpace>
+            <NText v-else depth="3">暂无通知。体检、Cron 告警和模型错误会沉淀在这里。</NText>
+          </NCard>
+        </NGridItem>
+      </NGrid>
 
       <!-- Stat row (4 cards) -->
       <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="12" :y-gap="12">
@@ -1070,7 +1152,7 @@ onMounted(() => {
 
 .action-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
@@ -1099,6 +1181,27 @@ onMounted(() => {
 
 .action-button {
   margin-top: 10px;
+}
+
+.notice-row {
+  border: 1px solid var(--n-border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.notice-row-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.notice-detail {
+  display: block;
+  margin: 6px 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .kpi-grid {

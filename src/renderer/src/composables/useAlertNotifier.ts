@@ -1,6 +1,7 @@
 import { ref, onUnmounted } from 'vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useCronStore } from '@/stores/cron'
+import { useOpsStore } from '@/stores/ops'
 import { isChannelExplicitlyUnlinked } from '@/utils/health'
 
 /**
@@ -41,6 +42,7 @@ export function useAlertNotifier(options: { interval?: number } = {}) {
     try {
     const wsStore = useWebSocketStore()
     const cronStore = useCronStore()
+    const opsStore = useOpsStore()
 
     const alertIds: Array<{ id: string; title: string; severity: 'critical' | 'warning' | 'info' }> = []
 
@@ -95,6 +97,12 @@ export function useAlertNotifier(options: { interval?: number } = {}) {
         for (const alert of alertIds) {
           if (!knownAlertIds.value.has(alert.id) && alert.severity !== 'info') {
             sendNotification(alert.title, alert.severity)
+            opsStore.pushNotice({
+              title: alert.title,
+              detail: '由 Desktop 后台巡检发现，请进入仪表盘或任务计划查看处置建议。',
+              severity: alert.severity === 'critical' ? 'critical' : 'warning',
+              source: '巡检',
+            })
           }
         }
       }

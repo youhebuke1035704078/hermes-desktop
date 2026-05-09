@@ -39,16 +39,18 @@ import { useI18n } from 'vue-i18n'
 import { useThemeStore, type ThemeMode } from '@/stores/theme'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useConnectionStore } from '@/stores/connection'
+import { useOpsStore } from '@/stores/ops'
 import { ConnectionState } from '@/api/types'
 import { useMgmtProbe, type MgmtFetchResult } from '@/composables/useMgmtProbe'
 import { hermesRestRequest } from '@/api/hermes-rest-client'
-import { formatRelativeTime } from '@/utils/format'
+import { downloadJSON, formatRelativeTime } from '@/utils/format'
 import { writeTextToClipboard } from '@/utils/clipboard'
 
 const router = useRouter()
 const themeStore = useThemeStore()
 const wsStore = useWebSocketStore()
 const connectionStore = useConnectionStore()
+const opsStore = useOpsStore()
 const { t } = useI18n()
 const message = useMessage()
 
@@ -325,13 +327,17 @@ function extractYamlScalar(content: string, key: string): string {
   return (match?.[1] || '').trim()
 }
 
-function extractFallbackModels(content: string): string {
+function parseFallbackModels(content: string): string[] {
   const fallbackBlock = content.match(/(?:fallback_providers|fallback_model):([\s\S]*?)(?:\n\S|$)/)
   const source = fallbackBlock?.[1] || ''
-  const models = [...source.matchAll(/^\s*model:\s*['"]?([^'"#\n]+)/gm)]
+  const models = [...source.matchAll(/^\s*(?:-\s*)?model:\s*['"]?([^'"#\n]+)/gm)]
     .map(match => (match[1] || '').trim())
     .filter(Boolean)
-  return models.slice(0, 3).join(', ')
+  if (!models.length) {
+    const inline = content.match(/^\s*fallback_model:\s*['"]?([^'"#\n]+)/m)?.[1]?.trim()
+    if (inline) models.push(inline)
+  }
+  return models
 }
 
 function hasEnvValue(content: string, key: string): boolean {
@@ -354,6 +360,65 @@ function classifyUpdateError(error: string): string {
     return '本地 Hermes Agent 有未提交改动，自动更新会被保护性拦截。'
   }
   return '可以先重试；如果仍失败，打开 Releases 页面手动下载或检查远端管理接口。'
+}
+
+function opsTagType(severity: string): DiagnosticType {
+  if (severity === 'critical') return 'error'
+  if (severity === 'success') return 'success'
+  if (severity === 'info') return 'info'
+  if (severity === 'warning') return 'warning'
+  return 'default'
+}
+
+function extractModelProbeText(payload: any): string {
+  return (
+    payload?.choices?.[0]?.message?.content ||
+    payload?.choices?.[0]?.text ||
+    payload?.output_text ||
+    payload?.content ||
+    ''
+  ).toString()
+}
+
+async function probeChatModel(label: string, key: string, model: string): Promise<ModelDiagnosticItem> {
+  if (!model) {
+    return {
+      key,
+      label,
+      value: '未配置',
+      detail: '没有可测试的模型名',
+      type: 'warning',
+    }
+  }
+  const started = Date.now()
+  try {
+    const result = await hermesRestRequest<any>('/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: '请只回复 OK，用于 Hermes Desktop 模型健康检查。' }],
+        max_tokens: 8,
+        stream: false,
+      }),
+    })
+    const preview = extractModelProbeText(result).slice(0, 40) || '接口已响应'
+    return {
+      key,
+      label,
+      value: '可用',
+      detail: `${model} · ${Date.now() - started}ms · ${preview}`,
+      type: 'success',
+    }
+  } catch (e: any) {
+    return {
+      key,
+      label,
+      value: '失败',
+      detail: `${model} · ${e?.message || '模型调用失败'}`,
+      type: 'error',
+    }
+  }
 }
 
 async function runModelDiagnostic() {
@@ -416,7 +481,8 @@ async function runModelDiagnostic() {
 
   const configuredDefault = extractYamlScalar(configYaml.value, 'default')
   const configuredProvider = extractYamlScalar(configYaml.value, 'provider')
-  const fallbackModels = extractFallbackModels(configYaml.value)
+  const fallbackModelList = parseFallbackModels(configYaml.value)
+  const fallbackModels = fallbackModelList.slice(0, 3).join(', ')
   items.push({
     key: 'config-main',
     label: '主模型配置',
@@ -446,8 +512,19 @@ async function runModelDiagnostic() {
     type: hasEnvValue(envContent.value, 'API_SERVER_KEY') || tokenPresent ? 'success' : 'warning',
   })
 
+  const primaryModel = configuredDefault || connectionStore.hermesRealModel || 'hermes-agent'
+  items.push(await probeChatModel('主模型调用', 'probe-primary', primaryModel))
+  items.push(await probeChatModel('备用模型调用', 'probe-fallback', fallbackModelList[0] || ''))
+
   modelDiagnosticItems.value = items
   modelDiagnosticCheckedAt.value = Date.now()
+  const hasError = items.some(item => item.type === 'error')
+  opsStore.pushNotice({
+    title: hasError ? '模型与凭据诊断发现异常' : '模型与凭据诊断通过',
+    detail: items.filter(item => item.type === 'error' || item.type === 'warning').map(item => `${item.label}: ${item.detail}`).join('；') || '主模型、备用模型、服务健康和关键凭据检查完成。',
+    severity: hasError ? 'warning' : 'success',
+    source: '模型诊断',
+  })
   modelDiagnosticLoading.value = false
 }
 
@@ -609,6 +686,11 @@ async function saveConfigYaml() {
     if (res.ok) {
       message.success(t('pages.settings.saveSuccess'))
       configYamlNotFound.value = false
+      opsStore.recordAudit({
+        target: 'config.yaml',
+        action: '保存',
+        detail: `${currentServer.value?.url || 'local'} · ${configYaml.value.length} chars · 重启后生效`,
+      })
     } else {
       message.error(`${t('pages.settings.saveFailed')}: ${res.error}`)
     }
@@ -628,6 +710,11 @@ async function saveEnv() {
     if (res.ok) {
       message.success(t('pages.settings.saveSuccess'))
       envNotFound.value = false
+      opsStore.recordAudit({
+        target: '.env',
+        action: '保存',
+        detail: `${currentServer.value?.url || 'local'} · ${envContent.value.split('\n').filter(Boolean).length} 行 · 重启后生效`,
+      })
     } else {
       message.error(`${t('pages.settings.saveFailed')}: ${res.error}`)
     }
@@ -636,6 +723,28 @@ async function saveEnv() {
   } finally {
     envSaving.value = false
   }
+}
+
+function exportDiagnosticReport() {
+  const report = opsStore.buildDiagnosticReport({
+    desktop: {
+      connectedServer: currentServer.value?.url || '',
+      serverType: connectionStore.serverType,
+      connectionStatus: connectionStore.status,
+      model: connectionStore.hermesRealModel || '',
+    },
+    modelDiagnostic: {
+      checkedAt: modelDiagnosticCheckedAt.value ? new Date(modelDiagnosticCheckedAt.value).toISOString() : null,
+      items: modelDiagnosticItems.value,
+    },
+    update: {
+      current: hermesCurrentTag.value || hermesVersion.value,
+      latest: hermesLatestTag.value,
+      checkError: hermesCheckError.value,
+      updateError: hermesUpdateError.value,
+    },
+  })
+  downloadJSON(report, `hermes-desktop-diagnostic-${new Date().toISOString().replace(/[:.]/g, '-')}.json`)
 }
 
 async function restartHermes() {
@@ -1115,6 +1224,64 @@ watch(
       </NButton>
     </NCard>
 
+    <!-- Notifications, audit and diagnostic export -->
+    <NGrid cols="1 l:3" responsive="screen" :x-gap="12" :y-gap="12">
+      <NGridItem>
+        <NCard title="通知中心" class="app-card settings-ops-card">
+          <template #header-extra>
+            <NTag size="small" :type="opsStore.activeNotices.length ? 'warning' : 'success'" round :bordered="false">
+              {{ opsStore.activeNotices.length }} 待处理
+            </NTag>
+          </template>
+          <NSpace v-if="opsStore.recentNotices.length" vertical :size="8">
+            <div v-for="notice in opsStore.recentNotices.slice(0, 4)" :key="notice.id" class="settings-ops-row">
+              <div class="settings-ops-row-head">
+                <NText strong>{{ notice.title }}</NText>
+                <NTag size="tiny" :type="opsTagType(notice.severity)" round :bordered="false">
+                  {{ notice.source }}
+                </NTag>
+              </div>
+              <NText depth="3" class="settings-ops-row-detail">{{ notice.detail }}</NText>
+              <NButton v-if="!notice.resolvedAt" size="tiny" secondary @click="opsStore.resolveNotice(notice.id)">
+                标记已处理
+              </NButton>
+            </div>
+          </NSpace>
+          <NText v-else depth="3">暂无通知。</NText>
+        </NCard>
+      </NGridItem>
+      <NGridItem>
+        <NCard title="配置变更审计" class="app-card settings-ops-card">
+          <NSpace v-if="opsStore.recentAudits.length" vertical :size="8">
+            <div v-for="audit in opsStore.recentAudits.slice(0, 5)" :key="audit.id" class="settings-ops-row">
+              <div class="settings-ops-row-head">
+                <NText strong>{{ audit.target }}</NText>
+                <NTag size="tiny" round :bordered="false">{{ audit.action }}</NTag>
+              </div>
+              <NText depth="3" class="settings-ops-row-detail">{{ audit.detail }}</NText>
+              <NText depth="3" style="font-size: 12px;">{{ formatRelativeTime(audit.createdAt) }}</NText>
+            </div>
+          </NSpace>
+          <NText v-else depth="3">保存 config.yaml 或 .env 后会自动记录审计摘要。</NText>
+        </NCard>
+      </NGridItem>
+      <NGridItem>
+        <NCard title="故障报告导出" class="app-card settings-ops-card">
+          <NText depth="3" class="settings-ops-row-detail">
+            导出 Desktop 连接状态、模型诊断、通知中心和配置审计摘要，方便跨设备排障。
+          </NText>
+          <NSpace vertical :size="8">
+            <NButton size="small" type="primary" secondary @click="exportDiagnosticReport">
+              导出诊断包
+            </NButton>
+            <NButton size="small" secondary :loading="modelDiagnosticLoading" @click="runModelDiagnostic">
+              重新测试主备模型
+            </NButton>
+          </NSpace>
+        </NCard>
+      </NGridItem>
+    </NGrid>
+
     <!-- Appearance -->
     <NCard :title="t('pages.settings.appearanceSettings')" class="app-card">
       <NForm label-placement="left" label-width="120" style="max-width: 500px;">
@@ -1195,6 +1362,31 @@ watch(
   flex: 1;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.settings-ops-card {
+  height: 100%;
+}
+
+.settings-ops-row {
+  border: 1px solid var(--n-border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.settings-ops-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-ops-row-detail {
+  display: block;
+  margin: 6px 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 720px) {
