@@ -32,6 +32,7 @@ const usageLoading = ref(false)
 const usageError = ref<string | null>(null)
 const lastUpdatedAt = ref<number | null>(null)
 const rangePreset = ref<RangePreset>('all')
+const usageSectionRef = ref<HTMLElement | null>(null)
 
 const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
 
@@ -180,7 +181,7 @@ const actionItems = computed(() => {
     detail: string
     type: HealthType
     actionText: string
-    target: 'settings' | 'cron' | 'price' | 'insights' | 'chat' | 'logs'
+    target: 'settings' | 'cron' | 'price' | 'usage' | 'chat' | 'logs'
   }> = []
 
   if (connectionStore.status !== 'connected') {
@@ -229,8 +230,8 @@ const actionItems = computed(() => {
       title: '核对运营统计接口',
       detail: usageError.value,
       type: 'warning',
-      actionText: '看运营洞察',
-      target: 'insights',
+      actionText: '看用量统计',
+      target: 'usage',
     })
   }
 
@@ -632,18 +633,20 @@ async function handleRefresh() {
   await fetchUsageData()
 }
 
-function goSessions() { router.push({ name: 'Sessions' }) }
 function goCron() { router.push({ name: 'Cron' }) }
 function goChat() { router.push({ name: 'Chat' }) }
-function goInsights() { router.push({ name: 'Insights' }) }
 function goSettings() { router.push({ name: 'Settings' }) }
 function goPriceWorkflow() { router.push({ name: 'Cron', query: { focus: 'price-monitor' } }) }
 
-function handleActionItem(target: 'settings' | 'cron' | 'price' | 'insights' | 'chat' | 'logs') {
+function scrollToUsageSection() {
+  usageSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function handleActionItem(target: 'settings' | 'cron' | 'price' | 'usage' | 'chat' | 'logs') {
   if (target === 'settings') goSettings()
   else if (target === 'cron') goCron()
   else if (target === 'price') goPriceWorkflow()
-  else if (target === 'insights') goInsights()
+  else if (target === 'usage') scrollToUsageSection()
   else if (target === 'logs') router.push({ name: 'Logs' })
   else goChat()
 }
@@ -689,8 +692,7 @@ onMounted(() => {
             <template #icon><NIcon :component="ChatboxEllipsesOutline" /></template>
             {{ t('routes.chat') }}
           </NButton>
-          <NButton secondary size="small" @click="goSessions">{{ t('routes.sessions') }}</NButton>
-          <NButton secondary size="small" @click="goInsights">{{ t('routes.insights') }}</NButton>
+          <NButton secondary size="small" @click="scrollToUsageSection">{{ t('routes.insights') }}</NButton>
           <NButton secondary size="small" @click="goCron">{{ t('routes.cron') }}</NButton>
         </NSpace>
 
@@ -774,16 +776,18 @@ onMounted(() => {
         </NGridItem>
       </NGrid>
 
-      <!-- KPI grid -->
-      <NCard :title="t('pages.dashboard.cards.kpis')" class="dashboard-card">
-        <div class="kpi-grid">
-          <div v-for="kpi in kpiCells" :key="kpi.key" class="kpi-card">
-            <NText depth="3" class="kpi-label">{{ kpi.label }}</NText>
-            <div class="kpi-value">{{ kpi.value }}</div>
-            <NText depth="3" class="kpi-hint">{{ kpi.hint }}</NText>
+      <div ref="usageSectionRef" class="dashboard-section-anchor">
+        <!-- KPI grid -->
+        <NCard :title="t('pages.dashboard.cards.kpis')" class="dashboard-card">
+          <div class="kpi-grid">
+            <div v-for="kpi in kpiCells" :key="kpi.key" class="kpi-card">
+              <NText depth="3" class="kpi-label">{{ kpi.label }}</NText>
+              <div class="kpi-value">{{ kpi.value }}</div>
+              <NText depth="3" class="kpi-hint">{{ kpi.hint }}</NText>
+            </div>
           </div>
-        </div>
-      </NCard>
+        </NCard>
+      </div>
 
       <!-- Trend (2/3) + Structure (1/3) -->
       <NGrid cols="1 l:3" responsive="screen" :x-gap="12" :y-gap="12">

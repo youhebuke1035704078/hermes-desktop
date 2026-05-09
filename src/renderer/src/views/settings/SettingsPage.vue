@@ -11,6 +11,8 @@ import {
   NButton,
   NTag,
   NIcon,
+  NGrid,
+  NGridItem,
   NDescriptions,
   NDescriptionsItem,
   NInput,
@@ -748,26 +750,50 @@ watch(
       <template #header>
         <NSpace align="center" :size="8">
           <NIcon :component="CogOutline" size="18" />
-          <span>维护与诊断入口</span>
+          <span>系统设置二级功能</span>
         </NSpace>
       </template>
       <NText depth="3" style="display: block; margin-bottom: 12px; font-size: 13px;">
-        低频配置和排障工具已收纳到这里，保持侧边栏聚焦日常主流程。
+        渠道、日志和备份已从主侧边栏收纳到系统设置，保持日常主流程聚焦在对话、任务和 Skill。
       </NText>
-      <NSpace :size="8" wrap>
-        <NButton size="small" secondary @click="goChannels">
-          <template #icon><NIcon :component="PaperPlaneOutline" /></template>
-          {{ t('routes.channels') }}
-        </NButton>
-        <NButton size="small" secondary @click="goLogs">
-          <template #icon><NIcon :component="DocumentTextOutline" /></template>
-          {{ t('routes.logs') }}
-        </NButton>
-        <NButton size="small" secondary @click="goBackup">
-          <template #icon><NIcon :component="SaveOutline" /></template>
-          {{ t('routes.backup') }}
-        </NButton>
-      </NSpace>
+      <NGrid cols="1 m:3" responsive="screen" :x-gap="10" :y-gap="10">
+        <NGridItem>
+          <div class="settings-module-card">
+            <div class="settings-module-head">
+              <NIcon :component="PaperPlaneOutline" size="18" />
+              <NText strong>{{ t('routes.channels') }}</NText>
+            </div>
+            <NText depth="3" class="settings-module-detail">
+              管理外部消息渠道、账号认证和连接状态。
+            </NText>
+            <NButton size="small" secondary block @click="goChannels">打开渠道设置</NButton>
+          </div>
+        </NGridItem>
+        <NGridItem>
+          <div class="settings-module-card">
+            <div class="settings-module-head">
+              <NIcon :component="DocumentTextOutline" size="18" />
+              <NText strong>{{ t('routes.logs') }}</NText>
+            </div>
+            <NText depth="3" class="settings-module-detail">
+              查看运行日志、筛选错误和导出排障线索。
+            </NText>
+            <NButton size="small" secondary block @click="goLogs">打开诊断日志</NButton>
+          </div>
+        </NGridItem>
+        <NGridItem>
+          <div class="settings-module-card">
+            <div class="settings-module-head">
+              <NIcon :component="SaveOutline" size="18" />
+              <NText strong>{{ t('routes.backup') }}</NText>
+            </div>
+            <NText depth="3" class="settings-module-detail">
+              创建、恢复、上传和下载 Hermes 数据备份。
+            </NText>
+            <NButton size="small" secondary block @click="goBackup">打开数据维护</NButton>
+          </div>
+        </NGridItem>
+      </NGrid>
     </NCard>
 
     <!-- Model & credential diagnostics -->
@@ -1146,6 +1172,29 @@ watch(
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
+.settings-module-card {
+  border: 1px solid var(--n-border-color);
+  border-radius: 10px;
+  padding: 12px;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-module-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-module-detail {
+  display: block;
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 @media (max-width: 720px) {

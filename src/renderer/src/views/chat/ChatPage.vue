@@ -2900,6 +2900,10 @@ async function handleSend() {
 
               <!-- Hermes REST: Conversation list -->
               <div v-if="isHermesRest" class="hermes-conv-list">
+                <div class="chat-side-section-title">
+                  <NText strong>会话管理</NText>
+                  <NText depth="3">{{ hermesChatStore.conversations.length }} 个对话</NText>
+                </div>
                 <div
                   v-for="conv in hermesChatStore.conversations"
                   :key="conv.id"
@@ -3951,6 +3955,15 @@ async function handleSend() {
   gap: 4px;
   max-height: 400px;
   overflow-y: auto;
+}
+
+.chat-side-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 6px;
+  font-size: 12px;
 }
 
 .hermes-conv-item {
