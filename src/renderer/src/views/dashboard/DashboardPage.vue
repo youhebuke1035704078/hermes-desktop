@@ -14,20 +14,10 @@ import { useConnectionStore } from '@/stores/connection'
 import { useWebSocketStore } from '@/stores/websocket'
 import { hermesRestGet } from '@/api/hermes-rest-client'
 import { formatRelativeTime } from '@/utils/format'
-import type { CronJob, SessionsUsageResult } from '@/api/types'
+import type { SessionsUsageResult } from '@/api/types'
 
 type RangePreset = 'all' | 'today' | 'yesterday' | '7d' | '15d' | '30d'
 type HealthType = 'success' | 'warning' | 'error' | 'info' | 'default'
-
-interface PriceWorkflowStage {
-  key: string
-  label: string
-  hint: string
-  job?: CronJob
-  type: HealthType
-  status: string
-  detail: string
-}
 
 const { t } = useI18n()
 const router = useRouter()
@@ -87,36 +77,6 @@ const priceJobs = computed(() =>
   cronStore.jobs.filter(job => /jd-tongrentang-price-watch|tongrentang|cron-health/i.test(job.name)),
 )
 
-function jobActivityMs(job?: CronJob): number {
-  if (!job) return 0
-  return Number(job.state?.runningAtMs || job.state?.lastRunAtMs || job.updatedAtMs || job.createdAtMs || 0)
-}
-
-function formatJobTime(ms?: number): string {
-  if (!ms || ms <= 0) return '-'
-  return formatRelativeTime(ms)
-}
-
-function jobStatusType(job?: CronJob): HealthType {
-  if (!job) return 'default'
-  if (!job.enabled) return 'warning'
-  if (job.state?.lastStatus === 'error') return 'error'
-  if (job.state?.lastStatus === 'skipped') return 'warning'
-  if (job.state?.runningAtMs) return 'info'
-  if (job.state?.lastStatus === 'ok') return 'success'
-  return 'default'
-}
-
-function jobStatusLabel(job?: CronJob): string {
-  if (!job) return '未配置'
-  if (!job.enabled) return '已停用'
-  if (job.state?.runningAtMs) return '运行中'
-  if (job.state?.lastStatus === 'ok') return '正常'
-  if (job.state?.lastStatus === 'error') return '失败'
-  if (job.state?.lastStatus === 'skipped') return '跳过'
-  return '等待执行'
-}
-
 function connectionStatusText(): string {
   switch (connectionStore.status) {
     case 'connected': return t('pages.dashboard.connection.connected')
@@ -135,48 +95,8 @@ function connectionStatusType(): HealthType {
   }
 }
 
-function findPriceStageJob(key: string): CronJob | undefined {
-  const jobs = priceJobs.value
-  if (key === 'daily') {
-    return jobs.find(job =>
-      /jd-tongrentang-price-watch/i.test(job.name) &&
-      !/backfill|watchdog|evening|alarm|backup|health/i.test(job.name),
-    )
-  }
-  if (key === 'watchdog') return jobs.find(job => /watchdog|11:00|11：00/i.test(job.name))
-  if (key === 'backfill') return jobs.find(job => /backfill|补录|17:00|17：00/i.test(job.name))
-  if (key === 'alarm') return jobs.find(job => /evening|alarm|告警|17:30|17：30/i.test(job.name))
-  if (key === 'health') return jobs.find(job => /cron-health|health|健康/i.test(job.name))
-  if (key === 'backup') return jobs.find(job => /backup|备份/i.test(job.name))
-  return undefined
-}
-
-const priceWorkflowStages = computed<PriceWorkflowStage[]>(() => {
-  const defs = [
-    { key: 'daily', label: '07:30 价格获取', hint: '主采集任务' },
-    { key: 'watchdog', label: '11:00 巡检', hint: '上午缺口检查' },
-    { key: 'backfill', label: '17:00 补录', hint: '失败数据补采' },
-    { key: 'alarm', label: '17:30 告警', hint: '晚间通知' },
-    { key: 'health', label: '23:00 健康检查', hint: 'Cron 状态巡检' },
-    { key: 'backup', label: '03:00 数据备份', hint: 'SQLite 备份' },
-  ]
-  return defs.map(def => {
-    const job = findPriceStageJob(def.key)
-    const type = jobStatusType(job)
-    const last = formatJobTime(jobActivityMs(job))
-    const error = job?.state?.lastError
-    return {
-      ...def,
-      job,
-      type,
-      status: jobStatusLabel(job),
-      detail: error ? error : last === '-' ? def.hint : `上次 ${last}`,
-    }
-  })
-})
-
 const priceIssueCount = computed(() =>
-  priceWorkflowStages.value.filter(stage => stage.type === 'error' || stage.type === 'warning').length,
+  priceJobs.value.filter(job => !job.enabled || job.state?.lastStatus === 'error' || job.state?.lastStatus === 'skipped').length,
 )
 
 const overallHealthType = computed<HealthType>(() => {
@@ -615,6 +535,7 @@ function goSessions() { router.push({ name: 'Sessions' }) }
 function goCron() { router.push({ name: 'Cron' }) }
 function goChat() { router.push({ name: 'Chat' }) }
 function goInsights() { router.push({ name: 'Insights' }) }
+function goPriceWorkflow() { router.push({ name: 'Cron', query: { focus: 'price-monitor' } }) }
 
 onMounted(() => {
   if (cronStore.jobs.length === 0) cronStore.fetchJobs()
@@ -680,6 +601,9 @@ onMounted(() => {
               <NTag size="small" :type="item.type" round :bordered="false">{{ item.value }}</NTag>
             </div>
             <NText depth="3" class="health-detail">{{ item.detail }}</NText>
+            <NButton v-if="item.key === 'price'" size="tiny" secondary class="health-action" @click="goPriceWorkflow">
+              查看任务闭环
+            </NButton>
           </div>
         </div>
 
@@ -688,28 +612,6 @@ onMounted(() => {
             <div v-for="issue in healthIssues" :key="issue">{{ issue }}</div>
           </div>
         </NAlert>
-      </NCard>
-
-      <!-- Price monitor workflow -->
-      <NCard title="价格监控闭环" class="dashboard-card">
-        <template #header-extra>
-          <NTag :type="priceIssueCount ? 'warning' : 'success'" round :bordered="false">
-            {{ priceIssueCount ? `${priceIssueCount} 项需关注` : '运行正常' }}
-          </NTag>
-        </template>
-
-        <div class="price-stage-grid">
-          <div v-for="stage in priceWorkflowStages" :key="stage.key" class="price-stage-card">
-            <div class="price-stage-head">
-              <NText strong>{{ stage.label }}</NText>
-              <NTag size="small" :type="stage.type" round :bordered="false">{{ stage.status }}</NTag>
-            </div>
-            <NText depth="3" class="price-stage-hint">{{ stage.hint }}</NText>
-            <NText class="price-stage-detail" :type="stage.type === 'error' ? 'error' : undefined">
-              {{ stage.detail }}
-            </NText>
-          </div>
-        </div>
       </NCard>
 
       <!-- Stat row (4 cards) -->
@@ -959,15 +861,13 @@ onMounted(() => {
   font-weight: 400;
 }
 
-.health-grid,
-.price-stage-grid {
+.health-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
-.health-card,
-.price-stage-card {
+.health-card {
   border: 1px solid var(--n-border-color);
   border-radius: 10px;
   padding: 10px 12px;
@@ -975,8 +875,7 @@ onMounted(() => {
   min-width: 0;
 }
 
-.health-card-head,
-.price-stage-head {
+.health-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -985,9 +884,7 @@ onMounted(() => {
 }
 
 .health-title,
-.health-detail,
-.price-stage-hint,
-.price-stage-detail {
+.health-detail {
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -1005,21 +902,8 @@ onMounted(() => {
   font-size: 13px;
 }
 
-.price-stage-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.price-stage-hint {
-  display: block;
+.health-action {
   margin-top: 8px;
-  font-size: 12px;
-}
-
-.price-stage-detail {
-  display: block;
-  margin-top: 8px;
-  font-size: 12px;
-  line-height: 1.45;
 }
 
 .kpi-grid {
@@ -1256,8 +1140,7 @@ onMounted(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .health-grid,
-  .price-stage-grid {
+  .health-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1267,8 +1150,7 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .health-grid,
-  .price-stage-grid {
+  .health-grid {
     grid-template-columns: 1fr;
   }
 }

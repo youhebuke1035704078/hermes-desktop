@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onMounted, onUnmounted, ref, watch, provide, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   NButton, NCard, NCollapse, NCollapseItem, NDataTable, NDrawer, NDrawerContent,
@@ -14,6 +15,7 @@ import type { SkillMeta } from '@/api/types'
 const { t } = useI18n()
 const message = useMessage()
 const skillStore = useSkillStore()
+const router = useRouter()
 
 // ── Filters ──
 const searchQuery = ref('')
@@ -45,6 +47,18 @@ const sourceLabel = computed(() =>
     : t('pages.skills.source.local'),
 )
 const userCreatedSkills = computed(() => skillStore.userCreatedSkills)
+const priceWatchSkill = computed(() =>
+  skillStore.skills.find(skill =>
+    skill.name === 'jd-tongrentang-price-watch' ||
+    skill.skillKey === 'jd-tongrentang-price-watch',
+  ),
+)
+const priceWatchSkillStatus = computed(() => {
+  const skill = priceWatchSkill.value
+  if (!skill) return { label: '未同步', type: 'warning' as const }
+  if (skillStore.isDisabled(skill.name)) return { label: '已停用', type: 'warning' as const }
+  return { label: '已启用', type: 'success' as const }
+})
 
 const filteredSkills = computed(() => {
   let list = skillStore.skills
@@ -111,6 +125,15 @@ onUnmounted(() => {
 function selectSkill(name: string) {
   skillStore.selectedSkillName = name
   if (isNarrow.value) drawerVisible.value = true
+}
+
+function selectPriceWatchSkill() {
+  if (!priceWatchSkill.value) return
+  selectSkill(priceWatchSkill.value.name)
+}
+
+function goPriceWorkflow() {
+  router.push({ name: 'Cron', query: { focus: 'price-monitor' } })
 }
 
 // ── Toggle ──
@@ -396,6 +419,58 @@ function rowProps(row: SkillMeta) {
           @click="selectSkill(skill.name)"
         >
           {{ skill.name }}
+        </NButton>
+      </NSpace>
+    </NCard>
+
+    <NCard>
+      <template #header>
+        <NSpace align="center" :size="8">
+          <NTag type="info" round>自建价格监控 Skill</NTag>
+          <span>jd-tongrentang-price-watch</span>
+        </NSpace>
+      </template>
+      <template #header-extra>
+        <NTag size="small" :type="priceWatchSkillStatus.type" round :bordered="false">
+          {{ priceWatchSkillStatus.label }}
+        </NTag>
+      </template>
+
+      <NGrid cols="1 m:3" responsive="screen" :x-gap="10" :y-gap="10">
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <NText depth="3" style="font-size: 12px;">定位</NText>
+            <div style="font-size: 14px; font-weight: 600; margin-top: 6px;">流程知识沉淀</div>
+            <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
+              说明采集脚本、补录、巡检、告警和备份如何协作。
+            </NText>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <NText depth="3" style="font-size: 12px;">路径</NText>
+            <NText code style="display: block; margin-top: 6px; font-size: 12px; overflow-wrap: anywhere;">
+              {{ priceWatchSkill?.dirPath || '未从 Hermes Agent 同步到该 skill' }}
+            </NText>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
+            <NText depth="3" style="font-size: 12px;">运行状态归属</NText>
+            <div style="font-size: 14px; font-weight: 600; margin-top: 6px;">任务计划</div>
+            <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
+              价格监控闭环的执行进度、失败原因和下次运行都在任务计划查看。
+            </NText>
+          </NCard>
+        </NGridItem>
+      </NGrid>
+
+      <NSpace :size="8" style="margin-top: 12px;">
+        <NButton size="small" type="primary" secondary :disabled="!priceWatchSkill" @click="selectPriceWatchSkill">
+          查看 Skill 定义
+        </NButton>
+        <NButton size="small" secondary @click="goPriceWorkflow">
+          查看任务闭环
         </NButton>
       </NSpace>
     </NCard>

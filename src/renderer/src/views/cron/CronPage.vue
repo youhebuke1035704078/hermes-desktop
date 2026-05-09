@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, onMounted, h, nextTick, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   NCard, NSpace, NButton, NIcon, NTag, NDataTable, NInput,
   NModal, NForm, NFormItem, NSwitch, NAlert,
@@ -21,11 +22,26 @@ import { formatRelativeTime, formatDate } from '@/utils/format'
 const { t } = useI18n()
 const message = useMessage()
 const cronStore = useCronStore()
+const route = useRoute()
+
+type CronTone = 'success' | 'warning' | 'error' | 'info' | 'default'
+
+interface PriceWorkflowStage {
+  key: string
+  label: string
+  hint: string
+  job?: CronJob
+  type: CronTone
+  status: string
+  detail: string
+  nextRun: string
+}
 
 // ── State ──
 const search = ref('')
 const showModal = ref(false)
 const editingJob = ref<CronJob | null>(null)
+const priceWorkflowSectionRef = ref<HTMLElement | null>(null)
 
 // Form
 const form = ref({
@@ -55,7 +71,7 @@ function jobActivityMs(job: CronJob): number {
   return Number(job.state?.runningAtMs || job.state?.lastRunAtMs || job.updatedAtMs || job.createdAtMs || 0)
 }
 
-function cronStatusType(job: CronJob): 'success' | 'warning' | 'error' | 'info' | 'default' {
+function cronStatusType(job: CronJob): CronTone {
   if (!job.enabled) return 'default'
   if (job.state?.runningAtMs) return 'info'
   if (job.state?.lastStatus === 'ok') return 'success'
@@ -85,6 +101,66 @@ const recentJobs = computed(() =>
 
 const priceMonitorJobs = computed(() =>
   cronStore.jobs.filter(job => /jd-tongrentang-price-watch|tongrentang|cron-health/i.test(job.name)),
+)
+
+function findPriceStageJob(key: string): CronJob | undefined {
+  const jobs = priceMonitorJobs.value
+  if (key === 'daily') {
+    return jobs.find(job =>
+      /jd-tongrentang-price-watch/i.test(job.name) &&
+      !/backfill|watchdog|evening|alarm|backup|health/i.test(job.name),
+    )
+  }
+  if (key === 'watchdog') return jobs.find(job => /watchdog|11:00|11：00/i.test(job.name))
+  if (key === 'backfill') return jobs.find(job => /backfill|补录|17:00|17：00/i.test(job.name))
+  if (key === 'alarm') return jobs.find(job => /evening|alarm|告警|17:30|17：30/i.test(job.name))
+  if (key === 'health') return jobs.find(job => /cron-health|health|健康/i.test(job.name))
+  if (key === 'backup') return jobs.find(job => /backup|备份/i.test(job.name))
+  return undefined
+}
+
+function priceStageType(job?: CronJob): CronTone {
+  if (!job) return 'default'
+  return cronStatusType(job)
+}
+
+function priceStageStatus(job?: CronJob): string {
+  if (!job) return '未配置'
+  return cronStatusLabel(job)
+}
+
+function priceStageDetail(job: CronJob | undefined, hint: string): string {
+  if (!job) return hint
+  if (job.state?.lastError) return job.state.lastError
+  const last = cronRelativeTime(job.state?.lastRunAtMs)
+  const duration = job.state?.lastDurationMs != null ? ` · ${(job.state.lastDurationMs / 1000).toFixed(1)}s` : ''
+  return `上次 ${last}${duration}`
+}
+
+const priceWorkflowStages = computed<PriceWorkflowStage[]>(() => {
+  const defs = [
+    { key: 'daily', label: '07:30 价格获取', hint: '主采集任务' },
+    { key: 'watchdog', label: '11:00 巡检', hint: '上午缺口检查' },
+    { key: 'backfill', label: '17:00 补录', hint: '失败数据补采' },
+    { key: 'alarm', label: '17:30 告警', hint: '晚间通知' },
+    { key: 'health', label: '23:00 健康检查', hint: 'Cron 状态巡检' },
+    { key: 'backup', label: '03:00 数据备份', hint: 'SQLite 备份' },
+  ]
+  return defs.map(def => {
+    const job = findPriceStageJob(def.key)
+    return {
+      ...def,
+      job,
+      type: priceStageType(job),
+      status: priceStageStatus(job),
+      detail: priceStageDetail(job, def.hint),
+      nextRun: job?.nextRun ? formatDate(job.nextRun) : '-',
+    }
+  })
+})
+
+const priceWorkflowIssueCount = computed(() =>
+  priceWorkflowStages.value.filter(stage => stage.type === 'error' || stage.type === 'warning' || !stage.job).length,
 )
 
 // Soonest next run
@@ -361,10 +437,24 @@ function handleTemplate(template: { name: string; schedule: string; prompt: stri
   showModal.value = true
 }
 
+async function scrollToPriceWorkflowIfRequested(): Promise<void> {
+  if (route.query.focus !== 'price-monitor') return
+  await nextTick()
+  priceWorkflowSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 // ── Lifecycle ──
-onMounted(() => {
-  cronStore.fetchJobs()
+onMounted(async () => {
+  await cronStore.fetchJobs()
+  await scrollToPriceWorkflowIfRequested()
 })
+
+watch(
+  () => route.query.focus,
+  () => {
+    scrollToPriceWorkflowIfRequested()
+  },
+)
 </script>
 
 <template>
@@ -447,6 +537,53 @@ onMounted(() => {
           </NButton>
         </NSpace>
       </NAlert>
+
+      <!-- Price monitor workflow -->
+      <div ref="priceWorkflowSectionRef" class="cron-section-anchor">
+        <NCard embedded :bordered="false" size="small" style="border-radius: 10px; margin-bottom: 16px;">
+          <template #header>
+            <NSpace align="center" :size="8">
+              <NText strong>价格监控闭环</NText>
+              <NTag
+                size="small"
+                :type="priceWorkflowIssueCount ? 'warning' : 'success'"
+                round
+                :bordered="false"
+              >
+                {{ priceWorkflowIssueCount ? `${priceWorkflowIssueCount} 项需关注` : '运行正常' }}
+              </NTag>
+            </NSpace>
+          </template>
+          <template #header-extra>
+            <NButton
+              v-if="priceMonitorJobs.length"
+              size="small"
+              secondary
+              @click="search = 'jd-tongrentang'"
+            >
+              筛选任务
+            </NButton>
+          </template>
+
+          <div class="price-workflow-grid">
+            <div v-for="stage in priceWorkflowStages" :key="stage.key" class="price-workflow-card">
+              <div class="price-workflow-head">
+                <NText strong>{{ stage.label }}</NText>
+                <NTag size="small" :type="stage.type" round :bordered="false">{{ stage.status }}</NTag>
+              </div>
+              <NText depth="3" class="price-workflow-hint">{{ stage.hint }}</NText>
+              <NText class="price-workflow-detail" :type="stage.type === 'error' ? 'error' : undefined">
+                {{ stage.detail }}
+              </NText>
+              <NText depth="3" class="price-workflow-next">下次 {{ stage.nextRun }}</NText>
+            </div>
+          </div>
+
+          <NAlert v-if="!priceMonitorJobs.length" type="warning" :closable="false" style="margin-top: 12px;">
+            未发现 jd-tongrentang-price-watch 相关 Cron 任务。请先确认自建 skill 已同步，并检查 Cron jobs 配置。
+          </NAlert>
+        </NCard>
+      </div>
 
       <!-- Operational health -->
       <NGrid cols="1 l:2" responsive="screen" :x-gap="12" :y-gap="12" style="margin-bottom: 16px;">
@@ -587,6 +724,42 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.cron-section-anchor {
+  scroll-margin-top: 16px;
+}
+
+.price-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.price-workflow-card {
+  border: 1px solid var(--n-border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 0;
+  background: var(--n-card-color);
+}
+
+.price-workflow-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.price-workflow-hint,
+.price-workflow-detail,
+.price-workflow-next {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .cron-mini-row {
   padding: 8px 0;
   border-bottom: 1px solid var(--n-border-color);
@@ -620,5 +793,17 @@ onMounted(() => {
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .price-workflow-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .price-workflow-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
