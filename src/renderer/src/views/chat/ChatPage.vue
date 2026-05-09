@@ -2794,7 +2794,7 @@ async function handleSend() {
       </template>
 
       <NGrid
-        cols="1 l:3"
+        cols="1 l:4"
         responsive="screen"
         :x-gap="12"
         :y-gap="12"
@@ -2985,7 +2985,7 @@ async function handleSend() {
           </NCard>
         </NGridItem>
 
-        <NGridItem :span="sideCollapsed ? 3 : 2" class="chat-grid-main">
+        <NGridItem :span="2" class="chat-grid-main">
           <!-- 展开按钮（侧边栏折叠时显示） -->
           <div v-if="sideCollapsed" class="chat-side-expand-btn" @click="sideCollapsed = false">
             <NIcon :component="ChevronForwardOutline" size="14" />
@@ -3647,6 +3647,59 @@ async function handleSend() {
             </NCard>
           </div>
         </NGridItem>
+
+        <NGridItem :span="1" class="chat-grid-tools">
+          <NCard embedded :bordered="false" class="chat-tools-card">
+            <NSpace vertical :size="12">
+              <div>
+                <NText strong class="chat-tools-title">右侧调试抽屉</NText>
+                <NText depth="3" class="chat-tools-note">
+                  模型、Skill、token、工具调用详情集中在这里，不挤占聊天主区域。
+                </NText>
+              </div>
+
+              <div class="chat-tools-grid">
+                <div class="chat-tools-mini">
+                  <span>当前模型</span>
+                  <strong>{{ connectionStore.hermesRealModel || hermesModel }}</strong>
+                </div>
+                <div class="chat-tools-mini">
+                  <span>Skill</span>
+                  <strong>{{ skillStore.userCreatedCount ? `${skillStore.userCreatedCount} 自建` : '-' }}</strong>
+                </div>
+                <div class="chat-tools-mini">
+                  <span>Token</span>
+                  <strong>
+                    {{
+                      currentSessionTokenUsage
+                        ? formatTokenCount(currentSessionTokenUsage.total)
+                        : '-'
+                    }}
+                  </strong>
+                </div>
+              </div>
+
+              <div class="chat-tools-section">
+                <div class="chat-tools-row">
+                  <span>会话</span>
+                  <strong>{{ isHermesRest ? hermesChatStore.conversations.length : sessionOptions.length }}</strong>
+                </div>
+                <div class="chat-tools-row">
+                  <span>当前消息</span>
+                  <strong>{{ messageList.length }}</strong>
+                </div>
+                <div class="chat-tools-row">
+                  <span>筛选</span>
+                  <strong>{{ roleFilter }}</strong>
+                </div>
+                <div class="chat-tools-row">
+                  <span>跟随最新</span>
+                  <strong>{{ autoFollowBottom ? '开启' : '关闭' }}</strong>
+                </div>
+              </div>
+            </NSpace>
+          </NCard>
+        </NGridItem>
       </NGrid>
 
       <NAlert
@@ -3712,7 +3765,8 @@ async function handleSend() {
   }
 
   .chat-grid-side,
-  .chat-grid-main {
+  .chat-grid-main,
+  .chat-grid-tools {
     min-height: 0;
     display: flex;
     position: relative;
@@ -3794,6 +3848,12 @@ async function handleSend() {
   .chat-main-column {
     flex: 1;
     min-height: 0;
+  }
+
+  .chat-tools-card {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
 }
 
@@ -3946,6 +4006,78 @@ async function handleSend() {
 
 .chat-side-card {
   border-radius: var(--radius);
+}
+
+.chat-tools-card {
+  border-radius: var(--radius);
+}
+
+.chat-tools-title {
+  display: block;
+  font-size: 15px;
+}
+
+.chat-tools-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chat-tools-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-tools-mini,
+.chat-tools-section {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-primary);
+}
+
+.chat-tools-mini {
+  padding: 10px;
+  min-width: 0;
+}
+
+.chat-tools-mini span,
+.chat-tools-row span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.chat-tools-mini strong {
+  display: block;
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-tools-section {
+  padding: 4px 10px;
+}
+
+.chat-tools-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+}
+
+.chat-tools-row:last-child {
+  border-bottom: 0;
+}
+
+.chat-tools-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Hermes conversation list ── */
@@ -4732,12 +4864,12 @@ async function handleSend() {
 
 body.wide-mode .chat-grid {
   display: grid !important;
-  grid-template-columns: 460px 1fr !important;
+  grid-template-columns: 460px minmax(0, 1fr) 300px !important;
   grid-template-rows: 1fr !important;
 }
 
 body.wide-mode .chat-grid--collapsed {
-  grid-template-columns: 1fr !important;
+  grid-template-columns: minmax(0, 1fr) 300px !important;
 }
 
 body.wide-mode .chat-grid > div {
@@ -4751,6 +4883,10 @@ body.wide-mode .chat-grid-side {
 
 body.wide-mode .chat-grid-main {
   flex: 1;
+  min-width: 0;
+}
+
+body.wide-mode .chat-grid-tools {
   min-width: 0;
 }
 

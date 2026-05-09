@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NLayout, NLayoutSider, NLayoutHeader, NLayoutContent } from 'naive-ui'
 import AppHeader from '@/components/layout/AppHeader.vue'
@@ -8,7 +8,6 @@ import { useWebSocketStore } from '@/stores/websocket'
 import { useConnectionStore } from '@/stores/connection'
 import { ConnectionState } from '@/api/types'
 
-const collapsed = ref(false)
 const router = useRouter()
 const wsStore = useWebSocketStore()
 const connectionStore = useConnectionStore()
@@ -45,17 +44,12 @@ onUnmounted(() => {
     <NLayoutSider
       class="app-layout-sider"
       bordered
-      collapse-mode="width"
-      :collapsed-width="64"
-      :width="240"
-      :collapsed="collapsed"
-      show-trigger
+      :width="232"
+      :collapsed="false"
       :native-scrollbar="false"
       style="height: 100vh"
-      @collapse="collapsed = true"
-      @expand="collapsed = false"
     >
-      <AppSidebar :collapsed="collapsed" />
+      <AppSidebar :collapsed="false" />
     </NLayoutSider>
 
     <NLayout class="app-layout-main">

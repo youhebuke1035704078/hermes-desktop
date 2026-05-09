@@ -82,6 +82,9 @@ const connectionStatus = computed(() => {
 const currentServer = computed(() => connectionStore.currentServer)
 const isNoAuth = computed(() => currentServer.value?.username === '_noauth_')
 const isHermesRest = computed(() => connectionStore.serverType === 'hermes-rest')
+const desktopVersion = computed(() =>
+  typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '-'
+)
 /** True when connected server is localhost — version/config/restart only work locally */
 const isLocalServer = computed(() => {
   const url = connectionStore.currentServer?.url
@@ -810,6 +813,90 @@ watch(
 
 <template>
   <NSpace vertical :size="16">
+    <NCard class="app-card settings-overview-card">
+      <template #header>
+        <NSpace align="center" :size="8">
+          <NIcon :component="CogOutline" size="18" />
+          <span>系统设置分区</span>
+        </NSpace>
+      </template>
+      <template #header-extra>
+        <NButton size="small" type="primary" secondary @click="exportDiagnosticReport">
+          导出诊断包
+        </NButton>
+      </template>
+
+      <NText depth="3" class="settings-overview-note">
+        按排障顺序重排：先连接与模型，再运维维护，最后偏好。
+      </NText>
+      <div class="settings-groups">
+        <div class="settings-group">
+          <div class="settings-group-title">连接与模型</div>
+          <div class="settings-row">
+            <span>服务器</span>
+            <strong>{{ currentServer?.url || '-' }}</strong>
+          </div>
+          <div class="settings-row">
+            <span>访问令牌</span>
+            <strong>{{ isNoAuth ? '免认证' : currentServer?.username ? '已配置' : '未配置' }}</strong>
+          </div>
+          <div class="settings-row">
+            <span>主模型</span>
+            <strong>{{ connectionStore.hermesRealModel || 'unknown' }}</strong>
+          </div>
+          <div class="settings-row">
+            <span>备用模型</span>
+            <strong>{{ modelDiagnosticItems.some(item => item.key.includes('fallback') && item.type === 'success') ? '可用' : '待诊断' }}</strong>
+          </div>
+          <NButton size="small" secondary :loading="modelDiagnosticLoading" @click="runModelDiagnostic">
+            运行诊断
+          </NButton>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">运维维护</div>
+          <div class="settings-row">
+            <span>版本更新</span>
+            <strong>{{ hermesCurrentTag || (hermesVersion ? `v${hermesVersion}` : `v${desktopVersion}`) }}</strong>
+          </div>
+          <div class="settings-row">
+            <span>系统日志</span>
+            <strong>可打开</strong>
+          </div>
+          <div class="settings-row">
+            <span>数据备份</span>
+            <strong>{{ t('routes.backup') }}</strong>
+          </div>
+          <div class="settings-row">
+            <span>配置审计</span>
+            <strong>{{ opsStore.recentAudits.length }} 条</strong>
+          </div>
+          <NButton size="small" secondary @click="goLogs">打开维护工具</NButton>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">偏好设置</div>
+          <div class="settings-row">
+            <span>主题</span>
+            <strong>{{ themeStore.mode }}</strong>
+          </div>
+          <div class="settings-row">
+            <span>语言</span>
+            <strong>中文 / English</strong>
+          </div>
+          <div class="settings-row">
+            <span>侧栏</span>
+            <strong>竖版固定</strong>
+          </div>
+          <div class="settings-row">
+            <span>关于</span>
+            <strong>Hermes Desktop</strong>
+          </div>
+          <NButton size="small" secondary @click="handleSwitchServer">切换连接</NButton>
+        </div>
+      </div>
+    </NCard>
+
     <!-- Current Connection -->
     <NCard class="app-card">
       <template #header>
@@ -1311,6 +1398,62 @@ watch(
 </template>
 
 <style scoped>
+.settings-overview-card {
+  border-radius: 14px;
+}
+
+.settings-overview-note {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.settings-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-group {
+  padding: 14px;
+  border: 1px solid var(--n-border-color);
+  border-radius: 12px;
+  background: var(--n-color-embedded);
+  min-width: 0;
+}
+
+.settings-group-title {
+  font-size: 15px;
+  font-weight: 760;
+  margin-bottom: 10px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+}
+
+.settings-row span {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.settings-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-group .n-button {
+  margin-top: 10px;
+}
+
 .diagnostic-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1390,6 +1533,10 @@ watch(
 }
 
 @media (max-width: 720px) {
+  .settings-groups {
+    grid-template-columns: 1fr;
+  }
+
   .diagnostic-grid {
     grid-template-columns: 1fr;
   }

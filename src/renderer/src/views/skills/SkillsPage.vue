@@ -67,13 +67,6 @@ const priceMonitorJobs = computed(() =>
   cronStore.jobs.filter(job => /jd-tongrentang-price-watch|tongrentang|cron-health|verification-gate/i.test(job.name)),
 )
 const priceFailedJobs = computed(() => priceMonitorJobs.value.filter(job => job.enabled && job.state?.lastStatus === 'error'))
-const priceRunningJobs = computed(() => priceMonitorJobs.value.filter(job => job.state?.runningAtMs))
-const priceNextRun = computed(() => {
-  const next = priceMonitorJobs.value
-    .filter(job => job.enabled && job.nextRun)
-    .sort((a, b) => new Date(a.nextRun!).getTime() - new Date(b.nextRun!).getTime())[0]
-  return next?.nextRun ? formatDate(next.nextRun) : '-'
-})
 
 function priceJobStatus(job: CronJob): { label: string; type: 'success' | 'warning' | 'error' | 'info' | 'default' } {
   if (!job.enabled) return { label: '已停用', type: 'default' }
@@ -95,6 +88,7 @@ const priceLifecycleStages = computed(() => [
   { key: 'health', label: '健康检查', job: findPriceJob(/cron-health|health|健康/i) },
   { key: 'backup', label: '备份', job: findPriceJob(/backup|备份/i) },
 ])
+const priceBackfillJob = computed(() => findPriceJob(/backfill|补录|17:00|17：00/i))
 
 const filteredSkills = computed(() => {
   let list = skillStore.skills
@@ -372,6 +366,98 @@ function rowProps(row: SkillMeta) {
 
 <template>
   <NSpace vertical :size="16">
+    <div class="skill-hero">
+      <NCard class="skill-hero-card">
+        <template #header>
+          <NSpace align="center" :size="8">
+            <NTag type="info" round :bordered="false">自建 Skill</NTag>
+            <span>jd-tongrentang-price-watch</span>
+          </NSpace>
+        </template>
+        <template #header-extra>
+          <NTag size="small" :type="priceWatchSkillStatus.type" round :bordered="false">
+            {{ priceWatchSkillStatus.label }}
+          </NTag>
+        </template>
+
+        <NText depth="3" class="skill-hero-note">
+          自建 Skill 按“小应用”呈现：标准流程、手动补跑、关联 Cron 和文件位置集中在这里。
+        </NText>
+        <div class="skill-metric-grid">
+          <div class="skill-mini">
+            <div class="skill-mini-label">今日入库</div>
+            <div class="skill-mini-value">
+              {{ priceFailedJobs.length ? '需处理' : '闭环正常' }}
+            </div>
+          </div>
+          <div class="skill-mini">
+            <div class="skill-mini-label">关联任务</div>
+            <div class="skill-mini-value">{{ priceMonitorJobs.length }}</div>
+          </div>
+          <div class="skill-mini">
+            <div class="skill-mini-label">最近失败</div>
+            <div class="skill-mini-value">{{ priceFailedJobs.length ? `${priceFailedJobs.length} 个` : '无' }}</div>
+          </div>
+          <div class="skill-mini">
+            <div class="skill-mini-label">路径</div>
+            <div class="skill-mini-value">{{ priceWatchSkill?.dirPath ? '可复制' : '未同步' }}</div>
+          </div>
+        </div>
+      </NCard>
+
+      <NCard class="skill-actions-card">
+        <template #header>快捷动作</template>
+        <NSpace vertical :size="10">
+          <NButton block secondary @click="runPriceJob(priceBackfillJob)">
+            <template #icon><NIcon :component="PlayOutline" /></template>
+            补跑 17:00
+          </NButton>
+          <NButton block secondary @click="goPriceWorkflow">打开任务闭环</NButton>
+          <NButton block secondary :disabled="!priceWatchSkill?.dirPath" @click="copyPriceSkillPath">
+            <template #icon><NIcon :component="CopyOutline" /></template>
+            复制 Skill 路径
+          </NButton>
+          <NButton block secondary :disabled="!priceWatchSkill" @click="selectPriceWatchSkill">
+            查看 Skill 定义
+          </NButton>
+        </NSpace>
+      </NCard>
+    </div>
+
+    <NCard class="skill-lifecycle-card">
+      <template #header>Skill 生命周期</template>
+      <div class="skill-process-list">
+        <div
+          v-for="(stage, index) in priceLifecycleStages.slice(0, 4)"
+          :key="stage.key"
+          class="skill-process-row"
+        >
+          <div class="skill-step-index">{{ index + 1 }}</div>
+          <div class="skill-process-main">
+            <NText strong>{{ stage.label }}</NText>
+            <NText depth="3" class="skill-process-detail">
+              <template v-if="stage.job">
+                上次 {{ stage.job.state?.lastRunAtMs ? formatRelativeTime(stage.job.state.lastRunAtMs) : '-' }}
+                · 下次 {{ stage.job.nextRun ? formatDate(stage.job.nextRun) : '-' }}
+              </template>
+              <template v-else>未发现关联 Cron 任务</template>
+            </NText>
+            <NText v-if="stage.job?.state?.lastError" type="error" class="skill-process-detail">
+              {{ stage.job.state.lastError }}
+            </NText>
+          </div>
+          <NTag
+            size="small"
+            :type="stage.job ? priceJobStatus(stage.job).type : 'warning'"
+            round
+            :bordered="false"
+          >
+            {{ stage.job ? priceJobStatus(stage.job).label : '未配置' }}
+          </NTag>
+        </div>
+      </div>
+    </NCard>
+
     <!-- Zone 1: Metrics + Filters -->
     <NCard>
       <template #header>
@@ -484,105 +570,6 @@ function rowProps(row: SkillMeta) {
           @click="selectSkill(skill.name)"
         >
           {{ skill.name }}
-        </NButton>
-      </NSpace>
-    </NCard>
-
-    <NCard>
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NTag type="info" round>自建价格监控 Skill</NTag>
-          <span>jd-tongrentang-price-watch</span>
-        </NSpace>
-      </template>
-      <template #header-extra>
-        <NTag size="small" :type="priceWatchSkillStatus.type" round :bordered="false">
-          {{ priceWatchSkillStatus.label }}
-        </NTag>
-      </template>
-
-      <NGrid cols="1 m:4" responsive="screen" :x-gap="10" :y-gap="10">
-        <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">定位</NText>
-            <div style="font-size: 14px; font-weight: 600; margin-top: 6px;">流程知识沉淀</div>
-            <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
-              说明验证门控、采集脚本、补录、巡检、告警和备份如何协作。
-            </NText>
-          </NCard>
-        </NGridItem>
-        <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">路径</NText>
-            <NText code style="display: block; margin-top: 6px; font-size: 12px; overflow-wrap: anywhere;">
-              {{ priceWatchSkill?.dirPath || '未从 Hermes Agent 同步到该 skill' }}
-            </NText>
-          </NCard>
-        </NGridItem>
-        <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">任务状态</NText>
-            <div style="font-size: 14px; font-weight: 600; margin-top: 6px;">
-              {{ priceMonitorJobs.length }} 个任务
-            </div>
-            <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
-              {{ priceFailedJobs.length ? `${priceFailedJobs.length} 个失败` : priceRunningJobs.length ? `${priceRunningJobs.length} 个运行中` : '闭环任务正常' }}
-            </NText>
-          </NCard>
-        </NGridItem>
-        <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">下次运行</NText>
-            <div style="font-size: 14px; font-weight: 600; margin-top: 6px;">{{ priceNextRun }}</div>
-            <NText depth="3" style="display: block; margin-top: 4px; font-size: 12px;">
-              任务计划负责执行，Skill 负责沉淀标准流程。
-            </NText>
-          </NCard>
-        </NGridItem>
-      </NGrid>
-
-      <div class="price-skill-lifecycle">
-        <div v-for="stage in priceLifecycleStages" :key="stage.key" class="price-skill-stage">
-          <div class="price-skill-stage-head">
-            <NText strong>{{ stage.label }}</NText>
-            <NTag
-              size="small"
-              :type="stage.job ? priceJobStatus(stage.job).type : 'warning'"
-              round
-              :bordered="false"
-            >
-              {{ stage.job ? priceJobStatus(stage.job).label : '未配置' }}
-            </NTag>
-          </div>
-          <NText depth="3" class="price-skill-stage-detail">
-            <template v-if="stage.job">
-              上次 {{ stage.job.state?.lastRunAtMs ? formatRelativeTime(stage.job.state.lastRunAtMs) : '-' }}
-              · 下次 {{ stage.job.nextRun ? formatDate(stage.job.nextRun) : '-' }}
-            </template>
-            <template v-else>
-              未发现关联 Cron 任务
-            </template>
-          </NText>
-          <NText v-if="stage.job?.state?.lastError" type="error" class="price-skill-stage-detail">
-            {{ stage.job.state.lastError }}
-          </NText>
-          <NButton v-if="stage.job" size="tiny" secondary @click="runPriceJob(stage.job)">
-            <template #icon><NIcon :component="PlayOutline" /></template>
-            补跑
-          </NButton>
-        </div>
-      </div>
-
-      <NSpace :size="8" style="margin-top: 12px;">
-        <NButton size="small" type="primary" secondary :disabled="!priceWatchSkill" @click="selectPriceWatchSkill">
-          查看 Skill 定义
-        </NButton>
-        <NButton size="small" secondary :disabled="!priceWatchSkill?.dirPath" @click="copyPriceSkillPath">
-          <template #icon><NIcon :component="CopyOutline" /></template>
-          复制 Skill 路径
-        </NButton>
-        <NButton size="small" secondary @click="goPriceWorkflow">
-          查看任务闭环
         </NButton>
       </NSpace>
     </NCard>
@@ -841,43 +828,106 @@ const SkillDetail = defineComponent({
   background-color: var(--n-color-hover) !important;
 }
 
-.price-skill-lifecycle {
-  margin-top: 12px;
+.skill-hero {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.7fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.skill-hero-card,
+.skill-actions-card,
+.skill-lifecycle-card {
+  border-radius: 14px;
+}
+
+.skill-hero-note {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.skill-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
-.price-skill-stage {
+.skill-mini {
+  min-height: 72px;
+  padding: 12px;
+  border-radius: 12px;
   border: 1px solid var(--n-border-color);
-  border-radius: 10px;
-  padding: 10px 12px;
+  background: var(--n-color-embedded);
   min-width: 0;
 }
 
-.price-skill-stage-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.skill-mini-label {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
-.price-skill-stage-detail {
+.skill-mini-value {
+  margin-top: 8px;
+  font-size: 18px;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-process-list {
+  display: grid;
+  gap: 10px;
+}
+
+.skill-process-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--n-border-color);
+  border-radius: 12px;
+  background: var(--n-color-embedded);
+}
+
+.skill-step-index {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #63e2b7;
+  background: rgba(99, 226, 183, 0.14);
+  font-weight: 800;
+}
+
+.skill-process-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.skill-process-detail {
   display: block;
-  margin: 8px 0;
+  margin-top: 4px;
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
 @media (max-width: 1100px) {
-  .price-skill-lifecycle {
+  .skill-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .skill-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
-  .price-skill-lifecycle {
+  .skill-metric-grid {
     grid-template-columns: 1fr;
   }
 }

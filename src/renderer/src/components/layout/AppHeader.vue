@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NBreadcrumb, NBreadcrumbItem, NButton, NSpace, NTooltip, NIcon } from 'naive-ui'
+import { NBreadcrumb, NBreadcrumbItem, NBadge, NButton, NIcon, NSpace, NTag, NTooltip } from 'naive-ui'
 import {
   SunnyOutline,
   MoonOutline,
   LogOutOutline,
   LanguageOutline,
   ExpandOutline,
-  ContractOutline
+  ContractOutline,
+  NotificationsOutline
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/composables/useTheme'
 import { useConnectionStore } from '@/stores/connection'
 import { useLocaleStore } from '@/stores/locale'
 import { useModelStore } from '@/stores/model'
+import { useOpsStore } from '@/stores/ops'
 import { useWideModeStore } from '@/stores/wideMode'
 import ConnectionStatus from '@/components/common/ConnectionStatus.vue'
 import ModelStateBadge from './ModelStateBadge.vue'
@@ -26,6 +28,7 @@ const { isDark, toggle } = useTheme()
 const connectionStore = useConnectionStore()
 const modelStore = useModelStore()
 const localeStore = useLocaleStore()
+const opsStore = useOpsStore()
 const wideModeStore = useWideModeStore()
 const { t } = useI18n()
 
@@ -69,9 +72,15 @@ const languageToggleTarget = computed(() =>
   localeStore.locale === 'zh-CN' ? t('common.languageEn') : t('common.languageZh')
 )
 
+const fallbackModelLabel = computed(() => modelStore.state.fallbackChain[0] || '')
+
 async function handleLogout() {
   await connectionStore.disconnect()
   router.push({ name: 'Connection' })
+}
+
+function goNotifications() {
+  router.push({ name: 'Settings' })
 }
 </script>
 
@@ -92,7 +101,33 @@ async function handleLogout() {
 
     <NSpace :size="8" align="center" class="app-header-actions">
       <ModelStateBadge v-if="showModelBadge" />
+      <NTag
+        v-if="fallbackModelLabel"
+        size="small"
+        round
+        :bordered="false"
+        class="app-header-fallback"
+      >
+        备用 {{ fallbackModelLabel }}
+      </NTag>
       <ConnectionStatus />
+
+      <NTooltip>
+        <template #trigger>
+          <NBadge
+            :value="opsStore.activeNotices.length"
+            :max="99"
+            :show="opsStore.activeNotices.length > 0"
+          >
+            <NButton quaternary circle @click="goNotifications">
+              <template #icon>
+                <NIcon :component="NotificationsOutline" />
+              </template>
+            </NButton>
+          </NBadge>
+        </template>
+        通知中心
+      </NTooltip>
 
       <NTooltip>
         <template #trigger>
@@ -176,6 +211,12 @@ async function handleLogout() {
 
 .app-header-actions {
   flex-shrink: 0;
+}
+
+.app-header-fallback.n-tag {
+  background: rgba(96, 165, 250, 0.14);
+  color: #93c5fd;
+  font-weight: 650;
 }
 
 @media (max-width: 760px) {
