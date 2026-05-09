@@ -5,7 +5,7 @@ export default {
   routes: {
     connection: '连接服务器',
     login: '登录',
-    dashboard: '仪表盘',
+    dashboard: '控制塔',
     chat: '在线对话',
     sessions: '会话管理',
     sessionDetail: '会话详情',

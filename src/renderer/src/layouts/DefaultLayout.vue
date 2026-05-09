@@ -18,7 +18,10 @@ let cleanupNavigate: (() => void) | undefined
 onMounted(() => {
   // Skip WebSocket reconnect in Hermes REST mode (no WS needed)
   const isHermesRest = connectionStore.serverType === 'hermes-rest'
-  if (!isHermesRest && (wsStore.state === ConnectionState.DISCONNECTED || wsStore.state === ConnectionState.FAILED)) {
+  if (
+    !isHermesRest &&
+    (wsStore.state === ConnectionState.DISCONNECTED || wsStore.state === ConnectionState.FAILED)
+  ) {
     wsStore.connect().catch((err) => {
       console.warn('[DefaultLayout] Background reconnect failed:', err)
     })
@@ -48,7 +51,7 @@ onUnmounted(() => {
       :collapsed="collapsed"
       show-trigger
       :native-scrollbar="false"
-      style="height: 100vh;"
+      style="height: 100vh"
       @collapse="collapsed = true"
       @expand="collapsed = false"
     >
@@ -63,7 +66,7 @@ onUnmounted(() => {
       <NLayoutContent
         class="app-layout-content"
         :native-scrollbar="false"
-        content-style="padding: 24px;"
+        content-style="padding: 22px 24px 34px;"
       >
         <div class="page-container">
           <RouterView v-slot="{ Component }">
@@ -82,22 +85,32 @@ onUnmounted(() => {
   inset: 0;
   height: 100vh;
   overflow: hidden;
+  background: var(--bg-secondary);
 }
 
 .app-layout-main {
   height: 100vh;
   overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.app-layout-sider {
+  background: #15161a;
+}
+
+.app-layout-sider :deep(.n-layout-sider-scroll-container) {
+  background: #15161a;
 }
 
 .app-layout-header {
-  height: var(--header-height);
+  height: 68px;
   padding: 0 24px;
   display: flex;
   align-items: center;
   position: sticky;
   top: 0;
   z-index: 12;
-  background: var(--bg-card);
+  background: rgba(25, 25, 29, 0.96);
   -webkit-app-region: drag;
 }
 
@@ -110,7 +123,8 @@ onUnmounted(() => {
 }
 
 .app-layout-content {
-  height: calc(100vh - var(--header-height));
+  height: calc(100vh - 68px);
+  background: var(--bg-secondary);
 }
 
 :deep(.app-layout-content .n-layout-scroll-container) {

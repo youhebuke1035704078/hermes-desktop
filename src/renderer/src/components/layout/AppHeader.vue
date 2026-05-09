@@ -2,7 +2,14 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NBreadcrumb, NBreadcrumbItem, NButton, NSpace, NTooltip, NIcon } from 'naive-ui'
-import { SunnyOutline, MoonOutline, LogOutOutline, LanguageOutline, ExpandOutline, ContractOutline } from '@vicons/ionicons5'
+import {
+  SunnyOutline,
+  MoonOutline,
+  LogOutOutline,
+  LanguageOutline,
+  ExpandOutline,
+  ContractOutline
+} from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/composables/useTheme'
 import { useConnectionStore } from '@/stores/connection'
@@ -26,7 +33,7 @@ const { t } = useI18n()
 // model name + reason stay visible. Hide only when no data has ever
 // been bootstrapped (kind === 'unknown').
 const showModelBadge = computed(() =>
-  shouldShowModelBadge(connectionStore.status, modelStore.state),
+  shouldShowModelBadge(connectionStore.status, modelStore.state)
 )
 
 const breadcrumbs = computed(() => {
@@ -34,12 +41,33 @@ const breadcrumbs = computed(() => {
   if (route.name !== 'Dashboard') {
     const titleKey = route.meta.titleKey as string | undefined
     const fallbackTitle = route.meta.title as string | undefined
-    items.push({ label: titleKey ? t(titleKey) : (fallbackTitle || '') })
+    items.push({ label: titleKey ? t(titleKey) : fallbackTitle || '' })
   }
   return items
 })
 
-const languageToggleTarget = computed(() => (localeStore.locale === 'zh-CN' ? t('common.languageEn') : t('common.languageZh')))
+const currentRouteLabel = computed(() => {
+  const titleKey = route.meta.titleKey as string | undefined
+  const fallbackTitle = route.meta.title as string | undefined
+  return titleKey ? t(titleKey) : fallbackTitle || ''
+})
+
+const pageTitle = computed(() => {
+  const name = route.name as string
+  if (name === 'Dashboard')
+    return localeStore.locale === 'zh-CN' ? '今日控制塔' : 'Today Control Tower'
+  if (name === 'Chat')
+    return localeStore.locale === 'zh-CN' ? '在线对话（工作台）' : 'Live Chat Workspace'
+  if (name === 'Cron')
+    return localeStore.locale === 'zh-CN' ? '任务计划按业务流分组' : 'Task Workbench'
+  if (name === 'Skills') return localeStore.locale === 'zh-CN' ? '技能管理' : 'Skills'
+  if (name === 'Settings') return localeStore.locale === 'zh-CN' ? '系统设置' : 'Settings'
+  return currentRouteLabel.value
+})
+
+const languageToggleTarget = computed(() =>
+  localeStore.locale === 'zh-CN' ? t('common.languageEn') : t('common.languageZh')
+)
 
 async function handleLogout() {
   await connectionStore.disconnect()
@@ -48,18 +76,21 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-    <NBreadcrumb>
-      <NBreadcrumbItem
-        v-for="(item, index) in breadcrumbs"
-        :key="index"
-        @click="item.name ? router.push({ name: item.name }) : undefined"
-      >
-        {{ item.label }}
-      </NBreadcrumbItem>
-    </NBreadcrumb>
+  <div class="app-header-shell">
+    <div class="app-header-title-block">
+      <NBreadcrumb class="app-header-crumb">
+        <NBreadcrumbItem
+          v-for="(item, index) in breadcrumbs"
+          :key="index"
+          @click="item.name ? router.push({ name: item.name }) : undefined"
+        >
+          {{ item.label }}
+        </NBreadcrumbItem>
+      </NBreadcrumb>
+      <div class="app-header-title">{{ pageTitle }}</div>
+    </div>
 
-    <NSpace :size="8" align="center">
+    <NSpace :size="8" align="center" class="app-header-actions">
       <ModelStateBadge v-if="showModelBadge" />
       <ConnectionStatus />
 
@@ -82,7 +113,9 @@ async function handleLogout() {
             </template>
           </NButton>
         </template>
-        {{ wideModeStore.isWideMode ? t('common.switchToNormalWidth') : t('common.switchToWideMode') }}
+        {{
+          wideModeStore.isWideMode ? t('common.switchToNormalWidth') : t('common.switchToWideMode')
+        }}
       </NTooltip>
 
       <NTooltip>
@@ -109,3 +142,50 @@ async function handleLogout() {
     </NSpace>
   </div>
 </template>
+
+<style scoped>
+.app-header-shell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  gap: 16px;
+}
+
+.app-header-title-block {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.app-header-crumb {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.app-header-title {
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 780;
+  line-height: 1.12;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header-actions {
+  flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+  .app-header-shell {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .app-header-actions {
+    flex-wrap: wrap;
+  }
+}
+</style>

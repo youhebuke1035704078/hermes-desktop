@@ -10,7 +10,7 @@ import {
   ChatboxEllipsesOutline,
   CogOutline,
   CalendarOutline,
-  ExtensionPuzzleOutline,
+  ExtensionPuzzleOutline
 } from '@vicons/ionicons5'
 import { routes } from '@/router/routes'
 import { useConnectionStore } from '@/stores/connection'
@@ -35,7 +35,7 @@ const iconMap: Record<string, any> = {
   ChatboxEllipsesOutline,
   CogOutline,
   CalendarOutline,
-  ExtensionPuzzleOutline,
+  ExtensionPuzzleOutline
 }
 
 interface MenuItem {
@@ -48,6 +48,7 @@ const baseMenuItems = computed<MenuItem[]>(() => {
   const mainRoute = routes.find((r) => r.path === '/')
   if (!mainRoute?.children) return []
   return mainRoute.children
+    .filter((child) => child.name && child.meta?.titleKey && child.meta?.icon)
     .filter((child) => !child.meta?.hidden)
     .filter((child) => {
       const name = child.name as string
@@ -58,7 +59,7 @@ const baseMenuItems = computed<MenuItem[]>(() => {
     .map((child) => ({
       key: child.name as string,
       titleKey: child.meta?.titleKey as string,
-      iconName: child.meta?.icon as string,
+      iconName: child.meta?.icon as string
     }))
     .sort((a, b) => {
       const ai = PRIMARY_MENU_ORDER.indexOf(a.key)
@@ -107,7 +108,7 @@ const activeParentMap: Record<string, string> = {
   Insights: 'Dashboard',
   Channels: 'Settings',
   Logs: 'Settings',
-  Backup: 'Settings',
+  Backup: 'Settings'
 }
 
 const activeKey = computed(() => {
@@ -158,20 +159,13 @@ function resetDrag() {
 </script>
 
 <template>
-  <div style="display: flex; flex-direction: column; height: 100%;">
+  <div style="display: flex; flex-direction: column; height: 100%">
     <div class="sidebar-logo" :class="{ 'sidebar-logo--collapsed': collapsed }">
-      <img
-        v-if="!collapsed"
-        src="@/assets/logo.png"
-        alt="Hermes"
-        style="width: 160px; height: auto;"
-      />
-      <img
-        v-else
-        src="@/assets/logo.png"
-        alt="Hermes"
-        style="width: 36px; height: auto; border-radius: 4px;"
-      />
+      <div class="sidebar-brand-mark">H</div>
+      <div v-if="!collapsed" class="sidebar-brand-text">
+        <div class="sidebar-brand-title">Hermes Desktop</div>
+        <div class="sidebar-brand-subtitle">控制塔</div>
+      </div>
     </div>
 
     <nav class="sidebar-menu">
@@ -189,7 +183,7 @@ function resetDrag() {
               'sidebar-item--active': activeKey === item.key,
               'sidebar-item--collapsed': collapsed,
               'sidebar-item--drag-over': overIdx === index && dragIdx !== index,
-              'sidebar-item--dragging': dragIdx === index,
+              'sidebar-item--dragging': dragIdx === index
             }"
             draggable="true"
             @dragstart="onDragStart(index, $event)"
@@ -199,7 +193,8 @@ function resetDrag() {
             @dragend="resetDrag"
             @click="handleSelect(item.key)"
           >
-            <NIcon :component="iconMap[item.iconName]" :size="20" />
+            <span v-if="!collapsed" class="sidebar-dot" />
+            <NIcon v-else :component="iconMap[item.iconName]" :size="20" />
             <span v-if="!collapsed" class="sidebar-label">{{ t(item.titleKey) }}</span>
             <span
               v-if="item.key === 'Alerts' && activeAlertCount > 0"
@@ -213,6 +208,14 @@ function resetDrag() {
         {{ t(item.titleKey) }}
       </NTooltip>
     </nav>
+
+    <div v-if="!collapsed" class="sidebar-foot">
+      <div class="sidebar-foot-label">今日重点</div>
+      <div class="sidebar-foot-title">价格监控完整</div>
+      <div class="sidebar-foot-detail">
+        {{ activeAlertCount ? `${activeAlertCount} 项需关注` : '查看控制塔确认最新状态' }}
+      </div>
+    </div>
   </div>
 </template>
 
@@ -233,46 +236,70 @@ function resetDrag() {
   padding-right: 16px;
 }
 
+.sidebar-brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #60d7ac, #78b7ff);
+  color: #111318;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  letter-spacing: 0;
+  flex: 0 0 auto;
+}
+
+.sidebar-brand-text {
+  min-width: 0;
+}
+
+.sidebar-brand-title {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 760;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.sidebar-brand-subtitle {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
 .sidebar-menu {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 0;
+  padding: 4px 14px;
 }
 
 .sidebar-item {
   display: flex;
   align-items: center;
-  padding: 0 24px;
+  padding: 0 12px;
   height: 42px;
-  gap: 12px;
+  gap: 10px;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.82);
-  transition: background-color 0.2s, color 0.2s, opacity 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    opacity 0.2s;
   user-select: none;
   font-size: 14px;
   position: relative;
   border-top: 2px solid transparent;
+  border-radius: 8px;
 }
 
 .sidebar-item:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .sidebar-item--active {
   color: #63e2b7;
-  background: rgba(99, 226, 183, 0.1);
-}
-
-.sidebar-item--active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 4px;
-  bottom: 4px;
-  width: 3px;
-  background: #63e2b7;
-  border-radius: 0 3px 3px 0;
+  background: rgba(99, 226, 183, 0.12);
 }
 
 .sidebar-item--collapsed {
@@ -293,6 +320,15 @@ function resetDrag() {
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+  font-weight: 650;
+}
+
+.sidebar-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: currentColor;
+  flex: 0 0 auto;
 }
 
 .sidebar-badge {
@@ -315,5 +351,31 @@ function resetDrag() {
   padding: 0 4px;
   line-height: 16px;
   min-width: 16px;
+}
+
+.sidebar-foot {
+  margin: 14px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sidebar-foot-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.sidebar-foot-title {
+  color: var(--text-primary);
+  margin-top: 8px;
+  font-weight: 720;
+}
+
+.sidebar-foot-detail {
+  color: var(--text-secondary);
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
 }
 </style>

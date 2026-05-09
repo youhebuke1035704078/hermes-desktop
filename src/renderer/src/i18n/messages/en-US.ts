@@ -5,7 +5,7 @@ export default {
   routes: {
     connection: 'Connect to Server',
     login: 'Login',
-    dashboard: 'Dashboard',
+    dashboard: 'Control Tower',
     chat: 'Live Chat',
     sessions: 'Sessions',
     sessionDetail: 'Session Detail',
