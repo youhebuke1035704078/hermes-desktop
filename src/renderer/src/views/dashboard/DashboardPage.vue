@@ -24,7 +24,7 @@ import { useConnectionStore } from '@/stores/connection'
 import { useWebSocketStore } from '@/stores/websocket'
 import { hermesRestGet } from '@/api/hermes-rest-client'
 import { formatRelativeTime } from '@/utils/format'
-import type { CronJob, SessionsUsageResult } from '@/api/types'
+import type { SessionsUsageResult } from '@/api/types'
 
 type RangePreset = 'all' | 'today' | 'yesterday' | '7d' | '15d' | '30d'
 type HealthType = 'success' | 'warning' | 'error' | 'info' | 'default'
@@ -94,9 +94,10 @@ const currentModelLabel = computed(
 )
 
 const priceJobs = computed(() =>
-  cronStore.jobs.filter((job) =>
-    /jd-tongrentang-price-watch|tongrentang|cron-health/i.test(job.name)
-  )
+  cronStore.jobs.filter((job) => {
+    const text = `${job.id} ${job.name} ${job.description || ''} ${job.command || ''}`.toLowerCase()
+    return /jd-tongrentang-price-watch|tongrentang|price-watch|价格监控|同仁堂/.test(text)
+  })
 )
 
 function connectionStatusText(): string {
@@ -133,69 +134,45 @@ const priceIssueCount = computed(
     ).length
 )
 
-function findPriceStageJob(key: string) {
-  const jobs = priceJobs.value
-  if (key === 'gate')
-    return jobs.find((job) => /verification-gate|验证门控|gate|07:20|07：20/i.test(job.name))
-  if (key === 'daily') {
-    return jobs.find(
-      (job) =>
-        /jd-tongrentang-price-watch/i.test(job.name) &&
-        !/verification-gate|gate|backfill|watchdog|evening|alarm|backup|health/i.test(job.name)
-    )
-  }
-  if (key === 'watchdog') return jobs.find((job) => /watchdog|11:00|11：00/i.test(job.name))
-  if (key === 'backfill') return jobs.find((job) => /backfill|补录|17:00|17：00/i.test(job.name))
-  if (key === 'alarm') return jobs.find((job) => /evening|alarm|告警|17:30|17：30/i.test(job.name))
-  if (key === 'health') return jobs.find((job) => /cron-health|health|健康/i.test(job.name))
-  if (key === 'backup') return jobs.find((job) => /backup|备份/i.test(job.name))
-  return undefined
-}
-
-function stageType(job?: CronJob): HealthType {
-  if (!job) return 'default'
-  if (!job.enabled) return 'default'
-  if (job.state?.lastStatus === 'error') return 'error'
-  if (job.state?.lastStatus === 'skipped') return 'warning'
-  if (job.state?.lastStatus === 'ok') return 'success'
-  return 'default'
-}
-
-function stageLabel(job?: CronJob): string {
-  if (!job) return '未配置'
-  if (!job.enabled) return '停用'
-  if (job.state?.lastStatus === 'error') return '失败'
-  if (job.state?.lastStatus === 'skipped') return '跳过'
-  if (job.state?.lastStatus === 'ok') return 'OK'
-  return '等待'
-}
-
-function stageDetail(job: ReturnType<typeof findPriceStageJob>, fallback: string): string {
-  if (!job) return fallback
-  if (job.state?.lastError) return job.state.lastError
-  return job.state?.lastRunAtMs ? `上次 ${formatRelativeTime(job.state.lastRunAtMs)}` : fallback
-}
-
-const priceTimelineStages = computed(() => {
-  const defs = [
-    { key: 'gate', time: '07:20', name: '验证门控', fallback: '京东快速验证检测。' },
-    { key: 'daily', time: '07:30', name: '价格获取', fallback: '主采集任务。' },
-    { key: 'watchdog', time: '11:00', name: '巡检', fallback: '上午缺口检查。' },
-    { key: 'backfill', time: '17:00', name: '补录', fallback: '失败数据补采。' },
-    { key: 'alarm', time: '17:30', name: '告警', fallback: '晚间通知。' },
-    { key: 'health', time: '23:00', name: '健康检查', fallback: 'Cron 状态巡检。' },
-    { key: 'backup', time: '03:00', name: '数据备份', fallback: 'SQLite 自动备份。' }
-  ]
-  return defs.map((def) => {
-    const job = findPriceStageJob(def.key)
-    return {
-      ...def,
-      type: stageType(job),
-      status: stageLabel(job),
-      detail: stageDetail(job, def.fallback)
-    }
-  })
+const priceSummaryType = computed<HealthType>(() => {
+  if (priceJobs.value.length === 0 || priceIssueCount.value > 0) return 'warning'
+  return 'success'
 })
+
+const priceSummaryLabel = computed(() => {
+  if (priceJobs.value.length === 0) return '未接入'
+  return priceIssueCount.value ? `${priceIssueCount.value} 项需关注` : '运行正常'
+})
+
+const priceSummaryRows = computed(() => [
+  {
+    label: '任务覆盖',
+    value: priceJobs.value.length ? `${priceJobs.value.length} 个任务已接入` : '未接入',
+    detail: priceJobs.value.length
+      ? '详细阶段和补录状态已收纳到任务计划。'
+      : '未发现同仁堂价格监控任务。'
+  },
+  {
+    label: '健康状态',
+    value:
+      priceJobs.value.length === 0
+        ? '待接入'
+        : priceIssueCount.value
+          ? `${priceIssueCount.value} 项需关注`
+          : '无阻断',
+    detail:
+      priceJobs.value.length === 0
+        ? '先在任务计划接入自建价格监控任务。'
+        : priceIssueCount.value
+          ? '去任务计划处理失败、跳过或停用任务。'
+          : '今日主流程没有阻断项。'
+  },
+  {
+    label: '标准流程',
+    value: '任务计划 + Skill',
+    detail: '执行入口在任务计划，操作沉淀在价格监控 Skill。'
+  }
+])
 
 const overallHealthType = computed<HealthType>(() => {
   if (connectionStore.status === 'error' || failedJobs.value.length > 0) return 'error'
@@ -203,6 +180,7 @@ const overallHealthType = computed<HealthType>(() => {
     connectionStore.status !== 'connected' ||
     usageError.value ||
     disabledJobs.value.length > 0 ||
+    priceJobs.value.length === 0 ||
     priceIssueCount.value > 0
   )
     return 'warning'
@@ -216,7 +194,7 @@ const overallHealthLabel = computed(() => {
 })
 
 const controlTowerTitle = computed(() => {
-  if (overallHealthType.value === 'success') return '系统可用\n价格监控完整'
+  if (overallHealthType.value === 'success') return '系统可用\n今日无阻断'
   if (overallHealthType.value === 'error') return '需要处理\n请先排障'
   return '系统可用\n有事项需关注'
 })
@@ -263,7 +241,7 @@ const healthItems = computed(() => [
         ? '未发现同仁堂价格监控任务'
         : priceIssueCount.value
           ? `${priceIssueCount.value} 个环节需关注`
-          : '闭环任务正常',
+          : '价格监控任务正常',
     type:
       priceJobs.value.length === 0
         ? ('warning' as HealthType)
@@ -282,6 +260,8 @@ const healthIssues = computed(() => {
   if (usageError.value) issues.push(`运营统计接口异常：${usageError.value}`)
   if (priceJobs.value.length === 0)
     issues.push('未发现 jd-tongrentang-price-watch 自建价格监控任务')
+  else if (priceIssueCount.value > 0)
+    issues.push(`价格监控有 ${priceIssueCount.value} 个任务需关注`)
   return issues
 })
 
@@ -328,13 +308,13 @@ const actionItems = computed(() => {
   if (priceJobs.value.length === 0 || priceIssueCount.value > 0) {
     actions.push({
       key: 'price',
-      title: '检查价格监控闭环',
+      title: '检查价格监控任务',
       detail:
         priceJobs.value.length === 0
           ? '未发现价格监控任务'
           : `${priceIssueCount.value} 个环节需关注`,
       type: 'warning',
-      actionText: '查看闭环',
+      actionText: '查看任务流',
       target: 'price'
     })
   }
@@ -385,7 +365,7 @@ const usageScopeRows = computed(() => [
   },
   {
     label: 'Token 口径',
-    value: 'input + output + cache read/write，与运营洞察一致'
+    value: 'input + output + cache read/write，控制塔统一口径'
   }
 ])
 
@@ -850,6 +830,9 @@ function goChat() {
 function goSettings() {
   router.push({ name: 'Settings' })
 }
+function goSkills() {
+  router.push({ name: 'Skills' })
+}
 function goPriceWorkflow() {
   router.push({ name: 'Cron', query: { focus: 'price-monitor' } })
 }
@@ -923,469 +906,479 @@ onMounted(() => {
         <template #header>
           <NSpace align="center" :size="8">
             <NText strong>业务闭环摘要</NText>
-            <NTag :type="priceIssueCount ? 'warning' : 'success'" round :bordered="false">
-              {{ priceIssueCount ? `${priceIssueCount} 项需关注` : '运行正常' }}
+            <NTag :type="priceSummaryType" round :bordered="false">
+              {{ priceSummaryLabel }}
             </NTag>
           </NSpace>
         </template>
         <template #header-extra>
-          <NButton size="small" secondary @click="goPriceWorkflow">打开任务闭环</NButton>
+          <NSpace :size="8">
+            <NButton size="small" secondary @click="goPriceWorkflow">查看任务</NButton>
+            <NButton size="small" secondary @click="goSkills">查看 Skill</NButton>
+          </NSpace>
         </template>
-        <div class="control-timeline">
-          <div v-for="stage in priceTimelineStages" :key="stage.key" class="control-stage">
-            <span class="control-stage-time">{{ stage.time }}</span>
-            <div class="control-stage-name">{{ stage.name }}</div>
-            <NText
-              depth="3"
-              class="control-stage-meta"
-              :type="stage.type === 'error' ? 'error' : undefined"
-            >
-              {{ stage.detail }}
-            </NText>
-            <NTag size="small" :type="stage.type" round :bordered="false">{{ stage.status }}</NTag>
+        <div class="control-summary-grid">
+          <div v-for="row in priceSummaryRows" :key="row.label" class="control-summary-tile">
+            <NText depth="3" class="control-summary-label">{{ row.label }}</NText>
+            <div class="control-summary-value">{{ row.value }}</div>
+            <NText depth="3" class="control-summary-detail">{{ row.detail }}</NText>
           </div>
         </div>
       </NCard>
 
       <template v-if="false">
-      <!-- Usage controls -->
-      <NCard class="dashboard-hero" :bordered="false">
-        <div class="dashboard-hero-top">
-          <div>
-            <div class="dashboard-hero-title">{{ t('pages.dashboard.hero.title') }}</div>
-            <div class="dashboard-hero-subtitle">
-              {{ t('pages.dashboard.hero.subtitle') }}
+        <!-- Usage controls -->
+        <NCard class="dashboard-hero" :bordered="false">
+          <div class="dashboard-hero-top">
+            <div>
+              <div class="dashboard-hero-title">{{ t('pages.dashboard.hero.title') }}</div>
+              <div class="dashboard-hero-subtitle">
+                {{ t('pages.dashboard.hero.subtitle') }}
+              </div>
             </div>
+            <NSpace :size="8" wrap>
+              <NTag :type="connectionType" round :bordered="false">{{ connectionLabel }}</NTag>
+              <NTag type="info" round :bordered="false">{{ coverageText }}</NTag>
+              <NTag round :bordered="false">{{ lastUpdatedText }}</NTag>
+            </NSpace>
           </div>
-          <NSpace :size="8" wrap>
-            <NTag :type="connectionType" round :bordered="false">{{ connectionLabel }}</NTag>
-            <NTag type="info" round :bordered="false">{{ coverageText }}</NTag>
-            <NTag round :bordered="false">{{ lastUpdatedText }}</NTag>
-          </NSpace>
-        </div>
 
-        <NSpace :size="8" wrap class="dashboard-filters-row">
-          <NButton
-            size="small"
-            :type="rangePreset === 'today' ? 'primary' : 'default'"
-            secondary
-            @click="setRangePreset('today')"
-            >{{ t('pages.dashboard.range.today') }}</NButton
-          >
-          <NButton
-            size="small"
-            :type="rangePreset === 'yesterday' ? 'primary' : 'default'"
-            secondary
-            @click="setRangePreset('yesterday')"
-            >{{ t('pages.dashboard.range.yesterday') }}</NButton
-          >
-          <NButton
-            size="small"
-            :type="rangePreset === '7d' ? 'primary' : 'default'"
-            secondary
-            @click="setRangePreset('7d')"
-            >{{ t('pages.dashboard.range.last7d') }}</NButton
-          >
-          <NButton
-            size="small"
-            :type="rangePreset === '15d' ? 'primary' : 'default'"
-            secondary
-            @click="setRangePreset('15d')"
-            >{{ t('pages.dashboard.range.last15d') }}</NButton
-          >
-          <NButton
-            size="small"
-            :type="rangePreset === '30d' ? 'primary' : 'default'"
-            secondary
-            @click="setRangePreset('30d')"
-            >{{ t('pages.dashboard.range.last30d') }}</NButton
-          >
-          <NButton
-            size="small"
-            :type="rangePreset === 'all' ? 'primary' : 'default'"
-            secondary
-            @click="setRangePreset('all')"
-            >{{ t('pages.dashboard.range.all') }}</NButton
-          >
-
-          <NButton
-            type="primary"
-            size="small"
-            :loading="usageLoading || cronStore.loading"
-            @click="handleRefresh"
-          >
-            <template #icon><NIcon :component="RefreshOutline" /></template>
-            {{ t('common.refresh') }}
-          </NButton>
-          <NButton secondary size="small" @click="goChat">
-            <template #icon><NIcon :component="ChatboxEllipsesOutline" /></template>
-            {{ t('routes.chat') }}
-          </NButton>
-          <NButton secondary size="small" @click="scrollToUsageSection">{{
-            t('routes.insights')
-          }}</NButton>
-          <NButton secondary size="small" @click="goCron">{{ t('routes.cron') }}</NButton>
-        </NSpace>
-
-        <NAlert v-if="usageError" type="warning" :bordered="false" style="margin-top: 10px">
-          {{ t('pages.dashboard.usage.error', { error: usageError }) }}
-        </NAlert>
-      </NCard>
-
-      <!-- Global health center -->
-      <NCard title="全局健康中心" class="dashboard-card">
-        <template #header-extra>
-          <NSpace align="center" :size="8">
-            <NTag v-if="healthCheckAt" round :bordered="false">
-              上次体检 {{ formatRelativeTime(healthCheckAt || 0) }}
-            </NTag>
-            <NTag :type="overallHealthType" round :bordered="false">{{ overallHealthLabel }}</NTag>
+          <NSpace :size="8" wrap class="dashboard-filters-row">
             <NButton
               size="small"
-              type="primary"
+              :type="rangePreset === 'today' ? 'primary' : 'default'"
               secondary
-              :loading="healthCheckRunning"
-              @click="runGlobalHealthCheck"
+              @click="setRangePreset('today')"
+              >{{ t('pages.dashboard.range.today') }}</NButton
+            >
+            <NButton
+              size="small"
+              :type="rangePreset === 'yesterday' ? 'primary' : 'default'"
+              secondary
+              @click="setRangePreset('yesterday')"
+              >{{ t('pages.dashboard.range.yesterday') }}</NButton
+            >
+            <NButton
+              size="small"
+              :type="rangePreset === '7d' ? 'primary' : 'default'"
+              secondary
+              @click="setRangePreset('7d')"
+              >{{ t('pages.dashboard.range.last7d') }}</NButton
+            >
+            <NButton
+              size="small"
+              :type="rangePreset === '15d' ? 'primary' : 'default'"
+              secondary
+              @click="setRangePreset('15d')"
+              >{{ t('pages.dashboard.range.last15d') }}</NButton
+            >
+            <NButton
+              size="small"
+              :type="rangePreset === '30d' ? 'primary' : 'default'"
+              secondary
+              @click="setRangePreset('30d')"
+              >{{ t('pages.dashboard.range.last30d') }}</NButton
+            >
+            <NButton
+              size="small"
+              :type="rangePreset === 'all' ? 'primary' : 'default'"
+              secondary
+              @click="setRangePreset('all')"
+              >{{ t('pages.dashboard.range.all') }}</NButton
+            >
+
+            <NButton
+              type="primary"
+              size="small"
+              :loading="usageLoading || cronStore.loading"
+              @click="handleRefresh"
             >
               <template #icon><NIcon :component="RefreshOutline" /></template>
-              一键体检
+              {{ t('common.refresh') }}
             </NButton>
+            <NButton secondary size="small" @click="goChat">
+              <template #icon><NIcon :component="ChatboxEllipsesOutline" /></template>
+              {{ t('routes.chat') }}
+            </NButton>
+            <NButton secondary size="small" @click="scrollToUsageSection">用量统计</NButton>
+            <NButton secondary size="small" @click="goCron">{{ t('routes.cron') }}</NButton>
           </NSpace>
-        </template>
 
-        <div class="health-grid">
-          <div v-for="item in healthItems" :key="item.key" class="health-card">
-            <div class="health-card-head">
-              <NText depth="3" class="health-title">{{ item.title }}</NText>
-              <NTag size="small" :type="item.type" round :bordered="false">{{ item.value }}</NTag>
-            </div>
-            <NText depth="3" class="health-detail">{{ item.detail }}</NText>
-            <NButton
-              v-if="item.key === 'price'"
-              size="tiny"
-              secondary
-              class="health-action"
-              @click="goPriceWorkflow"
-            >
-              查看任务闭环
-            </NButton>
-          </div>
-        </div>
+          <NAlert v-if="usageError" type="warning" :bordered="false" style="margin-top: 10px">
+            {{ t('pages.dashboard.usage.error', { error: usageError }) }}
+          </NAlert>
+        </NCard>
 
-        <NAlert
-          v-if="healthIssues.length"
-          type="warning"
-          :bordered="false"
-          style="margin-top: 12px"
-        >
-          <div class="health-issues">
-            <div v-for="issue in healthIssues" :key="issue">{{ issue }}</div>
-          </div>
-        </NAlert>
-        <NAlert
-          v-else-if="healthCheckSummary"
-          type="success"
-          :bordered="false"
-          style="margin-top: 12px"
-        >
-          {{ healthCheckSummary }}
-        </NAlert>
-      </NCard>
-
-      <!-- Action queue -->
-      <NGrid cols="1 l:2" responsive="screen" :x-gap="12" :y-gap="12">
-        <NGridItem>
-          <NCard title="待办处置队列" class="dashboard-card">
-            <div class="action-grid">
-              <div v-for="item in actionItems" :key="item.key" class="action-card">
-                <div class="action-card-main">
-                  <div>
-                    <NText strong>{{ item.title }}</NText>
-                    <NText depth="3" class="action-detail">{{ item.detail }}</NText>
-                  </div>
-                  <NTag size="small" :type="item.type" round :bordered="false">{{
-                    item.key === 'ready' ? '正常' : '待处理'
-                  }}</NTag>
-                </div>
-                <NButton
-                  size="tiny"
-                  secondary
-                  class="action-button"
-                  @click="handleActionItem(item.target)"
-                >
-                  {{ item.actionText }}
-                </NButton>
-              </div>
-            </div>
-          </NCard>
-        </NGridItem>
-        <NGridItem>
-          <NCard title="通知中心" class="dashboard-card">
-            <template #header-extra>
-              <NTag
-                size="small"
-                :type="opsStore.activeNotices.length ? 'warning' : 'success'"
-                round
-                :bordered="false"
-              >
-                {{ opsStore.activeNotices.length }} 条待处理
+        <!-- Global health center -->
+        <NCard title="全局健康中心" class="dashboard-card">
+          <template #header-extra>
+            <NSpace align="center" :size="8">
+              <NTag v-if="healthCheckAt" round :bordered="false">
+                上次体检 {{ formatRelativeTime(healthCheckAt || 0) }}
               </NTag>
-            </template>
-            <NSpace v-if="opsStore.recentNotices.length" vertical :size="8">
-              <div
-                v-for="notice in opsStore.recentNotices.slice(0, 5)"
-                :key="notice.id"
-                class="notice-row"
+              <NTag :type="overallHealthType" round :bordered="false">{{
+                overallHealthLabel
+              }}</NTag>
+              <NButton
+                size="small"
+                type="primary"
+                secondary
+                :loading="healthCheckRunning"
+                @click="runGlobalHealthCheck"
               >
-                <div class="notice-row-main">
-                  <NText strong>{{ notice.title }}</NText>
-                  <NTag size="tiny" :type="noticeTagType(notice.severity)" round :bordered="false">
-                    {{ notice.source }}
-                  </NTag>
-                </div>
-                <NText depth="3" class="notice-detail">{{ notice.detail }}</NText>
-                <NSpace justify="space-between" align="center">
-                  <NText depth="3" style="font-size: 12px">{{
-                    formatRelativeTime(notice.createdAt)
-                  }}</NText>
+                <template #icon><NIcon :component="RefreshOutline" /></template>
+                一键体检
+              </NButton>
+            </NSpace>
+          </template>
+
+          <div class="health-grid">
+            <div v-for="item in healthItems" :key="item.key" class="health-card">
+              <div class="health-card-head">
+                <NText depth="3" class="health-title">{{ item.title }}</NText>
+                <NTag size="small" :type="item.type" round :bordered="false">{{ item.value }}</NTag>
+              </div>
+              <NText depth="3" class="health-detail">{{ item.detail }}</NText>
+              <NButton
+                v-if="item.key === 'price'"
+                size="tiny"
+                secondary
+                class="health-action"
+                @click="goPriceWorkflow"
+              >
+                查看任务流
+              </NButton>
+            </div>
+          </div>
+
+          <NAlert
+            v-if="healthIssues.length"
+            type="warning"
+            :bordered="false"
+            style="margin-top: 12px"
+          >
+            <div class="health-issues">
+              <div v-for="issue in healthIssues" :key="issue">{{ issue }}</div>
+            </div>
+          </NAlert>
+          <NAlert
+            v-else-if="healthCheckSummary"
+            type="success"
+            :bordered="false"
+            style="margin-top: 12px"
+          >
+            {{ healthCheckSummary }}
+          </NAlert>
+        </NCard>
+
+        <!-- Action queue -->
+        <NGrid cols="1 l:2" responsive="screen" :x-gap="12" :y-gap="12">
+          <NGridItem>
+            <NCard title="待办处置队列" class="dashboard-card">
+              <div class="action-grid">
+                <div v-for="item in actionItems" :key="item.key" class="action-card">
+                  <div class="action-card-main">
+                    <div>
+                      <NText strong>{{ item.title }}</NText>
+                      <NText depth="3" class="action-detail">{{ item.detail }}</NText>
+                    </div>
+                    <NTag size="small" :type="item.type" round :bordered="false">{{
+                      item.key === 'ready' ? '正常' : '待处理'
+                    }}</NTag>
+                  </div>
                   <NButton
-                    v-if="!notice.resolvedAt"
                     size="tiny"
                     secondary
-                    @click="opsStore.resolveNotice(notice.id)"
+                    class="action-button"
+                    @click="handleActionItem(item.target)"
                   >
-                    标记已处理
+                    {{ item.actionText }}
                   </NButton>
-                  <NTag v-else size="tiny" round :bordered="false">已处理</NTag>
-                </NSpace>
+                </div>
               </div>
-            </NSpace>
-            <NText v-else depth="3">暂无通知。体检、Cron 告警和模型错误会沉淀在这里。</NText>
-          </NCard>
-        </NGridItem>
-      </NGrid>
-
-      <!-- Stat row (4 cards) -->
-      <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="12" :y-gap="12">
-        <NGridItem>
-          <div class="stat-card">
-            <NText depth="3" class="stat-label">{{
-              t('pages.dashboard.metrics.conversations')
-            }}</NText>
-            <div class="stat-value">{{ totalConversations }}</div>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="stat-card">
-            <NText depth="3" class="stat-label">{{ t('pages.dashboard.metrics.cronJobs') }}</NText>
-            <div class="stat-value">
-              {{ totalJobs }}
-              <NText type="success" class="stat-value-sub">
-                {{ enabledJobs }} {{ t('pages.dashboard.metrics.enabled') }}</NText
-              >
-            </div>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="stat-card">
-            <NText depth="3" class="stat-label">{{ t('pages.dashboard.stats.modelsSeen') }}</NText>
-            <div class="stat-value">{{ modelsSeen }}</div>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="stat-card">
-            <NText depth="3" class="stat-label">{{ t('pages.dashboard.stats.totalTokens') }}</NText>
-            <div class="stat-value">{{ formatTokens(totalTokens) }}</div>
-          </div>
-        </NGridItem>
-      </NGrid>
-
-      <div ref="usageSectionRef" class="dashboard-section-anchor">
-        <!-- KPI grid -->
-        <NCard :title="t('pages.dashboard.cards.kpis')" class="dashboard-card">
-          <div class="kpi-grid">
-            <div v-for="kpi in kpiCells" :key="kpi.key" class="kpi-card">
-              <NText depth="3" class="kpi-label">{{ kpi.label }}</NText>
-              <div class="kpi-value">{{ kpi.value }}</div>
-              <NText depth="3" class="kpi-hint">{{ kpi.hint }}</NText>
-            </div>
-          </div>
-        </NCard>
-      </div>
-
-      <!-- Trend (2/3) + Structure (1/3) -->
-      <NGrid cols="1 l:3" responsive="screen" :x-gap="12" :y-gap="12">
-        <NGridItem v-if="showDailyTrend" :span="2" class="usage-trend-item">
-          <NCard :title="t('pages.dashboard.cards.trend')" class="dashboard-card usage-trend-card">
-            <template #header-extra>
-              <NSpace :size="8" align="center">
-                <NTag size="small" :bordered="false" round>
-                  {{ formatTokens(totalTokens) }}
+            </NCard>
+          </NGridItem>
+          <NGridItem>
+            <NCard title="通知中心" class="dashboard-card">
+              <template #header-extra>
+                <NTag
+                  size="small"
+                  :type="opsStore.activeNotices.length ? 'warning' : 'success'"
+                  round
+                  :bordered="false"
+                >
+                  {{ opsStore.activeNotices.length }} 条待处理
                 </NTag>
-              </NSpace>
-            </template>
-
-            <div class="trend-chart-panel">
-              <template v-if="trendGeometry.points.length">
-                <div class="trend-chart-canvas">
-                  <svg
-                    ref="trendSvgRef"
-                    class="trend-chart-svg"
-                    :viewBox="`0 0 ${trendGeometry.width} ${trendGeometry.height}`"
-                    preserveAspectRatio="none"
-                    @mousemove="handleTrendMouseMove"
-                    @mouseleave="clearTrendHover"
-                  >
-                    <g v-for="guide in trendGeometry.guides" :key="`guide-${guide.ratio}`">
-                      <line
-                        :x1="trendGeometry.left"
-                        :y1="guide.y"
-                        :x2="trendGeometry.left + trendGeometry.usableWidth"
-                        :y2="guide.y"
-                        class="trend-grid-line"
-                      />
-                      <text x="4" :y="guide.y + 4" class="trend-grid-label">
-                        {{ formatTokens(guide.value) }}
-                      </text>
-                    </g>
-
-                    <path
-                      v-if="trendGeometry.areaPath"
-                      class="trend-area"
-                      :d="trendGeometry.areaPath"
-                    />
-                    <polyline
-                      v-if="trendGeometry.polyline"
-                      class="trend-line"
-                      :points="trendGeometry.polyline"
-                    />
-                    <line
-                      v-if="hoveredTrendPoint"
-                      class="trend-hover-line"
-                      :x1="hoveredTrendPoint?.x || 0"
-                      :y1="trendGeometry.top"
-                      :x2="hoveredTrendPoint?.x || 0"
-                      :y2="trendGeometry.top + trendGeometry.usableHeight"
-                    />
-                    <circle
-                      v-for="point in trendGeometry.points"
-                      :key="`point-${point.date}`"
-                      class="trend-point"
-                      :class="{ 'trend-point-active': hoveredTrendPoint?.date === point.date }"
-                      :cx="point.x"
-                      :cy="point.y"
-                      :r="hoveredTrendPoint?.date === point.date ? 6 : 3.5"
-                    />
-                  </svg>
-
-                  <div
-                    v-if="hoveredTrendPoint && trendTooltipStyle"
-                    class="trend-tooltip"
-                    :style="trendTooltipStyle"
-                  >
-                    {{ hoveredTrendText }}
-                  </div>
-                </div>
-
-                <div class="trend-axis-note">
-                  <span>{{ trendAxisLabels.start }}</span>
-                  <span>{{ trendAxisLabels.mid }}</span>
-                  <span>{{ trendAxisLabels.end }}</span>
-                </div>
               </template>
-              <div v-else class="daily-empty">{{ t('pages.dashboard.trend.empty') }}</div>
+              <NSpace v-if="opsStore.recentNotices.length" vertical :size="8">
+                <div
+                  v-for="notice in opsStore.recentNotices.slice(0, 5)"
+                  :key="notice.id"
+                  class="notice-row"
+                >
+                  <div class="notice-row-main">
+                    <NText strong>{{ notice.title }}</NText>
+                    <NTag
+                      size="tiny"
+                      :type="noticeTagType(notice.severity)"
+                      round
+                      :bordered="false"
+                    >
+                      {{ notice.source }}
+                    </NTag>
+                  </div>
+                  <NText depth="3" class="notice-detail">{{ notice.detail }}</NText>
+                  <NSpace justify="space-between" align="center">
+                    <NText depth="3" style="font-size: 12px">{{
+                      formatRelativeTime(notice.createdAt)
+                    }}</NText>
+                    <NButton
+                      v-if="!notice.resolvedAt"
+                      size="tiny"
+                      secondary
+                      @click="opsStore.resolveNotice(notice.id)"
+                    >
+                      标记已处理
+                    </NButton>
+                    <NTag v-else size="tiny" round :bordered="false">已处理</NTag>
+                  </NSpace>
+                </div>
+              </NSpace>
+              <NText v-else depth="3">暂无通知。体检、Cron 告警和模型错误会沉淀在这里。</NText>
+            </NCard>
+          </NGridItem>
+        </NGrid>
+
+        <!-- Stat row (4 cards) -->
+        <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="12" :y-gap="12">
+          <NGridItem>
+            <div class="stat-card">
+              <NText depth="3" class="stat-label">{{
+                t('pages.dashboard.metrics.conversations')
+              }}</NText>
+              <div class="stat-value">{{ totalConversations }}</div>
+            </div>
+          </NGridItem>
+          <NGridItem>
+            <div class="stat-card">
+              <NText depth="3" class="stat-label">{{
+                t('pages.dashboard.metrics.cronJobs')
+              }}</NText>
+              <div class="stat-value">
+                {{ totalJobs }}
+                <NText type="success" class="stat-value-sub">
+                  {{ enabledJobs }} {{ t('pages.dashboard.metrics.enabled') }}</NText
+                >
+              </div>
+            </div>
+          </NGridItem>
+          <NGridItem>
+            <div class="stat-card">
+              <NText depth="3" class="stat-label">{{
+                t('pages.dashboard.stats.modelsSeen')
+              }}</NText>
+              <div class="stat-value">{{ modelsSeen }}</div>
+            </div>
+          </NGridItem>
+          <NGridItem>
+            <div class="stat-card">
+              <NText depth="3" class="stat-label">{{
+                t('pages.dashboard.stats.totalTokens')
+              }}</NText>
+              <div class="stat-value">{{ formatTokens(totalTokens) }}</div>
+            </div>
+          </NGridItem>
+        </NGrid>
+
+        <div ref="usageSectionRef" class="dashboard-section-anchor">
+          <!-- KPI grid -->
+          <NCard :title="t('pages.dashboard.cards.kpis')" class="dashboard-card">
+            <div class="kpi-grid">
+              <div v-for="kpi in kpiCells" :key="kpi.key" class="kpi-card">
+                <NText depth="3" class="kpi-label">{{ kpi.label }}</NText>
+                <div class="kpi-value">{{ kpi.value }}</div>
+                <NText depth="3" class="kpi-hint">{{ kpi.hint }}</NText>
+              </div>
             </div>
           </NCard>
-        </NGridItem>
+        </div>
 
-        <NGridItem :span="showDailyTrend ? 1 : 3" class="usage-structure-item">
-          <NCard
-            :title="t('pages.dashboard.cards.structure')"
-            class="dashboard-card usage-structure-card"
-          >
-            <NSpace justify="space-between" align="center" style="margin-bottom: 8px">
-              <NText depth="3">{{ t('pages.dashboard.usage.totalTokens') }}</NText>
-              <NText strong>{{ formatTokens(totalTokens) }}</NText>
-            </NSpace>
+        <!-- Trend (2/3) + Structure (1/3) -->
+        <NGrid cols="1 l:3" responsive="screen" :x-gap="12" :y-gap="12">
+          <NGridItem v-if="showDailyTrend" :span="2" class="usage-trend-item">
+            <NCard
+              :title="t('pages.dashboard.cards.trend')"
+              class="dashboard-card usage-trend-card"
+            >
+              <template #header-extra>
+                <NSpace :size="8" align="center">
+                  <NTag size="small" :bordered="false" round>
+                    {{ formatTokens(totalTokens) }}
+                  </NTag>
+                </NSpace>
+              </template>
 
-            <div class="segment-track">
-              <div
-                class="segment-item"
-                :style="{ width: segmentWidth(inputTokens), background: '#60a5fa' }"
-              />
-              <div
-                class="segment-item"
-                :style="{ width: segmentWidth(outputTokens), background: '#4ade80' }"
-              />
-              <div
-                class="segment-item"
-                :style="{ width: segmentWidth(cacheReadTokens), background: '#f0a020' }"
-              />
-              <div
-                class="segment-item"
-                :style="{ width: segmentWidth(cacheWriteTokens), background: '#d03050' }"
-              />
-            </div>
+              <div class="trend-chart-panel">
+                <template v-if="trendGeometry.points.length">
+                  <div class="trend-chart-canvas">
+                    <svg
+                      ref="trendSvgRef"
+                      class="trend-chart-svg"
+                      :viewBox="`0 0 ${trendGeometry.width} ${trendGeometry.height}`"
+                      preserveAspectRatio="none"
+                      @mousemove="handleTrendMouseMove"
+                      @mouseleave="clearTrendHover"
+                    >
+                      <g v-for="guide in trendGeometry.guides" :key="`guide-${guide.ratio}`">
+                        <line
+                          :x1="trendGeometry.left"
+                          :y1="guide.y"
+                          :x2="trendGeometry.left + trendGeometry.usableWidth"
+                          :y2="guide.y"
+                          class="trend-grid-line"
+                        />
+                        <text x="4" :y="guide.y + 4" class="trend-grid-label">
+                          {{ formatTokens(guide.value) }}
+                        </text>
+                      </g>
 
-            <div class="segment-list">
-              <div class="segment-row">
-                <div class="segment-row-label">
-                  <span class="segment-dot" :style="{ background: '#60a5fa' }" />
-                  <span>{{ t('pages.dashboard.usage.segments.input') }}</span>
+                      <path
+                        v-if="trendGeometry.areaPath"
+                        class="trend-area"
+                        :d="trendGeometry.areaPath"
+                      />
+                      <polyline
+                        v-if="trendGeometry.polyline"
+                        class="trend-line"
+                        :points="trendGeometry.polyline"
+                      />
+                      <line
+                        v-if="hoveredTrendPoint"
+                        class="trend-hover-line"
+                        :x1="hoveredTrendPoint?.x || 0"
+                        :y1="trendGeometry.top"
+                        :x2="hoveredTrendPoint?.x || 0"
+                        :y2="trendGeometry.top + trendGeometry.usableHeight"
+                      />
+                      <circle
+                        v-for="point in trendGeometry.points"
+                        :key="`point-${point.date}`"
+                        class="trend-point"
+                        :class="{ 'trend-point-active': hoveredTrendPoint?.date === point.date }"
+                        :cx="point.x"
+                        :cy="point.y"
+                        :r="hoveredTrendPoint?.date === point.date ? 6 : 3.5"
+                      />
+                    </svg>
+
+                    <div
+                      v-if="hoveredTrendPoint && trendTooltipStyle"
+                      class="trend-tooltip"
+                      :style="trendTooltipStyle"
+                    >
+                      {{ hoveredTrendText }}
+                    </div>
+                  </div>
+
+                  <div class="trend-axis-note">
+                    <span>{{ trendAxisLabels.start }}</span>
+                    <span>{{ trendAxisLabels.mid }}</span>
+                    <span>{{ trendAxisLabels.end }}</span>
+                  </div>
+                </template>
+                <div v-else class="daily-empty">{{ t('pages.dashboard.trend.empty') }}</div>
+              </div>
+            </NCard>
+          </NGridItem>
+
+          <NGridItem :span="showDailyTrend ? 1 : 3" class="usage-structure-item">
+            <NCard
+              :title="t('pages.dashboard.cards.structure')"
+              class="dashboard-card usage-structure-card"
+            >
+              <NSpace justify="space-between" align="center" style="margin-bottom: 8px">
+                <NText depth="3">{{ t('pages.dashboard.usage.totalTokens') }}</NText>
+                <NText strong>{{ formatTokens(totalTokens) }}</NText>
+              </NSpace>
+
+              <div class="segment-track">
+                <div
+                  class="segment-item"
+                  :style="{ width: segmentWidth(inputTokens), background: '#60a5fa' }"
+                />
+                <div
+                  class="segment-item"
+                  :style="{ width: segmentWidth(outputTokens), background: '#4ade80' }"
+                />
+                <div
+                  class="segment-item"
+                  :style="{ width: segmentWidth(cacheReadTokens), background: '#f0a020' }"
+                />
+                <div
+                  class="segment-item"
+                  :style="{ width: segmentWidth(cacheWriteTokens), background: '#d03050' }"
+                />
+              </div>
+
+              <div class="segment-list">
+                <div class="segment-row">
+                  <div class="segment-row-label">
+                    <span class="segment-dot" :style="{ background: '#60a5fa' }" />
+                    <span>{{ t('pages.dashboard.usage.segments.input') }}</span>
+                  </div>
+                  <NText>{{ formatTokens(inputTokens) }}</NText>
                 </div>
-                <NText>{{ formatTokens(inputTokens) }}</NText>
-              </div>
-              <div class="segment-row">
-                <div class="segment-row-label">
-                  <span class="segment-dot" :style="{ background: '#4ade80' }" />
-                  <span>{{ t('pages.dashboard.usage.segments.output') }}</span>
+                <div class="segment-row">
+                  <div class="segment-row-label">
+                    <span class="segment-dot" :style="{ background: '#4ade80' }" />
+                    <span>{{ t('pages.dashboard.usage.segments.output') }}</span>
+                  </div>
+                  <NText>{{ formatTokens(outputTokens) }}</NText>
                 </div>
-                <NText>{{ formatTokens(outputTokens) }}</NText>
-              </div>
-              <div class="segment-row">
-                <div class="segment-row-label">
-                  <span class="segment-dot" :style="{ background: '#f0a020' }" />
-                  <span>Cache Read</span>
+                <div class="segment-row">
+                  <div class="segment-row-label">
+                    <span class="segment-dot" :style="{ background: '#f0a020' }" />
+                    <span>Cache Read</span>
+                  </div>
+                  <NText>{{ formatTokens(cacheReadTokens) }}</NText>
                 </div>
-                <NText>{{ formatTokens(cacheReadTokens) }}</NText>
-              </div>
-              <div class="segment-row">
-                <div class="segment-row-label">
-                  <span class="segment-dot" :style="{ background: '#d03050' }" />
-                  <span>Cache Write</span>
+                <div class="segment-row">
+                  <div class="segment-row-label">
+                    <span class="segment-dot" :style="{ background: '#d03050' }" />
+                    <span>Cache Write</span>
+                  </div>
+                  <NText>{{ formatTokens(cacheWriteTokens) }}</NText>
                 </div>
-                <NText>{{ formatTokens(cacheWriteTokens) }}</NText>
               </div>
-            </div>
 
-            <div class="usage-scope-list">
-              <div v-for="row in usageScopeRows" :key="row.label" class="usage-scope-row">
-                <NText depth="3">{{ row.label }}</NText>
-                <NText>{{ row.value }}</NText>
+              <div class="usage-scope-list">
+                <div v-for="row in usageScopeRows" :key="row.label" class="usage-scope-row">
+                  <NText depth="3">{{ row.label }}</NText>
+                  <NText>{{ row.value }}</NText>
+                </div>
               </div>
-            </div>
-          </NCard>
-        </NGridItem>
-      </NGrid>
+            </NCard>
+          </NGridItem>
+        </NGrid>
 
-      <!-- Top Models (full width) -->
-      <NCard :title="t('pages.dashboard.top.models')" class="dashboard-card">
-        <div v-if="topModels.length" class="top-list">
-          <div v-for="(item, index) in topModels" :key="`model-${index}`" class="top-row">
-            <div class="top-row-main">
-              <span>{{ item.model || '-' }}</span>
-              <span>{{ formatTokens(item.totals.totalTokens) }}</span>
-            </div>
-            <div class="top-row-bar">
-              <div
-                class="top-row-bar-inner"
-                :style="{ width: topBarWidth(item.totals.totalTokens, topModelMax) }"
-              />
+        <!-- Top Models (full width) -->
+        <NCard :title="t('pages.dashboard.top.models')" class="dashboard-card">
+          <div v-if="topModels.length" class="top-list">
+            <div v-for="(item, index) in topModels" :key="`model-${index}`" class="top-row">
+              <div class="top-row-main">
+                <span>{{ item.model || '-' }}</span>
+                <span>{{ formatTokens(item.totals.totalTokens) }}</span>
+              </div>
+              <div class="top-row-bar">
+                <div
+                  class="top-row-bar-inner"
+                  :style="{ width: topBarWidth(item.totals.totalTokens, topModelMax) }"
+                />
+              </div>
             </div>
           </div>
-        </div>
-        <div v-else class="top-empty">{{ t('common.empty') }}</div>
-      </NCard>
+          <div v-else class="top-empty">{{ t('common.empty') }}</div>
+        </NCard>
       </template>
     </div>
   </NSpin>
@@ -1526,13 +1519,13 @@ onMounted(() => {
   border-radius: 10px;
 }
 
-.control-timeline {
+.control-summary-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-.control-stage {
+.control-summary-tile {
   border: 1px solid var(--n-border-color);
   border-radius: 10px;
   background: var(--n-card-color);
@@ -1542,19 +1535,19 @@ onMounted(() => {
   flex-direction: column;
 }
 
-.control-stage-time {
+.control-summary-label {
   color: #63e2b7;
   font-size: 13px;
   font-weight: 760;
 }
 
-.control-stage-name {
+.control-summary-value {
   margin-top: 6px;
   font-weight: 760;
 }
 
-.control-stage-meta {
-  margin: 8px 0 12px;
+.control-summary-detail {
+  margin-top: 8px;
   overflow-wrap: anywhere;
 }
 
@@ -1973,7 +1966,7 @@ onMounted(() => {
   }
 
   .control-status-strip,
-  .control-timeline {
+  .control-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1994,7 +1987,7 @@ onMounted(() => {
 
 @media (max-width: 560px) {
   .control-status-strip,
-  .control-timeline {
+  .control-summary-grid {
     grid-template-columns: 1fr;
   }
 

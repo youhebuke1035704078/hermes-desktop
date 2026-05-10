@@ -211,9 +211,9 @@ function resetDrag() {
 
     <div v-if="!collapsed" class="sidebar-foot">
       <div class="sidebar-foot-label">今日重点</div>
-      <div class="sidebar-foot-title">价格监控完整</div>
+      <div class="sidebar-foot-title">控制塔总览</div>
       <div class="sidebar-foot-detail">
-        {{ activeAlertCount ? `${activeAlertCount} 项需关注` : '40/40 SKU · 无需补录' }}
+        {{ activeAlertCount ? `${activeAlertCount} 项需关注` : '主流程无阻断' }}
       </div>
     </div>
   </div>
