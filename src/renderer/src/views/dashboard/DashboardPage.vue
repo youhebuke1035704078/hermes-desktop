@@ -891,7 +891,7 @@ onMounted(() => {
             >
               <span class="control-severity" :class="`control-severity--${item.type}`" />
               <div class="control-todo-main">
-                <NText strong>{{ item.title }}</NText>
+                <NText strong class="control-todo-title">{{ item.title }}</NText>
                 <NText depth="3" class="control-todo-detail">{{ item.detail }}</NText>
               </div>
               <NTag size="small" :type="item.type" round :bordered="false">
@@ -1425,24 +1425,24 @@ onMounted(() => {
 
 .control-status-panel h2 {
   margin: 8px 0 10px;
-  font-size: clamp(30px, 4vw, 54px);
-  line-height: 1.02;
+  font-size: clamp(28px, 3vw, 42px);
+  line-height: 1.08;
   white-space: pre-line;
   letter-spacing: 0;
 }
 
 .control-status-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .control-mini {
   border: 1px solid var(--n-border-color);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
-  padding: 10px 12px;
+  padding: 9px 10px;
   min-width: 0;
 }
 
@@ -1452,12 +1452,13 @@ onMounted(() => {
 
 .control-mini-value {
   margin-top: 6px;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 760;
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .control-section-head {
@@ -1469,7 +1470,7 @@ onMounted(() => {
 }
 
 .control-section-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 760;
 }
 
@@ -1515,6 +1516,12 @@ onMounted(() => {
   min-width: 0;
 }
 
+.control-todo-title {
+  display: block;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
 .control-price-card {
   border-radius: 10px;
 }
@@ -1543,6 +1550,7 @@ onMounted(() => {
 
 .control-summary-value {
   margin-top: 6px;
+  font-size: 15px;
   font-weight: 760;
 }
 
