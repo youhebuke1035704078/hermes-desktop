@@ -2,13 +2,28 @@
 import { computed, h, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  NButton, NCard, NDataTable, NGrid, NGridItem, NIcon,
-  NPopconfirm, NProgress, NSpace, NText, useMessage, useDialog,
+  NButton,
+  NCard,
+  NDataTable,
+  NGrid,
+  NGridItem,
+  NIcon,
+  NPopconfirm,
+  NProgress,
+  NSpace,
+  NText,
+  useMessage,
+  useDialog
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import {
-  SaveOutline, RefreshOutline, CloudDownloadOutline, CloudUploadOutline,
-  TrashOutline, ArchiveOutline, AddOutline,
+  SaveOutline,
+  RefreshOutline,
+  CloudDownloadOutline,
+  CloudUploadOutline,
+  TrashOutline,
+  ArchiveOutline,
+  AddOutline
 } from '@vicons/ionicons5'
 import { useBackupStore } from '@/stores/backup'
 import type { BackupItem } from '@/api/types/backup'
@@ -84,7 +99,7 @@ function handleRestore(filename: string): void {
       } catch (e: any) {
         message.error(t('pages.backup.restoreFailed', { error: e?.message || String(e) }))
       }
-    },
+    }
   })
 }
 
@@ -106,10 +121,21 @@ const columns = computed<DataTableColumns<BackupItem>>(() => [
     ellipsis: { tooltip: true },
     render(row) {
       return h('div', [
-        h(NText, { strong: true, style: 'display:block; font-family: monospace; font-size: 12px;' }, { default: () => row.filename }),
-        h(NText, { depth: 3, style: 'font-size: 11px;' }, { default: () => formatDate(row.createdAt) }),
+        h(
+          NText,
+          {
+            strong: true,
+            style: 'display:block; font-family: monospace; font-size: var(--font-body-sm);'
+          },
+          { default: () => row.filename }
+        ),
+        h(
+          NText,
+          { depth: 3, style: 'font-size: 11px;' },
+          { default: () => formatDate(row.createdAt) }
+        )
       ])
-    },
+    }
   },
   {
     title: t('pages.backup.columns.size'),
@@ -117,7 +143,7 @@ const columns = computed<DataTableColumns<BackupItem>>(() => [
     width: 110,
     render(row) {
       return h(NText, {}, { default: () => formatBytes(row.size) })
-    },
+    }
   },
   {
     title: t('pages.backup.columns.date'),
@@ -125,7 +151,7 @@ const columns = computed<DataTableColumns<BackupItem>>(() => [
     width: 140,
     render(row) {
       return h(NText, { depth: 3 }, { default: () => row.date })
-    },
+    }
   },
   {
     title: t('pages.backup.columns.actions'),
@@ -133,45 +159,66 @@ const columns = computed<DataTableColumns<BackupItem>>(() => [
     width: 280,
     fixed: 'right',
     render(row) {
-      return h(NSpace, { size: 4 }, {
-        default: () => [
-          h(NButton, {
-            size: 'tiny',
-            type: 'primary',
-            quaternary: true,
-            disabled: backupStore.busy,
-            onClick: () => handleRestore(row.filename),
-          }, {
-            icon: () => h(NIcon, { component: ArchiveOutline }),
-            default: () => t('pages.backup.restore'),
-          }),
-          h(NButton, {
-            size: 'tiny',
-            quaternary: true,
-            disabled: backupStore.busy,
-            onClick: () => handleDownload(row.filename),
-          }, {
-            icon: () => h(NIcon, { component: CloudDownloadOutline }),
-            default: () => t('pages.backup.download'),
-          }),
-          h(NPopconfirm, {
-            onPositiveClick: () => handleDelete(row.filename),
-          }, {
-            trigger: () => h(NButton, {
-              size: 'tiny',
-              type: 'error',
-              quaternary: true,
-              disabled: backupStore.busy,
-            }, {
-              icon: () => h(NIcon, { component: TrashOutline }),
-              default: () => t('pages.backup.delete'),
-            }),
-            default: () => t('pages.backup.deleteConfirm'),
-          }),
-        ],
-      })
-    },
-  },
+      return h(
+        NSpace,
+        { size: 4 },
+        {
+          default: () => [
+            h(
+              NButton,
+              {
+                size: 'tiny',
+                type: 'primary',
+                quaternary: true,
+                disabled: backupStore.busy,
+                onClick: () => handleRestore(row.filename)
+              },
+              {
+                icon: () => h(NIcon, { component: ArchiveOutline }),
+                default: () => t('pages.backup.restore')
+              }
+            ),
+            h(
+              NButton,
+              {
+                size: 'tiny',
+                quaternary: true,
+                disabled: backupStore.busy,
+                onClick: () => handleDownload(row.filename)
+              },
+              {
+                icon: () => h(NIcon, { component: CloudDownloadOutline }),
+                default: () => t('pages.backup.download')
+              }
+            ),
+            h(
+              NPopconfirm,
+              {
+                onPositiveClick: () => handleDelete(row.filename)
+              },
+              {
+                trigger: () =>
+                  h(
+                    NButton,
+                    {
+                      size: 'tiny',
+                      type: 'error',
+                      quaternary: true,
+                      disabled: backupStore.busy
+                    },
+                    {
+                      icon: () => h(NIcon, { component: TrashOutline }),
+                      default: () => t('pages.backup.delete')
+                    }
+                  ),
+                default: () => t('pages.backup.deleteConfirm')
+              }
+            )
+          ]
+        }
+      )
+    }
+  }
 ])
 
 // ── Lifecycle ──
@@ -231,23 +278,40 @@ onUnmounted(() => {
 
       <NGrid cols="1 s:2 m:3" responsive="screen" :x-gap="10" :y-gap="10">
         <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.backup.metrics.total') }}</NText>
-            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">{{ backupStore.count }}</div>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px">
+            <NText depth="3" style="font-size: var(--font-body-sm)">{{
+              t('pages.backup.metrics.total')
+            }}</NText>
+            <div style="font-size: var(--font-metric); font-weight: 700; margin-top: 6px">
+              {{ backupStore.count }}
+            </div>
           </NCard>
         </NGridItem>
         <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.backup.metrics.totalSize') }}</NText>
-            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px">
+            <NText depth="3" style="font-size: var(--font-body-sm)">{{
+              t('pages.backup.metrics.totalSize')
+            }}</NText>
+            <div style="font-size: var(--font-metric); font-weight: 700; margin-top: 6px">
               <NText type="info">{{ formatBytes(backupStore.totalSize) }}</NText>
             </div>
           </NCard>
         </NGridItem>
         <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.backup.metrics.latest') }}</NText>
-            <div style="font-size: 14px; font-weight: 600; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px">
+            <NText depth="3" style="font-size: var(--font-body-sm)">{{
+              t('pages.backup.metrics.latest')
+            }}</NText>
+            <div
+              style="
+                font-size: var(--font-card-title);
+                font-weight: 600;
+                margin-top: 6px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              "
+            >
               <template v-if="backupStore.latestBackup">
                 <NText type="success">{{ formatDate(backupStore.latestBackup.createdAt) }}</NText>
               </template>
@@ -260,22 +324,24 @@ onUnmounted(() => {
       </NGrid>
 
       <!-- Active task progress -->
-      <div v-if="backupStore.progress" style="margin-top: 14px;">
-        <NText depth="3" style="font-size: 12px;">{{ backupStore.progress.message }}</NText>
+      <div v-if="backupStore.progress" style="margin-top: 14px">
+        <NText depth="3" style="font-size: var(--font-body-sm)">{{
+          backupStore.progress.message
+        }}</NText>
         <NProgress
           :percentage="Math.round(backupStore.progress.progress)"
           :show-indicator="true"
           processing
-          style="margin-top: 4px;"
+          style="margin-top: 4px"
         />
       </div>
     </NCard>
 
     <!-- Empty state -->
     <NCard v-if="!backupStore.loading && backupStore.backups.length === 0">
-      <div style="text-align: center; padding: 40px;">
+      <div style="text-align: center; padding: 40px">
         <NIcon :component="ArchiveOutline" :size="48" depth="3" />
-        <div style="margin-top: 12px;">
+        <div style="margin-top: 12px">
           <NText depth="3">{{ t('pages.backup.empty') }}</NText>
         </div>
       </div>

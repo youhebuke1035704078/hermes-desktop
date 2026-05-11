@@ -3,12 +3,35 @@ import { computed, h, onMounted, onUnmounted, ref, watch, provide, type Ref } fr
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
-  NButton, NCard, NCollapse, NCollapseItem, NDataTable, NDrawer, NDrawerContent,
-  NGrid, NGridItem, NIcon, NInput, NPopconfirm, NSelect, NSpace, NSwitch,
-  NTag, NText, useMessage,
+  NButton,
+  NCard,
+  NCollapse,
+  NCollapseItem,
+  NDataTable,
+  NDrawer,
+  NDrawerContent,
+  NGrid,
+  NGridItem,
+  NIcon,
+  NInput,
+  NPopconfirm,
+  NSelect,
+  NSpace,
+  NSwitch,
+  NTag,
+  NText,
+  useMessage
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { ExtensionPuzzleOutline, RefreshOutline, AddOutline, TrashOutline, LinkOutline, PlayOutline, CopyOutline } from '@vicons/ionicons5'
+import {
+  ExtensionPuzzleOutline,
+  RefreshOutline,
+  AddOutline,
+  TrashOutline,
+  LinkOutline,
+  PlayOutline,
+  CopyOutline
+} from '@vicons/ionicons5'
 import { useSkillStore } from '@/stores/skill'
 import { useCronStore } from '@/stores/cron'
 import { writeTextToClipboard } from '@/utils/clipboard'
@@ -37,33 +60,31 @@ const sourceFilter = ref<'user_created' | 'other' | null>(null)
 
 const categoryOptions = computed(() => [
   { label: t('pages.skills.categoryAll'), value: null as any },
-  ...skillStore.categories.map((c) => ({ label: c, value: c })),
+  ...skillStore.categories.map((c) => ({ label: c, value: c }))
 ])
 
 const statusOptions = computed(() => [
   { label: t('pages.skills.statusAll'), value: null as any },
   { label: t('pages.skills.statusEnabled'), value: 'enabled' },
-  { label: t('pages.skills.statusDisabled'), value: 'disabled' },
+  { label: t('pages.skills.statusDisabled'), value: 'disabled' }
 ])
 
 const skillSourceOptions = computed(() => [
   { label: t('pages.skills.sourceAll'), value: null as any },
   { label: t('pages.skills.sources.userCreated'), value: 'user_created' },
-  { label: t('pages.skills.sourceOther'), value: 'other' },
+  { label: t('pages.skills.sourceOther'), value: 'other' }
 ])
 
 const sourceType = computed(() => (skillStore.source === 'server' ? 'success' : 'warning'))
 const sourceLabel = computed(() =>
-  skillStore.source === 'server'
-    ? t('pages.skills.source.server')
-    : t('pages.skills.source.local'),
+  skillStore.source === 'server' ? t('pages.skills.source.server') : t('pages.skills.source.local')
 )
 const userCreatedSkills = computed(() => skillStore.userCreatedSkills)
 const priceWatchSkill = computed(() =>
-  skillStore.skills.find(skill =>
-    skill.name === 'jd-tongrentang-price-watch' ||
-    skill.skillKey === 'jd-tongrentang-price-watch',
-  ),
+  skillStore.skills.find(
+    (skill) =>
+      skill.name === 'jd-tongrentang-price-watch' || skill.skillKey === 'jd-tongrentang-price-watch'
+  )
 )
 const priceWatchSkillStatus = computed(() => {
   const skill = priceWatchSkill.value
@@ -72,11 +93,18 @@ const priceWatchSkillStatus = computed(() => {
   return { label: '已启用', type: 'success' as const }
 })
 const priceMonitorJobs = computed(() =>
-  cronStore.jobs.filter(job => /jd-tongrentang-price-watch|tongrentang|cron-health|verification-gate/i.test(job.name)),
+  cronStore.jobs.filter((job) =>
+    /jd-tongrentang-price-watch|tongrentang|cron-health|verification-gate/i.test(job.name)
+  )
 )
-const priceFailedJobs = computed(() => priceMonitorJobs.value.filter(job => job.enabled && job.state?.lastStatus === 'error'))
+const priceFailedJobs = computed(() =>
+  priceMonitorJobs.value.filter((job) => job.enabled && job.state?.lastStatus === 'error')
+)
 
-function priceJobStatus(job: CronJob): { label: string; type: 'success' | 'warning' | 'error' | 'info' | 'default' } {
+function priceJobStatus(job: CronJob): {
+  label: string
+  type: 'success' | 'warning' | 'error' | 'info' | 'default'
+} {
   if (!job.enabled) return { label: '已停用', type: 'default' }
   if (job.state?.runningAtMs) return { label: '运行中', type: 'info' }
   if (job.state?.lastStatus === 'ok') return { label: 'OK', type: 'success' }
@@ -86,7 +114,7 @@ function priceJobStatus(job: CronJob): { label: string; type: 'success' | 'warni
 }
 
 function findPriceJob(pattern: RegExp): CronJob | undefined {
-  return priceMonitorJobs.value.find(job => pattern.test(job.name))
+  return priceMonitorJobs.value.find((job) => pattern.test(job.name))
 }
 
 const priceBackfillJob = computed(() => findPriceJob(/backfill|补录|17:00|17：00/i))
@@ -98,9 +126,9 @@ const skillProcessRows = computed<SkillProcessRow[]>(() => {
   const alarm = findPriceJob(/evening|alarm|告警|17:30|17：30/i)
   const backup = findPriceJob(/backup|备份/i)
   const combinedIssue = (...jobs: Array<CronJob | undefined>) =>
-    jobs.find(job => job?.enabled && job.state?.lastStatus === 'error')
+    jobs.find((job) => job?.enabled && job.state?.lastStatus === 'error')
   const combinedOk = (...jobs: Array<CronJob | undefined>) =>
-    jobs.some(job => job?.enabled && job.state?.lastStatus === 'ok')
+    jobs.some((job) => job?.enabled && job.state?.lastStatus === 'ok')
 
   return [
     {
@@ -108,29 +136,41 @@ const skillProcessRows = computed<SkillProcessRow[]>(() => {
       label: '验证门控',
       detail: '检测是否需要人工解锁，不自动绕过验证。',
       type: gate ? priceJobStatus(gate).type : 'warning',
-      status: gate ? priceJobStatus(gate).label : '未配置',
+      status: gate ? priceJobStatus(gate).label : '未配置'
     },
     {
       key: 'collect',
       label: '采集与入库',
       detail: '采集 SKU 价格，落 SQLite，生成报告。',
       type: daily ? priceJobStatus(daily).type : 'warning',
-      status: daily ? priceJobStatus(daily).label : '未配置',
+      status: daily ? priceJobStatus(daily).label : '未配置'
     },
     {
       key: 'recover',
       label: '巡检与补录',
       detail: '缺数据才补录；已齐全直接确认退出。',
-      type: combinedIssue(watchdog, backfill) ? 'error' : combinedOk(watchdog, backfill) ? 'success' : 'warning',
-      status: combinedIssue(watchdog, backfill) ? '观察' : combinedOk(watchdog, backfill) ? 'OK' : '待确认',
+      type: combinedIssue(watchdog, backfill)
+        ? 'error'
+        : combinedOk(watchdog, backfill)
+          ? 'success'
+          : 'warning',
+      status: combinedIssue(watchdog, backfill)
+        ? '观察'
+        : combinedOk(watchdog, backfill)
+          ? 'OK'
+          : '待确认'
     },
     {
       key: 'ops',
       label: '告警与备份',
       detail: '缺口通知飞书，夜间备份 SQLite。',
-      type: combinedIssue(alarm, backup) ? 'error' : combinedOk(alarm, backup) ? 'success' : 'warning',
-      status: combinedIssue(alarm, backup) ? '需处理' : combinedOk(alarm, backup) ? 'OK' : '待确认',
-    },
+      type: combinedIssue(alarm, backup)
+        ? 'error'
+        : combinedOk(alarm, backup)
+          ? 'success'
+          : 'warning',
+      status: combinedIssue(alarm, backup) ? '需处理' : combinedOk(alarm, backup) ? 'OK' : '待确认'
+    }
   ]
 })
 
@@ -142,7 +182,7 @@ const filteredSkills = computed(() => {
       (s) =>
         s.name.toLowerCase().includes(q) ||
         s.description.toLowerCase().includes(q) ||
-        (s.tags || []).some((tag) => tag.toLowerCase().includes(q)),
+        (s.tags || []).some((tag) => tag.toLowerCase().includes(q))
     )
   }
   if (categoryFilter.value) {
@@ -242,7 +282,7 @@ async function handleToggle(name: string) {
     message.success(
       isNowDisabled
         ? t('pages.skills.toggle.disabled', { name })
-        : t('pages.skills.toggle.enabled', { name }),
+        : t('pages.skills.toggle.enabled', { name })
     )
   } else {
     message.error(t('pages.skills.toggle.failed'))
@@ -270,7 +310,7 @@ watch(
         configEditValues.value[cv.key] = stored != null ? String(stored) : ''
       }
     }
-  },
+  }
 )
 
 function getNestedValue(obj: any, dotPath: string): any {
@@ -338,17 +378,21 @@ const columns = computed<DataTableColumns<SkillMeta>>(() => [
     render(row) {
       return h('div', [
         h(NText, { strong: true, style: 'display:block' }, { default: () => row.name }),
-        h(NText, { depth: 3, style: 'font-size:12px' }, { default: () => row.description || '' }),
+        h(NText, { depth: 3, style: 'font-size:12px' }, { default: () => row.description || '' })
       ])
-    },
+    }
   },
   {
     title: t('pages.skills.columns.category'),
     key: 'category',
     width: 120,
     render(row) {
-      return h(NTag, { size: 'small', bordered: false, round: true }, { default: () => row.category })
-    },
+      return h(
+        NTag,
+        { size: 'small', bordered: false, round: true },
+        { default: () => row.category }
+      )
+    }
   },
   {
     title: t('pages.skills.columns.source'),
@@ -358,9 +402,9 @@ const columns = computed<DataTableColumns<SkillMeta>>(() => [
       return h(
         NTag,
         { size: 'small', type: skillSourceTagType(row.source), bordered: false, round: true },
-        { default: () => skillSourceLabel(row.source) },
+        { default: () => skillSourceLabel(row.source) }
       )
-    },
+    }
   },
   {
     title: t('pages.skills.columns.platform'),
@@ -368,14 +412,27 @@ const columns = computed<DataTableColumns<SkillMeta>>(() => [
     width: 100,
     render(row) {
       if (!row.platforms.length) {
-        return h(NText, { depth: 3, style: 'font-size:12px' }, { default: () => t('pages.skills.detail.platformAll') })
+        return h(
+          NText,
+          { depth: 3, style: 'font-size:12px' },
+          { default: () => t('pages.skills.detail.platformAll') }
+        )
       }
-      return h(NSpace, { size: 4 }, {
-        default: () => row.platforms.map((p) =>
-          h(NTag, { size: 'tiny', type: 'success', bordered: false, round: true }, { default: () => p }),
-        ),
-      })
-    },
+      return h(
+        NSpace,
+        { size: 4 },
+        {
+          default: () =>
+            row.platforms.map((p) =>
+              h(
+                NTag,
+                { size: 'tiny', type: 'success', bordered: false, round: true },
+                { default: () => p }
+              )
+            )
+        }
+      )
+    }
   },
   {
     title: t('pages.skills.columns.status'),
@@ -385,10 +442,10 @@ const columns = computed<DataTableColumns<SkillMeta>>(() => [
       return h(NSwitch, {
         value: !skillStore.isDisabled(row.name),
         'onUpdate:value': () => handleToggle(row.name),
-        size: 'small',
+        size: 'small'
       })
-    },
-  },
+    }
+  }
 ])
 
 function rowClassName(row: SkillMeta): string {
@@ -398,15 +455,15 @@ function rowClassName(row: SkillMeta): string {
 function rowProps(row: SkillMeta) {
   return {
     style: 'cursor: pointer',
-    onClick: () => selectSkill(row.name),
+    onClick: () => selectSkill(row.name)
   }
 }
 </script>
 
 <template>
-  <NSpace vertical :size="16">
+  <NSpace vertical :size="12" class="skills-page">
     <div class="skill-hero">
-      <NCard class="skill-hero-card">
+      <NCard class="app-card skill-hero-card">
         <template #header>
           <NSpace align="center" :size="8">
             <NTag type="info" round :bordered="false">自建 Skill</NTag>
@@ -435,7 +492,9 @@ function rowProps(row: SkillMeta) {
           </div>
           <div class="skill-mini">
             <div class="skill-mini-label">最近失败</div>
-            <div class="skill-mini-value">{{ priceFailedJobs.length ? `${priceFailedJobs.length} 个` : '无' }}</div>
+            <div class="skill-mini-value">
+              {{ priceFailedJobs.length ? `${priceFailedJobs.length} 个` : '无' }}
+            </div>
           </div>
           <div class="skill-mini">
             <div class="skill-mini-label">路径</div>
@@ -444,7 +503,7 @@ function rowProps(row: SkillMeta) {
         </div>
       </NCard>
 
-      <NCard class="skill-actions-card">
+      <NCard class="app-card skill-actions-card">
         <template #header>快捷动作</template>
         <NSpace vertical :size="10">
           <NButton block secondary @click="runPriceJob(priceBackfillJob)">
@@ -452,7 +511,12 @@ function rowProps(row: SkillMeta) {
             补跑 17:00
           </NButton>
           <NButton block secondary @click="goPriceWorkflow">打开任务闭环</NButton>
-          <NButton block secondary :disabled="!priceWatchSkill?.dirPath" @click="copyPriceSkillPath">
+          <NButton
+            block
+            secondary
+            :disabled="!priceWatchSkill?.dirPath"
+            @click="copyPriceSkillPath"
+          >
             <template #icon><NIcon :component="CopyOutline" /></template>
             复制 Skill 路径
           </NButton>
@@ -461,14 +525,10 @@ function rowProps(row: SkillMeta) {
       </NCard>
     </div>
 
-    <NCard class="skill-lifecycle-card">
+    <NCard class="app-card skill-lifecycle-card">
       <template #header>Skill 生命周期</template>
       <div class="skill-process-list">
-        <div
-          v-for="(row, index) in skillProcessRows"
-          :key="row.key"
-          class="skill-process-row"
-        >
+        <div v-for="(row, index) in skillProcessRows" :key="row.key" class="skill-process-row">
           <div class="skill-step-index">{{ index + 1 }}</div>
           <div class="skill-process-main">
             <NText strong>{{ row.label }}</NText>
@@ -482,7 +542,7 @@ function rowProps(row: SkillMeta) {
     </NCard>
 
     <!-- Zone 1: Metrics + Filters -->
-    <NCard>
+    <NCard class="app-card skill-catalog-card">
       <template #header>
         <NSpace align="center" :size="8">
           <NIcon :component="ExtensionPuzzleOutline" :size="20" />
@@ -494,120 +554,136 @@ function rowProps(row: SkillMeta) {
           <NTag size="small" :type="sourceType" round>
             {{ sourceLabel }}
           </NTag>
-          <NButton secondary size="small" @click="skillStore.fetchSkills()" :loading="skillStore.loading">
+          <NButton
+            secondary
+            size="small"
+            @click="skillStore.fetchSkills()"
+            :loading="skillStore.loading"
+          >
             <template #icon><NIcon :component="RefreshOutline" /></template>
             {{ t('pages.skills.refresh') }}
           </NButton>
         </NSpace>
       </template>
 
-      <NGrid cols="1 s:2 m:5" responsive="screen" :x-gap="10" :y-gap="10">
+      <NGrid cols="1 s:2 m:5" responsive="screen" :x-gap="8" :y-gap="8">
         <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.metrics.total') }}</NText>
-            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">{{ skillStore.skills.length }}</div>
-          </NCard>
+          <div class="console-metric-tile">
+            <div class="console-metric-label">{{ t('pages.skills.metrics.total') }}</div>
+            <div class="console-metric-value">{{ skillStore.skills.length }}</div>
+          </div>
         </NGridItem>
         <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.metrics.enabled') }}</NText>
-            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+          <div class="console-metric-tile">
+            <div class="console-metric-label">{{ t('pages.skills.metrics.enabled') }}</div>
+            <div class="console-metric-value">
               <NText type="success">{{ skillStore.enabledCount }}</NText>
             </div>
-          </NCard>
+          </div>
         </NGridItem>
         <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.metrics.disabled') }}</NText>
-            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+          <div class="console-metric-tile">
+            <div class="console-metric-label">{{ t('pages.skills.metrics.disabled') }}</div>
+            <div class="console-metric-value">
               <NText type="error">{{ skillStore.disabledCount }}</NText>
             </div>
-          </NCard>
+          </div>
         </NGridItem>
         <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.metrics.configVars') }}</NText>
-            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+          <div class="console-metric-tile">
+            <div class="console-metric-label">{{ t('pages.skills.metrics.configVars') }}</div>
+            <div class="console-metric-value">
               <NText type="info">{{ skillStore.configVarCount }}</NText>
             </div>
-          </NCard>
+          </div>
         </NGridItem>
         <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.skills.metrics.userCreated') }}</NText>
-            <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
+          <div class="console-metric-tile">
+            <div class="console-metric-label">{{ t('pages.skills.metrics.userCreated') }}</div>
+            <div class="console-metric-value">
               <NText type="info">{{ skillStore.userCreatedCount }}</NText>
             </div>
-          </NCard>
+          </div>
         </NGridItem>
       </NGrid>
 
       <!-- Filter bar -->
-      <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+      <div class="skill-filter-bar">
         <NInput
           v-model:value="searchQuery"
           clearable
           :placeholder="t('pages.skills.search')"
-          style="flex: 1; min-width: 200px;"
+          style="flex: 1; min-width: 200px"
         />
         <NSelect
           v-model:value="categoryFilter"
           :options="categoryOptions"
           :placeholder="t('pages.skills.categoryFilter')"
           clearable
-          style="width: 160px;"
+          style="width: 160px"
         />
         <NSelect
           v-model:value="statusFilter"
           :options="statusOptions"
           :placeholder="t('pages.skills.statusFilter')"
           clearable
-          style="width: 140px;"
+          style="width: 140px"
         />
         <NSelect
           v-model:value="sourceFilter"
           :options="skillSourceOptions"
           :placeholder="t('pages.skills.sourceFilter')"
           clearable
-          style="width: 150px;"
+          style="width: 150px"
         />
       </div>
-      <NText v-if="skillStore.sourceError" type="warning" style="font-size: 12px; margin-top: 8px; display: block;">
+      <NText
+        v-if="skillStore.sourceError"
+        type="warning"
+        style="font-size: 12px; margin-top: 8px; display: block"
+      >
         {{ t('pages.skills.source.fallback', { error: skillStore.sourceError }) }}
       </NText>
     </NCard>
 
-    <NCard v-if="userCreatedSkills.length > 0">
+    <NCard v-if="userCreatedSkills.length > 0" class="app-card">
       <template #header>
         <NSpace align="center" :size="8">
           <NTag type="info" round>{{ t('pages.skills.sources.userCreated') }}</NTag>
           <span>{{ t('pages.skills.userCreated.title') }}</span>
         </NSpace>
       </template>
-      <NSpace :size="8" style="flex-wrap: wrap;">
-        <NButton
+      <div class="skill-chip-grid">
+        <button
           v-for="skill in userCreatedSkills"
           :key="skill.name"
-          secondary
-          size="small"
+          class="skill-chip"
+          type="button"
           @click="selectSkill(skill.name)"
         >
-          {{ skill.name }}
-        </NButton>
-      </NSpace>
+          <span class="skill-chip-name">{{ skill.name }}</span>
+          <span class="skill-chip-meta">
+            {{ skill.configVars?.length || 0 }} 配置 ·
+            {{ skillStore.isDisabled(skill.name) ? '停用' : '启用' }}
+          </span>
+        </button>
+      </div>
     </NCard>
 
     <!-- Empty state -->
-    <NCard v-if="!skillStore.loading && skillStore.skills.length === 0">
-      <div style="text-align: center; padding: 40px;">
+    <NCard v-if="!skillStore.loading && skillStore.skills.length === 0" class="app-card">
+      <div class="skill-empty">
         <NText depth="3">{{ t('pages.skills.empty') }}</NText>
       </div>
     </NCard>
 
     <!-- Zone 2+3: Table + Detail -->
-    <div v-else style="display: flex; gap: 12px; align-items: flex-start;">
+    <div v-else class="skill-browser">
       <!-- Left: Table -->
-      <NCard :style="{ flex: isNarrow ? '1' : '0 0 60%', minWidth: 0 }">
+      <NCard
+        class="app-card skill-table-card"
+        :style="{ flex: isNarrow ? '1' : '0 0 60%', minWidth: 0 }"
+      >
         <NDataTable
           :columns="columns"
           :data="filteredSkills"
@@ -622,8 +698,8 @@ function rowProps(row: SkillMeta) {
       </NCard>
 
       <!-- Right: Detail Panel (wide screen) -->
-      <NCard v-if="!isNarrow" style="flex: 0 0 38%; min-width: 280px; position: sticky; top: 12px;">
-        <div v-if="!skillStore.selectedSkill" style="text-align: center; padding: 40px;">
+      <NCard v-if="!isNarrow" class="app-card skill-detail-card">
+        <div v-if="!skillStore.selectedSkill" class="skill-empty">
           <NText depth="3">{{ t('pages.skills.detail.empty') }}</NText>
         </div>
         <SkillDetail v-else />
@@ -638,19 +714,19 @@ function rowProps(row: SkillMeta) {
     </NDrawer>
 
     <!-- External Directories -->
-    <NCard>
+    <NCard class="app-card">
       <NCollapse>
         <NCollapseItem :title="t('pages.skills.externalDirs.title')" name="external-dirs">
-          <div v-if="skillStore.externalDirs.length === 0" style="text-align: center; padding: 16px;">
+          <div v-if="skillStore.externalDirs.length === 0" class="skill-empty skill-empty--compact">
             <NText depth="3">{{ t('pages.skills.externalDirs.empty') }}</NText>
           </div>
-          <div v-else style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
-            <div
-              v-for="dir in skillStore.externalDirs"
-              :key="dir"
-              style="display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--n-color-embedded); border-radius: 6px;"
-            >
-              <NText code style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;">{{ dir }}</NText>
+          <div v-else class="skill-dir-list">
+            <div v-for="dir in skillStore.externalDirs" :key="dir" class="skill-dir-row">
+              <NText
+                code
+                style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis"
+                >{{ dir }}</NText
+              >
               <NPopconfirm @positive-click="handleRemoveDir(dir)">
                 <template #trigger>
                   <NButton size="tiny" type="error" quaternary>
@@ -665,7 +741,7 @@ function rowProps(row: SkillMeta) {
             <NInput
               v-model:value="newDirPath"
               :placeholder="t('pages.skills.externalDirs.placeholder')"
-              style="width: 300px;"
+              style="width: 300px"
               @keyup.enter="handleAddDir"
             />
             <NButton type="primary" @click="handleAddDir" :disabled="!newDirPath.trim()">
@@ -696,153 +772,276 @@ const SkillDetail = defineComponent({
   computed: {
     skill() {
       return this.skillStore.selectedSkill
-    },
+    }
   },
   render() {
     const skill = this.skill
     if (!skill) return null
     const { t, skillStore, configEditValues, handleConfigInput } = this
 
-    return h(NSpace, { vertical: true, size: 16 }, {
-      default: () => [
-        // Header
-        h('div', [
-          h(NText, { strong: true, style: 'font-size: 18px; display: block;' }, { default: () => skill.name }),
-          h(NText, { depth: 3, style: 'font-size: 13px; margin-top: 4px; display: block;' }, { default: () => skill.description }),
-        ]),
-
-        // Meta info
-        h(NSpace, { size: 8, style: 'flex-wrap: wrap;' }, {
-          default: () => [
-            skill.version ? h(NTag, { size: 'small', bordered: false }, { default: () => `v${skill.version}` }) : null,
-            skill.author ? h(NTag, { size: 'small', bordered: false }, { default: () => skill.author }) : null,
-            skill.license ? h(NTag, { size: 'small', bordered: false }, { default: () => skill.license }) : null,
-          ].filter(Boolean),
-        }),
-
-        // Platforms
-        h(NSpace, { size: 4 }, {
-          default: () =>
-            skill.platforms.length
-              ? skill.platforms.map((p: string) =>
-                  h(NTag, { size: 'small', type: 'success', bordered: false, round: true }, { default: () => p }),
-                )
-              : [h(NTag, { size: 'small', bordered: false, round: true }, { default: () => t('pages.skills.detail.platformAll') })],
-        }),
-
-        // Tags
-        skill.tags?.length
-          ? h('div', [
-              h(NText, { depth: 3, style: 'font-size: 12px; display: block; margin-bottom: 4px;' }, { default: () => t('pages.skills.detail.tags') }),
-              h(NSpace, { size: 4 }, {
-                default: () => skill.tags!.map((tag: string) => h(NTag, { size: 'tiny', bordered: false }, { default: () => tag })),
-              }),
-            ])
-          : null,
-
-        // Toggle
-        h(
-          'div',
-          {
-            style:
-              'display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid var(--n-border-color); border-bottom: 1px solid var(--n-border-color);',
-          },
+    return h(
+      NSpace,
+      { vertical: true, size: 16 },
+      {
+        default: () =>
           [
-            h(NText, {}, {
-              default: () =>
-                skillStore.isDisabled(skill.name) ? t('pages.skills.detail.disabled') : t('pages.skills.detail.enabled'),
-            }),
-            h(NSwitch, {
-              value: !skillStore.isDisabled(skill.name),
-              'onUpdate:value': async () => {
-                const ok = await skillStore.toggleSkill(skill.name)
-                if (ok) {
-                  const msg = skillStore.isDisabled(skill.name)
-                    ? t('pages.skills.toggle.disabled', { name: skill.name })
-                    : t('pages.skills.toggle.enabled', { name: skill.name })
-                  this.message.success(msg)
-                } else {
-                  this.message.error(t('pages.skills.toggle.failed'))
-                }
-              },
-            }),
-          ],
-        ),
+            // Header
+            h('div', [
+              h(
+                NText,
+                { strong: true, style: 'font-size: 16px; display: block;' },
+                { default: () => skill.name }
+              ),
+              h(
+                NText,
+                { depth: 3, style: 'font-size: 13px; margin-top: 4px; display: block;' },
+                { default: () => skill.description }
+              )
+            ]),
 
-        // Prerequisites
-        h('div', [
-          h(NText, { strong: true, style: 'font-size: 13px; display: block; margin-bottom: 6px;' }, {
-            default: () => t('pages.skills.detail.prerequisites'),
-          }),
-          skill.prerequisites?.commands?.length || skill.prerequisites?.env_vars?.length
-            ? h(NSpace, { vertical: true, size: 4 }, {
-                default: () => [
-                  ...(skill.prerequisites?.commands || []).map((cmd: string) =>
-                    h(NText, { code: true, style: 'font-size: 12px;' }, { default: () => cmd }),
-                  ),
-                  ...(skill.prerequisites?.env_vars || []).map((env: string) =>
-                    h(NText, { code: true, style: 'font-size: 12px;' }, { default: () => `$${env}` }),
-                  ),
-                ],
-              })
-            : h(NText, { depth: 3, style: 'font-size: 12px;' }, { default: () => t('pages.skills.detail.noPrerequisites') }),
-        ]),
-
-        // Config Variables
-        h('div', [
-          h(NText, { strong: true, style: 'font-size: 13px; display: block; margin-bottom: 6px;' }, {
-            default: () => t('pages.skills.detail.configVars'),
-          }),
-          skill.configVars?.length
-            ? h(NSpace, { vertical: true, size: 8 }, {
+            // Meta info
+            h(
+              NSpace,
+              { size: 8, style: 'flex-wrap: wrap;' },
+              {
                 default: () =>
-                  skill.configVars!.map((cv: any) =>
-                    h('div', { key: cv.key }, [
-                      h(NText, { code: true, style: 'font-size: 12px; display: block;' }, { default: () => cv.key }),
-                      cv.description
-                        ? h(NText, { depth: 3, style: 'font-size: 11px; display: block; margin: 2px 0;' }, { default: () => cv.description })
-                        : null,
-                      h(NInput, {
-                        size: 'small',
-                        value: configEditValues[cv.key] ?? '',
-                        placeholder:
-                          cv.default != null ? `${t('pages.skills.detail.configDefault', { value: cv.default })}` : '',
-                        onBlur: () => handleConfigInput(cv.key),
-                        onKeyup: (e: KeyboardEvent) => {
-                          if (e.key === 'Enter') handleConfigInput(cv.key)
-                        },
-                        'onUpdate:value': (val: string) => {
-                          configEditValues[cv.key] = val
-                        },
-                      }),
-                    ]),
+                  [
+                    skill.version
+                      ? h(
+                          NTag,
+                          { size: 'small', bordered: false },
+                          { default: () => `v${skill.version}` }
+                        )
+                      : null,
+                    skill.author
+                      ? h(NTag, { size: 'small', bordered: false }, { default: () => skill.author })
+                      : null,
+                    skill.license
+                      ? h(
+                          NTag,
+                          { size: 'small', bordered: false },
+                          { default: () => skill.license }
+                        )
+                      : null
+                  ].filter(Boolean)
+              }
+            ),
+
+            // Platforms
+            h(
+              NSpace,
+              { size: 4 },
+              {
+                default: () =>
+                  skill.platforms.length
+                    ? skill.platforms.map((p: string) =>
+                        h(
+                          NTag,
+                          { size: 'small', type: 'success', bordered: false, round: true },
+                          { default: () => p }
+                        )
+                      )
+                    : [
+                        h(
+                          NTag,
+                          { size: 'small', bordered: false, round: true },
+                          { default: () => t('pages.skills.detail.platformAll') }
+                        )
+                      ]
+              }
+            ),
+
+            // Tags
+            skill.tags?.length
+              ? h('div', [
+                  h(
+                    NText,
+                    { depth: 3, style: 'font-size: 12px; display: block; margin-bottom: 4px;' },
+                    { default: () => t('pages.skills.detail.tags') }
                   ),
-              })
-            : h(NText, { depth: 3, style: 'font-size: 12px;' }, { default: () => t('pages.skills.detail.noConfigVars') }),
-        ]),
+                  h(
+                    NSpace,
+                    { size: 4 },
+                    {
+                      default: () =>
+                        skill.tags!.map((tag: string) =>
+                          h(NTag, { size: 'tiny', bordered: false }, { default: () => tag })
+                        )
+                    }
+                  )
+                ])
+              : null,
 
-        // Related Skills
-        skill.relatedSkills?.length
-          ? h('div', [
-              h(NText, { strong: true, style: 'font-size: 13px; display: block; margin-bottom: 6px;' }, {
-                default: () => t('pages.skills.detail.relatedSkills'),
-              }),
-              h(NSpace, { size: 4 }, {
-                default: () => skill.relatedSkills!.map((rs: string) => h(NTag, { size: 'small', bordered: false }, { default: () => rs })),
-              }),
-            ])
-          : null,
+            // Toggle
+            h(
+              'div',
+              {
+                style:
+                  'display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid var(--n-border-color); border-bottom: 1px solid var(--n-border-color);'
+              },
+              [
+                h(
+                  NText,
+                  {},
+                  {
+                    default: () =>
+                      skillStore.isDisabled(skill.name)
+                        ? t('pages.skills.detail.disabled')
+                        : t('pages.skills.detail.enabled')
+                  }
+                ),
+                h(NSwitch, {
+                  value: !skillStore.isDisabled(skill.name),
+                  'onUpdate:value': async () => {
+                    const ok = await skillStore.toggleSkill(skill.name)
+                    if (ok) {
+                      const msg = skillStore.isDisabled(skill.name)
+                        ? t('pages.skills.toggle.disabled', { name: skill.name })
+                        : t('pages.skills.toggle.enabled', { name: skill.name })
+                      this.message.success(msg)
+                    } else {
+                      this.message.error(t('pages.skills.toggle.failed'))
+                    }
+                  }
+                })
+              ]
+            ),
 
-        // Homepage
-        skill.homepage
-          ? h('div', { style: 'display: flex; align-items: center; gap: 4px;' }, [
-              h(NIcon, { component: LinkOutline, size: 14 }),
-              h(NText, { depth: 3, style: 'font-size: 12px;' }, { default: () => skill.homepage }),
-            ])
-          : null,
-      ].filter(Boolean),
-    })
-  },
+            // Prerequisites
+            h('div', [
+              h(
+                NText,
+                { strong: true, style: 'font-size: 13px; display: block; margin-bottom: 6px;' },
+                {
+                  default: () => t('pages.skills.detail.prerequisites')
+                }
+              ),
+              skill.prerequisites?.commands?.length || skill.prerequisites?.env_vars?.length
+                ? h(
+                    NSpace,
+                    { vertical: true, size: 4 },
+                    {
+                      default: () => [
+                        ...(skill.prerequisites?.commands || []).map((cmd: string) =>
+                          h(
+                            NText,
+                            { code: true, style: 'font-size: 12px;' },
+                            { default: () => cmd }
+                          )
+                        ),
+                        ...(skill.prerequisites?.env_vars || []).map((env: string) =>
+                          h(
+                            NText,
+                            { code: true, style: 'font-size: 12px;' },
+                            { default: () => `$${env}` }
+                          )
+                        )
+                      ]
+                    }
+                  )
+                : h(
+                    NText,
+                    { depth: 3, style: 'font-size: 12px;' },
+                    { default: () => t('pages.skills.detail.noPrerequisites') }
+                  )
+            ]),
+
+            // Config Variables
+            h('div', [
+              h(
+                NText,
+                { strong: true, style: 'font-size: 13px; display: block; margin-bottom: 6px;' },
+                {
+                  default: () => t('pages.skills.detail.configVars')
+                }
+              ),
+              skill.configVars?.length
+                ? h(
+                    NSpace,
+                    { vertical: true, size: 8 },
+                    {
+                      default: () =>
+                        skill.configVars!.map((cv: any) =>
+                          h('div', { key: cv.key }, [
+                            h(
+                              NText,
+                              { code: true, style: 'font-size: 12px; display: block;' },
+                              { default: () => cv.key }
+                            ),
+                            cv.description
+                              ? h(
+                                  NText,
+                                  {
+                                    depth: 3,
+                                    style: 'font-size: 11px; display: block; margin: 2px 0;'
+                                  },
+                                  { default: () => cv.description }
+                                )
+                              : null,
+                            h(NInput, {
+                              size: 'small',
+                              value: configEditValues[cv.key] ?? '',
+                              placeholder:
+                                cv.default != null
+                                  ? `${t('pages.skills.detail.configDefault', { value: cv.default })}`
+                                  : '',
+                              onBlur: () => handleConfigInput(cv.key),
+                              onKeyup: (e: KeyboardEvent) => {
+                                if (e.key === 'Enter') handleConfigInput(cv.key)
+                              },
+                              'onUpdate:value': (val: string) => {
+                                configEditValues[cv.key] = val
+                              }
+                            })
+                          ])
+                        )
+                    }
+                  )
+                : h(
+                    NText,
+                    { depth: 3, style: 'font-size: 12px;' },
+                    { default: () => t('pages.skills.detail.noConfigVars') }
+                  )
+            ]),
+
+            // Related Skills
+            skill.relatedSkills?.length
+              ? h('div', [
+                  h(
+                    NText,
+                    { strong: true, style: 'font-size: 13px; display: block; margin-bottom: 6px;' },
+                    {
+                      default: () => t('pages.skills.detail.relatedSkills')
+                    }
+                  ),
+                  h(
+                    NSpace,
+                    { size: 4 },
+                    {
+                      default: () =>
+                        skill.relatedSkills!.map((rs: string) =>
+                          h(NTag, { size: 'small', bordered: false }, { default: () => rs })
+                        )
+                    }
+                  )
+                ])
+              : null,
+
+            // Homepage
+            skill.homepage
+              ? h('div', { style: 'display: flex; align-items: center; gap: 4px;' }, [
+                  h(NIcon, { component: LinkOutline, size: 14 }),
+                  h(
+                    NText,
+                    { depth: 3, style: 'font-size: 12px;' },
+                    { default: () => skill.homepage }
+                  )
+                ])
+              : null
+          ].filter(Boolean)
+      }
+    )
+  }
 })
 </script>
 
@@ -851,48 +1050,53 @@ const SkillDetail = defineComponent({
   background-color: var(--n-color-hover) !important;
 }
 
+.skills-page {
+  font-size: var(--font-body);
+}
+
 .skill-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.7fr);
-  gap: 16px;
+  gap: var(--ui-gap);
   align-items: stretch;
 }
 
 .skill-hero-card,
 .skill-actions-card,
 .skill-lifecycle-card {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .skill-hero-note {
   display: block;
-  margin-bottom: 14px;
-  font-size: 13px;
+  margin-bottom: var(--ui-gap);
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
 }
 
 .skill-metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--ui-gap-sm);
 }
 
 .skill-mini {
-  min-height: 72px;
-  padding: 12px;
-  border-radius: 12px;
+  min-height: 68px;
+  padding: 10px;
+  border-radius: var(--radius);
   border: 1px solid var(--n-border-color);
   background: var(--n-color-embedded);
   min-width: 0;
 }
 
 .skill-mini-label {
-  font-size: 12px;
+  font-size: var(--font-kicker);
   color: var(--text-secondary);
 }
 
 .skill-mini-value {
-  margin-top: 8px;
-  font-size: 18px;
+  margin-top: 7px;
+  font-size: var(--font-section-title);
   font-weight: 750;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -901,16 +1105,16 @@ const SkillDetail = defineComponent({
 
 .skill-process-list {
   display: grid;
-  gap: 10px;
+  gap: var(--ui-gap-sm);
 }
 
 .skill-process-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--ui-gap);
+  padding: 10px 12px;
   border: 1px solid var(--n-border-color);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--n-color-embedded);
 }
 
@@ -934,9 +1138,92 @@ const SkillDetail = defineComponent({
 .skill-process-detail {
   display: block;
   margin-top: 4px;
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
   overflow-wrap: anywhere;
+}
+
+.skill-filter-bar {
+  display: flex;
+  gap: var(--ui-gap-sm);
+  margin-top: var(--ui-gap);
+  flex-wrap: wrap;
+}
+
+.skill-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--ui-gap-sm);
+}
+
+.skill-chip {
+  appearance: none;
+  border: 1px solid var(--n-border-color);
+  border-radius: var(--radius);
+  background: var(--n-color-embedded);
+  color: var(--text-primary);
+  padding: 9px 10px;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+}
+
+.skill-chip:hover {
+  border-color: rgba(99, 226, 183, 0.52);
+  background: rgba(99, 226, 183, 0.08);
+}
+
+.skill-chip-name {
+  min-width: 0;
+  font-size: var(--font-card-title);
+  font-weight: 720;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-chip-meta {
+  color: var(--text-secondary);
+  font-size: var(--font-body-sm);
+}
+
+.skill-browser {
+  display: flex;
+  gap: var(--ui-gap);
+  align-items: flex-start;
+}
+
+.skill-detail-card {
+  flex: 0 0 38%;
+  min-width: 280px;
+  position: sticky;
+  top: 12px;
+}
+
+.skill-empty {
+  text-align: center;
+  padding: 28px;
+}
+
+.skill-empty--compact {
+  padding: 12px;
+}
+
+.skill-dir-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-gap-sm);
+  margin-bottom: var(--ui-gap);
+}
+
+.skill-dir-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-gap-sm);
+  padding: 8px;
+  background: var(--n-color-embedded);
+  border-radius: var(--radius);
 }
 
 @media (max-width: 1100px) {

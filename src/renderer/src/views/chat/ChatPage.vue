@@ -2674,8 +2674,7 @@ async function handleSend() {
       <aside class="chat-list">
         <NSpace vertical :size="12">
           <div class="chat-side-heading">
-            <NText strong class="chat-side-heading-title">会话管理</NText>
-            <NText depth="3" class="chat-side-heading-note">会话不再是独立主入口。</NText>
+            <NText strong class="chat-side-heading-title">会话</NText>
           </div>
 
           <!-- Hermes REST: New conversation button -->
@@ -3430,10 +3429,7 @@ async function handleSend() {
       <aside class="chat-tools">
         <NSpace vertical :size="12">
           <div>
-            <NText strong class="chat-tools-title">右侧调试抽屉</NText>
-            <NText depth="3" class="chat-tools-note">
-              模型、Skill、token、工具调用详情集中在这里，不挤占聊天主区域。
-            </NText>
+            <NText strong class="chat-tools-title">运行详情</NText>
           </div>
 
           <div class="chat-tools-grid">
@@ -3540,18 +3536,18 @@ async function handleSend() {
 <style scoped>
 .chat-page {
   min-height: 0;
-  height: calc(100vh - var(--header-height) - 48px);
+  height: calc(100vh - var(--header-height) - var(--app-content-y-padding));
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-gap);
 }
 
 .chat-layout {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 280px;
-  gap: 16px;
+  grid-template-columns: 248px minmax(520px, 1fr) 252px;
+  gap: var(--ui-gap);
   align-items: stretch;
 }
 
@@ -3568,13 +3564,13 @@ async function handleSend() {
 
 .chat-list,
 .chat-tools {
-  padding: 16px;
+  padding: var(--ui-panel-padding);
   overflow: auto;
 }
 
 .chat-main {
   display: flex;
-  padding: 16px;
+  padding: var(--ui-panel-padding);
   overflow: hidden;
 }
 
@@ -3627,7 +3623,7 @@ async function handleSend() {
 }
 
 .chat-agent-details {
-  padding: 10px;
+  padding: var(--ui-panel-padding-sm);
   border: 1px dashed var(--border-color);
   border-radius: var(--radius);
   background: var(--bg-secondary);
@@ -3726,12 +3722,12 @@ async function handleSend() {
 }
 
 .chat-side-heading {
-  padding: 2px 2px 4px;
+  padding: 2px 2px 0;
 }
 
 .chat-side-heading-title {
   display: block;
-  font-size: 15px;
+  font-size: var(--font-section-title);
 }
 
 .chat-side-heading-note {
@@ -3742,30 +3738,31 @@ async function handleSend() {
 
 .chat-tools-title {
   display: block;
-  font-size: 15px;
+  font-size: var(--font-section-title);
 }
 
 .chat-tools-note {
   display: block;
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--font-body-sm);
   line-height: 1.45;
 }
 
 .chat-tools-grid {
   display: grid;
-  gap: 8px;
+  grid-template-columns: 1fr;
+  gap: var(--ui-gap-sm);
 }
 
 .chat-tools-mini,
 .chat-tools-section {
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--bg-primary);
 }
 
 .chat-tools-mini {
-  padding: 10px;
+  padding: var(--ui-panel-padding-sm);
   min-width: 0;
 }
 
@@ -3773,28 +3770,28 @@ async function handleSend() {
 .chat-tools-row span {
   display: block;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-kicker);
 }
 
 .chat-tools-mini strong {
   display: block;
-  margin-top: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-top: 5px;
+  font-size: var(--font-card-title);
+  line-height: var(--line-tight);
+  overflow-wrap: anywhere;
 }
 
 .chat-tools-section {
-  padding: 4px 10px;
+  padding: 4px var(--ui-panel-padding-sm);
 }
 
 .chat-tools-row {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 0;
+  padding: 7px 0;
   border-bottom: 1px solid var(--border-color);
-  font-size: 12px;
+  font-size: var(--font-body-sm);
 }
 
 .chat-tools-row:last-child {
@@ -3810,19 +3807,19 @@ async function handleSend() {
 
 .chat-tools-controls {
   display: grid;
-  gap: 10px;
+  gap: var(--ui-gap-sm);
 }
 
 .chat-tools-control {
-  padding: 10px;
+  padding: var(--ui-panel-padding-sm);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--bg-primary);
 }
 
 .chat-tools-control-label {
   display: block;
-  font-size: 12px;
+  font-size: var(--font-kicker);
 }
 
 /* ── Hermes conversation list ── */
@@ -3830,7 +3827,7 @@ async function handleSend() {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 400px;
+  max-height: calc(100vh - var(--header-height) - 180px);
   overflow-y: auto;
 }
 
@@ -3845,7 +3842,7 @@ async function handleSend() {
 
 .hermes-conv-item {
   position: relative;
-  padding: 8px 10px;
+  padding: 8px 9px;
   border-radius: 6px;
   border: 1px solid transparent;
   cursor: pointer;
@@ -3875,7 +3872,7 @@ async function handleSend() {
 }
 
 .hermes-conv-title {
-  font-size: 13px;
+  font-size: var(--font-body);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3931,7 +3928,7 @@ async function handleSend() {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-gap);
   min-height: 0;
   overflow: hidden;
 }
@@ -3939,7 +3936,7 @@ async function handleSend() {
 .chat-side-switches,
 .chat-side-stats,
 .chat-quick-panel {
-  padding: 10px;
+  padding: var(--ui-panel-padding-sm);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   background: var(--bg-primary);
@@ -4055,8 +4052,8 @@ async function handleSend() {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px;
-  padding-bottom: 20px;
+  padding: 2px;
+  padding-bottom: 16px;
   overflow-anchor: none;
   overscroll-behavior: contain;
   background: transparent;
@@ -4070,7 +4067,7 @@ async function handleSend() {
 }
 
 :deep(.chat-compose-card .n-card__content) {
-  padding: 12px !important;
+  padding: var(--ui-panel-padding-sm) !important;
 }
 
 .chat-slash-panel {
@@ -4153,10 +4150,10 @@ async function handleSend() {
 .chat-bubble {
   position: relative;
   width: fit-content;
-  max-width: min(840px, 88%);
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  max-width: min(820px, 86%);
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  border-radius: var(--radius);
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
 }
@@ -4218,8 +4215,8 @@ async function handleSend() {
 
 .chat-markdown {
   white-space: normal;
-  font-size: 12.5px;
-  line-height: 1.72;
+  font-size: var(--font-body);
+  line-height: var(--line-readable);
   word-break: break-word;
   overflow-wrap: break-word;
 }
@@ -4242,7 +4239,7 @@ async function handleSend() {
   margin: 16px 0 4px;
   line-height: 1.4;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .chat-markdown :deep(h1) {
@@ -4258,7 +4255,7 @@ async function handleSend() {
 /* —— 段落 —— */
 .chat-markdown :deep(p) {
   margin: 4px 0;
-  line-height: 1.72;
+  line-height: var(--line-readable);
 }
 
 /* —— 表格（GFM） —— */
@@ -4619,7 +4616,7 @@ async function handleSend() {
 
 body.wide-mode .chat-layout {
   display: grid !important;
-  grid-template-columns: 320px minmax(0, 1fr) 320px !important;
+  grid-template-columns: 280px minmax(0, 1fr) 280px !important;
   grid-template-rows: 1fr !important;
 }
 
@@ -4627,7 +4624,7 @@ body.wide-mode .chat-bubble {
   max-width: min(1600px, 92%);
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .chat-page {
     height: auto;
   }

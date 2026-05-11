@@ -60,7 +60,7 @@ onUnmounted(() => {
       <NLayoutContent
         class="app-layout-content"
         :native-scrollbar="false"
-        content-style="padding: 22px 24px 34px;"
+        content-style="padding: 18px var(--app-content-x-padding) 28px;"
       >
         <div class="page-container">
           <RouterView v-slot="{ Component }">
@@ -97,8 +97,8 @@ onUnmounted(() => {
 }
 
 .app-layout-header {
-  height: 68px;
-  padding: 0 24px;
+  height: var(--header-height);
+  padding: 0 var(--app-content-x-padding);
   display: flex;
   align-items: center;
   position: sticky;
@@ -117,7 +117,7 @@ onUnmounted(() => {
 }
 
 .app-layout-content {
-  height: calc(100vh - 68px);
+  height: calc(100vh - var(--header-height));
   background: var(--bg-secondary);
 }
 

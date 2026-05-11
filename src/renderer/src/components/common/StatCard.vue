@@ -10,11 +10,11 @@ defineProps<{
 </script>
 
 <template>
-  <NCard :bordered="true" style="border-radius: var(--radius-lg);">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+  <NCard :bordered="true" class="stat-card-shell">
+    <div class="stat-card-inner">
       <NStatistic :label="title" :value="value" />
       <div
-        style="width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"
+        class="stat-card-icon"
         :style="{ backgroundColor: (color || '#18a058') + '15', color: color || '#18a058' }"
       >
         <NIcon :size="22" :component="icon as any" />
@@ -22,3 +22,35 @@ defineProps<{
     </div>
   </NCard>
 </template>
+
+<style scoped>
+.stat-card-shell {
+  border-radius: var(--radius);
+}
+
+.stat-card-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--ui-gap);
+}
+
+.stat-card-shell :deep(.n-statistic .n-statistic__label) {
+  font-size: var(--font-kicker);
+}
+
+.stat-card-shell :deep(.n-statistic .n-statistic-value) {
+  font-size: var(--font-metric);
+  line-height: var(--line-tight);
+}
+
+.stat-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+</style>

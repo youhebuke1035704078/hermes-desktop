@@ -18,7 +18,7 @@ import {
   NInput,
   NSpin,
   NAlert,
-  useMessage,
+  useMessage
 } from 'naive-ui'
 import {
   ServerOutline,
@@ -33,7 +33,7 @@ import {
   InformationCircleOutline,
   PaperPlaneOutline,
   CogOutline,
-  CopyOutline,
+  CopyOutline
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore, type ThemeMode } from '@/stores/theme'
@@ -55,27 +55,37 @@ const { t } = useI18n()
 const message = useMessage()
 
 // ── Theme ──
-const themeOptions = computed(() => ([
+const themeOptions = computed(() => [
   { label: t('pages.settings.themeLight'), value: 'light' },
-  { label: t('pages.settings.themeDark'), value: 'dark' },
-]))
+  { label: t('pages.settings.themeDark'), value: 'dark' }
+])
 
 // ── Connection status ──
 const connectionStatus = computed(() => {
   // Local Hermes REST mode has no WebSocket — derive status from connectionStore
   if (connectionStore.serverType === 'hermes-rest') {
     const st = connectionStore.status
-    if (st === 'connected') return { text: t('pages.settings.statusConnected'), type: 'success' as const }
-    if (st === 'connecting') return { text: t('pages.settings.statusConnecting'), type: 'info' as const }
+    if (st === 'connected')
+      return { text: t('pages.settings.statusConnected'), type: 'success' as const }
+    if (st === 'connecting')
+      return { text: t('pages.settings.statusConnecting'), type: 'info' as const }
     if (st === 'error') return { text: t('pages.settings.statusFailed'), type: 'error' as const }
     return { text: t('pages.settings.statusDisconnected'), type: 'error' as const }
   }
   switch (wsStore.state) {
-    case ConnectionState.CONNECTED: return { text: t('pages.settings.statusConnected'), type: 'success' as const }
-    case ConnectionState.CONNECTING: return { text: t('pages.settings.statusConnecting'), type: 'info' as const }
-    case ConnectionState.RECONNECTING: return { text: t('pages.settings.statusReconnecting', { count: wsStore.reconnectAttempts }), type: 'warning' as const }
-    case ConnectionState.FAILED: return { text: t('pages.settings.statusFailed'), type: 'error' as const }
-    default: return { text: t('pages.settings.statusDisconnected'), type: 'error' as const }
+    case ConnectionState.CONNECTED:
+      return { text: t('pages.settings.statusConnected'), type: 'success' as const }
+    case ConnectionState.CONNECTING:
+      return { text: t('pages.settings.statusConnecting'), type: 'info' as const }
+    case ConnectionState.RECONNECTING:
+      return {
+        text: t('pages.settings.statusReconnecting', { count: wsStore.reconnectAttempts }),
+        type: 'warning' as const
+      }
+    case ConnectionState.FAILED:
+      return { text: t('pages.settings.statusFailed'), type: 'error' as const }
+    default:
+      return { text: t('pages.settings.statusDisconnected'), type: 'error' as const }
   }
 })
 
@@ -92,7 +102,9 @@ const isLocalServer = computed(() => {
   try {
     const host = new URL(url).hostname
     return host === 'localhost' || host === '127.0.0.1' || host === '::1'
-  } catch { return false }
+  } catch {
+    return false
+  }
 })
 
 // ── Remote management API ──
@@ -104,7 +116,9 @@ const mgmtUrl = computed(() => {
     const u = new URL(url)
     u.port = '8643'
     return u.origin
-  } catch { return '' }
+  } catch {
+    return ''
+  }
 })
 
 /** Wall-clock timeout for the mgmt-server health probe. Main-process
@@ -114,9 +128,9 @@ const MGMT_PROBE_TIMEOUT_MS = 5000
 
 async function mgmtHealthFetcher(url: string): Promise<MgmtFetchResult> {
   const fetchPromise: Promise<MgmtFetchResult> = window.api
-    ? window.api.httpFetch(url).then(r => ({ ok: r.ok, status: r.status, body: r.body }))
+    ? window.api.httpFetch(url).then((r) => ({ ok: r.ok, status: r.status, body: r.body }))
     : fetch(url, { signal: AbortSignal.timeout(MGMT_PROBE_TIMEOUT_MS) })
-        .then(async r => ({ ok: r.ok, status: r.status, body: await r.text() }))
+        .then(async (r) => ({ ok: r.ok, status: r.status, body: await r.text() }))
         .catch((e: any) => ({ ok: false, status: 0, body: e?.message || 'fetch failed' }))
   const timeoutPromise = new Promise<MgmtFetchResult>((_, reject) =>
     setTimeout(() => reject(new Error('timeout')), MGMT_PROBE_TIMEOUT_MS)
@@ -135,8 +149,10 @@ const restSettingsProbing = ref(false)
 const restSettingsError = ref('')
 
 /** True if version/config/restart features should be shown */
-const canManage = computed(() =>
-  isHermesRest.value && (isLocalServer.value || restSettingsAvailable.value || mgmtAvailable.value)
+const canManage = computed(
+  () =>
+    isHermesRest.value &&
+    (isLocalServer.value || restSettingsAvailable.value || mgmtAvailable.value)
 )
 const remoteManageAvailable = computed(() => restSettingsAvailable.value || mgmtAvailable.value)
 const remoteProbeBusy = computed(() => restSettingsProbing.value || mgmtProbing.value)
@@ -150,29 +166,48 @@ const mgmtErrorMessage = computed(() => {
 })
 
 /** Call remote management API with auth */
-async function mgmtFetch(path: string, options: { method?: string; body?: string } = {}): Promise<any> {
+async function mgmtFetch(
+  path: string,
+  options: { method?: string; body?: string } = {}
+): Promise<any> {
   const url = `${mgmtUrl.value}${path}`
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (connectionStore.hermesAuthToken) headers['Authorization'] = `Bearer ${connectionStore.hermesAuthToken}`
+  if (connectionStore.hermesAuthToken)
+    headers['Authorization'] = `Bearer ${connectionStore.hermesAuthToken}`
   if (window.api) {
-    const resp = await window.api.httpFetch(url, { method: options.method || 'GET', headers, body: options.body })
+    const resp = await window.api.httpFetch(url, {
+      method: options.method || 'GET',
+      headers,
+      body: options.body
+    })
     return typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : resp
   }
-  const resp = await fetch(url, { method: options.method || 'GET', headers, body: options.body, signal: AbortSignal.timeout(10000) })
+  const resp = await fetch(url, {
+    method: options.method || 'GET',
+    headers,
+    body: options.body,
+    signal: AbortSignal.timeout(10000)
+  })
   return resp.json()
 }
 
 /** Call Hermes Agent REST settings API on the connected :8642 server. */
-async function restSettingsFetch(path: string, options: { method?: string; body?: string } = {}): Promise<any> {
+async function restSettingsFetch(
+  path: string,
+  options: { method?: string; body?: string } = {}
+): Promise<any> {
   return await hermesRestRequest(`/v1/hermes/settings${path}`, {
     method: options.method || 'GET',
     headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
-    body: options.body,
+    body: options.body
   })
 }
 
 /** Remote settings calls prefer the built-in Hermes REST API and keep 8643 as legacy fallback. */
-async function remoteSettingsFetch(path: string, options: { method?: string; body?: string } = {}): Promise<any> {
+async function remoteSettingsFetch(
+  path: string,
+  options: { method?: string; body?: string } = {}
+): Promise<any> {
   if (restSettingsAvailable.value) {
     return await restSettingsFetch(path, options)
   }
@@ -266,7 +301,7 @@ const hermesVersionLoading = ref(false)
 const hermesCurrentTag = ref('')
 const hermesLatestTag = ref('')
 const hermesUpdateAvailable = ref(false)
-const hermesUpdateChecked = ref(false)   // true after first check completes
+const hermesUpdateChecked = ref(false) // true after first check completes
 const hermesCheckingUpdate = ref(false)
 const hermesUpdating = ref(false)
 const hermesUpdateLog = ref('')
@@ -292,20 +327,24 @@ const modelDiagnosticItems = ref<ModelDiagnosticItem[]>([])
 const hermesReleaseUrl = computed(() =>
   hermesLatestTag.value
     ? `https://github.com/NousResearch/hermes-agent/releases/tag/${hermesLatestTag.value}`
-    : 'https://github.com/NousResearch/hermes-agent/releases',
+    : 'https://github.com/NousResearch/hermes-agent/releases'
 )
 
 const modelDiagnosticSummary = computed(() => {
-  const hasError = modelDiagnosticItems.value.some(item => item.type === 'error')
-  const hasWarning = modelDiagnosticItems.value.some(item => item.type === 'warning')
+  const hasError = modelDiagnosticItems.value.some((item) => item.type === 'error')
+  const hasWarning = modelDiagnosticItems.value.some((item) => item.type === 'warning')
   return {
-    type: hasError ? 'error' as DiagnosticType : hasWarning ? 'warning' as DiagnosticType : 'success' as DiagnosticType,
-    label: hasError ? '异常' : hasWarning ? '需关注' : '可用',
+    type: hasError
+      ? ('error' as DiagnosticType)
+      : hasWarning
+        ? ('warning' as DiagnosticType)
+        : ('success' as DiagnosticType),
+    label: hasError ? '异常' : hasWarning ? '需关注' : '可用'
   }
 })
 
 const modelDiagnosticCheckedText = computed(() =>
-  modelDiagnosticCheckedAt.value ? formatRelativeTime(modelDiagnosticCheckedAt.value) : '尚未运行',
+  modelDiagnosticCheckedAt.value ? formatRelativeTime(modelDiagnosticCheckedAt.value) : '尚未运行'
 )
 
 const modelDiagnosticText = computed(() => {
@@ -314,7 +353,7 @@ const modelDiagnosticText = computed(() => {
     `服务器：${currentServer.value?.url || '-'}`,
     `当前识别模型：${connectionStore.hermesRealModel || 'unknown'}`,
     `上次诊断：${modelDiagnosticCheckedText.value}`,
-    ...modelDiagnosticItems.value.map(item => `- ${item.label}: ${item.value} | ${item.detail}`),
+    ...modelDiagnosticItems.value.map((item) => `- ${item.label}: ${item.value} | ${item.detail}`)
   ].join('\n')
 })
 
@@ -334,7 +373,7 @@ function parseFallbackModels(content: string): string[] {
   const fallbackBlock = content.match(/(?:fallback_providers|fallback_model):([\s\S]*?)(?:\n\S|$)/)
   const source = fallbackBlock?.[1] || ''
   const models = [...source.matchAll(/^\s*(?:-\s*)?model:\s*['"]?([^'"#\n]+)/gm)]
-    .map(match => (match[1] || '').trim())
+    .map((match) => (match[1] || '').trim())
     .filter(Boolean)
   if (!models.length) {
     const inline = content.match(/^\s*fallback_model:\s*['"]?([^'"#\n]+)/m)?.[1]?.trim()
@@ -383,14 +422,18 @@ function extractModelProbeText(payload: any): string {
   ).toString()
 }
 
-async function probeChatModel(label: string, key: string, model: string): Promise<ModelDiagnosticItem> {
+async function probeChatModel(
+  label: string,
+  key: string,
+  model: string
+): Promise<ModelDiagnosticItem> {
   if (!model) {
     return {
       key,
       label,
       value: '未配置',
       detail: '没有可测试的模型名',
-      type: 'warning',
+      type: 'warning'
     }
   }
   const started = Date.now()
@@ -402,8 +445,8 @@ async function probeChatModel(label: string, key: string, model: string): Promis
         model,
         messages: [{ role: 'user', content: '请只回复 OK，用于 Hermes Desktop 模型健康检查。' }],
         max_tokens: 8,
-        stream: false,
-      }),
+        stream: false
+      })
     })
     const preview = extractModelProbeText(result).slice(0, 40) || '接口已响应'
     return {
@@ -411,7 +454,7 @@ async function probeChatModel(label: string, key: string, model: string): Promis
       label,
       value: '可用',
       detail: `${model} · ${Date.now() - started}ms · ${preview}`,
-      type: 'success',
+      type: 'success'
     }
   } catch (e: any) {
     return {
@@ -419,7 +462,7 @@ async function probeChatModel(label: string, key: string, model: string): Promis
       label,
       value: '失败',
       detail: `${model} · ${e?.message || '模型调用失败'}`,
-      type: 'error',
+      type: 'error'
     }
   }
 }
@@ -434,7 +477,7 @@ async function runModelDiagnostic() {
     label: '访问令牌',
     value: tokenPresent ? '已配置' : '未配置',
     detail: tokenPresent ? 'Desktop 会在 REST 请求中附带 Bearer token' : '受保护接口可能返回 401',
-    type: tokenPresent ? 'success' : 'warning',
+    type: tokenPresent ? 'success' : 'warning'
   })
 
   try {
@@ -444,7 +487,7 @@ async function runModelDiagnostic() {
       label: '服务健康',
       value: health?.status || health?.ok ? '可访问' : '有响应',
       detail: currentServer.value?.url || 'Hermes REST',
-      type: health?.ok === false ? 'warning' : 'success',
+      type: health?.ok === false ? 'warning' : 'success'
     })
   } catch (e: any) {
     items.push({
@@ -452,7 +495,7 @@ async function runModelDiagnostic() {
       label: '服务健康',
       value: '失败',
       detail: e?.message || 'health probe failed',
-      type: 'error',
+      type: 'error'
     })
   }
 
@@ -465,8 +508,10 @@ async function runModelDiagnostic() {
       key: 'models',
       label: '模型接口',
       value: modelIds[0] || connectionStore.hermesRealModel || '已响应',
-      detail: modelIds.length ? `可见模型 ${modelIds.slice(0, 3).join(', ')}` : '接口响应中未包含模型列表',
-      type: modelIds.length || connectionStore.hermesRealModel ? 'success' : 'warning',
+      detail: modelIds.length
+        ? `可见模型 ${modelIds.slice(0, 3).join(', ')}`
+        : '接口响应中未包含模型列表',
+      type: modelIds.length || connectionStore.hermesRealModel ? 'success' : 'warning'
     })
   } catch (e: any) {
     items.push({
@@ -474,7 +519,7 @@ async function runModelDiagnostic() {
       label: '模型接口',
       value: '失败',
       detail: e?.message || 'models probe failed',
-      type: 'error',
+      type: 'error'
     })
   }
 
@@ -490,29 +535,33 @@ async function runModelDiagnostic() {
     key: 'config-main',
     label: '主模型配置',
     value: configuredDefault || connectionStore.hermesRealModel || '未识别',
-    detail: configuredProvider ? `provider: ${configuredProvider}` : '未从 config.yaml 解析到 provider',
-    type: configuredDefault || connectionStore.hermesRealModel ? 'success' : 'warning',
+    detail: configuredProvider
+      ? `provider: ${configuredProvider}`
+      : '未从 config.yaml 解析到 provider',
+    type: configuredDefault || connectionStore.hermesRealModel ? 'success' : 'warning'
   })
   items.push({
     key: 'config-fallback',
     label: '备用模型',
     value: fallbackModels || '未配置',
-    detail: fallbackModels ? 'fallback_providers 已配置' : '建议保留可用备用模型，避免主模型凭据失败时中断',
-    type: fallbackModels ? 'success' : 'warning',
+    detail: fallbackModels
+      ? 'fallback_providers 已配置'
+      : '建议保留可用备用模型，避免主模型凭据失败时中断',
+    type: fallbackModels ? 'success' : 'warning'
   })
   items.push({
     key: 'gemini-key',
     label: 'GEMINI_API_KEY',
     value: hasEnvValue(envContent.value, 'GEMINI_API_KEY') ? '已配置' : '未配置',
     detail: '用于 Gemini 备用模型可用性',
-    type: hasEnvValue(envContent.value, 'GEMINI_API_KEY') ? 'success' : 'warning',
+    type: hasEnvValue(envContent.value, 'GEMINI_API_KEY') ? 'success' : 'warning'
   })
   items.push({
     key: 'server-key',
     label: 'API_SERVER_KEY',
     value: hasEnvValue(envContent.value, 'API_SERVER_KEY') ? '已配置' : '未配置',
     detail: '用于 Desktop 访问受保护的 Hermes REST 接口',
-    type: hasEnvValue(envContent.value, 'API_SERVER_KEY') || tokenPresent ? 'success' : 'warning',
+    type: hasEnvValue(envContent.value, 'API_SERVER_KEY') || tokenPresent ? 'success' : 'warning'
   })
 
   const primaryModel = configuredDefault || connectionStore.hermesRealModel || 'hermes-agent'
@@ -521,12 +570,16 @@ async function runModelDiagnostic() {
 
   modelDiagnosticItems.value = items
   modelDiagnosticCheckedAt.value = Date.now()
-  const hasError = items.some(item => item.type === 'error')
+  const hasError = items.some((item) => item.type === 'error')
   opsStore.pushNotice({
     title: hasError ? '模型与凭据诊断发现异常' : '模型与凭据诊断通过',
-    detail: items.filter(item => item.type === 'error' || item.type === 'warning').map(item => `${item.label}: ${item.detail}`).join('；') || '主模型、备用模型、服务健康和关键凭据检查完成。',
+    detail:
+      items
+        .filter((item) => item.type === 'error' || item.type === 'warning')
+        .map((item) => `${item.label}: ${item.detail}`)
+        .join('；') || '主模型、备用模型、服务健康和关键凭据检查完成。',
     severity: hasError ? 'warning' : 'success',
-    source: '模型诊断',
+    source: '模型诊断'
   })
   modelDiagnosticLoading.value = false
 }
@@ -547,15 +600,19 @@ async function copyModelDiagnostic(): Promise<void> {
 async function fetchHermesVersion() {
   hermesVersionLoading.value = true
   try {
-    const res = isLocalServer.value && window.api
-      ? await window.api.hermesVersion()
-      : await remoteSettingsFetch('/version')
+    const res =
+      isLocalServer.value && window.api
+        ? await window.api.hermesVersion()
+        : await remoteSettingsFetch('/version')
     if (res.ok) {
       hermesVersion.value = res.version || ''
       hermesDate.value = res.date || ''
     }
-  } catch { /* ignore */ }
-  finally { hermesVersionLoading.value = false }
+  } catch {
+    /* ignore */
+  } finally {
+    hermesVersionLoading.value = false
+  }
 }
 
 async function checkHermesUpdate() {
@@ -565,9 +622,10 @@ async function checkHermesUpdate() {
   // by a leftover message from a previous failure.
   hermesCheckError.value = ''
   try {
-    const res = isLocalServer.value && window.api
-      ? await window.api.hermesCheckUpdate()
-      : await remoteSettingsFetch('/check-update')
+    const res =
+      isLocalServer.value && window.api
+        ? await window.api.hermesCheckUpdate()
+        : await remoteSettingsFetch('/check-update')
     if (res.ok) {
       hermesCurrentTag.value = res.current || ''
       hermesLatestTag.value = res.latest || ''
@@ -603,9 +661,10 @@ async function doHermesUpdate() {
     })
   }
   try {
-    const res = isLocalServer.value && window.api
-      ? await window.api.hermesUpdate()
-      : await remoteSettingsFetch('/update', { method: 'POST' })
+    const res =
+      isLocalServer.value && window.api
+        ? await window.api.hermesUpdate()
+        : await remoteSettingsFetch('/update', { method: 'POST' })
     if (res.ok) {
       message.success(t('pages.settings.updateSuccess'))
       hermesUpdateAvailable.value = false
@@ -638,9 +697,10 @@ async function loadConfigFiles() {
   configYamlError.value = ''
   configYamlNotFound.value = false
   try {
-    const res = isLocalServer.value && window.api
-      ? await window.api.fsReadFile(`${hermesDir.value}/config.yaml`)
-      : await remoteSettingsFetch('/config/yaml')
+    const res =
+      isLocalServer.value && window.api
+        ? await window.api.fsReadFile(`${hermesDir.value}/config.yaml`)
+        : await remoteSettingsFetch('/config/yaml')
     if (res.ok) {
       configYaml.value = res.content || ''
       if (res.notFound) configYamlNotFound.value = true
@@ -661,9 +721,10 @@ async function loadConfigFiles() {
   envError.value = ''
   envNotFound.value = false
   try {
-    const res = isLocalServer.value && window.api
-      ? await window.api.fsReadFile(`${hermesDir.value}/.env`)
-      : await remoteSettingsFetch('/config/env')
+    const res =
+      isLocalServer.value && window.api
+        ? await window.api.fsReadFile(`${hermesDir.value}/.env`)
+        : await remoteSettingsFetch('/config/env')
     if (res.ok) {
       envContent.value = res.content || ''
       if (res.notFound) envNotFound.value = true
@@ -683,16 +744,20 @@ async function loadConfigFiles() {
 async function saveConfigYaml() {
   configYamlSaving.value = true
   try {
-    const res = isLocalServer.value && window.api
-      ? await window.api.fsWriteFile(`${hermesDir.value}/config.yaml`, configYaml.value)
-      : await remoteSettingsFetch('/config/yaml', { method: 'PUT', body: JSON.stringify({ content: configYaml.value }) })
+    const res =
+      isLocalServer.value && window.api
+        ? await window.api.fsWriteFile(`${hermesDir.value}/config.yaml`, configYaml.value)
+        : await remoteSettingsFetch('/config/yaml', {
+            method: 'PUT',
+            body: JSON.stringify({ content: configYaml.value })
+          })
     if (res.ok) {
       message.success(t('pages.settings.saveSuccess'))
       configYamlNotFound.value = false
       opsStore.recordAudit({
         target: 'config.yaml',
         action: '保存',
-        detail: `${currentServer.value?.url || 'local'} · ${configYaml.value.length} chars · 重启后生效`,
+        detail: `${currentServer.value?.url || 'local'} · ${configYaml.value.length} chars · 重启后生效`
       })
     } else {
       message.error(`${t('pages.settings.saveFailed')}: ${res.error}`)
@@ -707,16 +772,20 @@ async function saveConfigYaml() {
 async function saveEnv() {
   envSaving.value = true
   try {
-    const res = isLocalServer.value && window.api
-      ? await window.api.fsWriteFile(`${hermesDir.value}/.env`, envContent.value)
-      : await remoteSettingsFetch('/config/env', { method: 'PUT', body: JSON.stringify({ content: envContent.value }) })
+    const res =
+      isLocalServer.value && window.api
+        ? await window.api.fsWriteFile(`${hermesDir.value}/.env`, envContent.value)
+        : await remoteSettingsFetch('/config/env', {
+            method: 'PUT',
+            body: JSON.stringify({ content: envContent.value })
+          })
     if (res.ok) {
       message.success(t('pages.settings.saveSuccess'))
       envNotFound.value = false
       opsStore.recordAudit({
         target: '.env',
         action: '保存',
-        detail: `${currentServer.value?.url || 'local'} · ${envContent.value.split('\n').filter(Boolean).length} 行 · 重启后生效`,
+        detail: `${currentServer.value?.url || 'local'} · ${envContent.value.split('\n').filter(Boolean).length} 行 · 重启后生效`
       })
     } else {
       message.error(`${t('pages.settings.saveFailed')}: ${res.error}`)
@@ -734,28 +803,34 @@ function exportDiagnosticReport() {
       connectedServer: currentServer.value?.url || '',
       serverType: connectionStore.serverType,
       connectionStatus: connectionStore.status,
-      model: connectionStore.hermesRealModel || '',
+      model: connectionStore.hermesRealModel || ''
     },
     modelDiagnostic: {
-      checkedAt: modelDiagnosticCheckedAt.value ? new Date(modelDiagnosticCheckedAt.value).toISOString() : null,
-      items: modelDiagnosticItems.value,
+      checkedAt: modelDiagnosticCheckedAt.value
+        ? new Date(modelDiagnosticCheckedAt.value).toISOString()
+        : null,
+      items: modelDiagnosticItems.value
     },
     update: {
       current: hermesCurrentTag.value || hermesVersion.value,
       latest: hermesLatestTag.value,
       checkError: hermesCheckError.value,
-      updateError: hermesUpdateError.value,
-    },
+      updateError: hermesUpdateError.value
+    }
   })
-  downloadJSON(report, `hermes-desktop-diagnostic-${new Date().toISOString().replace(/[:.]/g, '-')}.json`)
+  downloadJSON(
+    report,
+    `hermes-desktop-diagnostic-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+  )
 }
 
 async function restartHermes() {
   restarting.value = true
   try {
-    const res = isLocalServer.value && window.api
-      ? await window.api.hermesRestart()
-      : await remoteSettingsFetch('/restart', { method: 'POST' })
+    const res =
+      isLocalServer.value && window.api
+        ? await window.api.hermesRestart()
+        : await remoteSettingsFetch('/restart', { method: 'POST' })
     if (res.ok) {
       message.success(t('pages.settings.restartSuccess'))
     } else {
@@ -787,16 +862,19 @@ onMounted(async () => {
 // a drop (Tailscale reconnect, server restart, manual disconnect+reconnect).
 // Without this, a one-shot probe failure during mount would leave the
 // Settings page permanently showing the misleading "local-only" banner.
-watch(() => connectionStore.status, (newStatus, oldStatus) => {
-  if (
-    newStatus === 'connected' &&
-    oldStatus !== 'connected' &&
-    isHermesRest.value &&
-    !isLocalServer.value
-  ) {
-    void triggerMgmtProbe()
+watch(
+  () => connectionStore.status,
+  (newStatus, oldStatus) => {
+    if (
+      newStatus === 'connected' &&
+      oldStatus !== 'connected' &&
+      isHermesRest.value &&
+      !isLocalServer.value
+    ) {
+      void triggerMgmtProbe()
+    }
   }
-})
+)
 
 watch(
   () => [connectionStore.currentServer?.url || '', connectionStore.serverType] as const,
@@ -807,17 +885,17 @@ watch(
     if (connectionStore.status === 'connected' && isHermesRest.value && !isLocalServer.value) {
       void triggerMgmtProbe()
     }
-  },
+  }
 )
 </script>
 
 <template>
-  <NSpace vertical :size="16">
+  <NSpace vertical :size="12" class="settings-page">
     <NCard class="app-card settings-overview-card">
       <template #header>
         <NSpace align="center" :size="8">
           <NIcon :component="CogOutline" size="18" />
-          <span>系统设置分区</span>
+          <span>系统设置</span>
         </NSpace>
       </template>
       <template #header-extra>
@@ -827,7 +905,7 @@ watch(
       </template>
 
       <NText depth="3" class="settings-overview-note">
-        按排障顺序重排：先连接与模型，再运维维护，最后偏好。
+        连接、模型、更新、诊断和偏好集中管理。
       </NText>
       <div class="settings-groups">
         <div class="settings-group">
@@ -838,7 +916,9 @@ watch(
           </div>
           <div class="settings-row">
             <span>访问令牌</span>
-            <strong>{{ isNoAuth ? '免认证' : currentServer?.username ? '已配置' : '未配置' }}</strong>
+            <strong>{{
+              isNoAuth ? '免认证' : currentServer?.username ? '已配置' : '未配置'
+            }}</strong>
           </div>
           <div class="settings-row">
             <span>主模型</span>
@@ -846,9 +926,20 @@ watch(
           </div>
           <div class="settings-row">
             <span>备用模型</span>
-            <strong>{{ modelDiagnosticItems.some(item => item.key.includes('fallback') && item.type === 'success') ? '可用' : '待诊断' }}</strong>
+            <strong>{{
+              modelDiagnosticItems.some(
+                (item) => item.key.includes('fallback') && item.type === 'success'
+              )
+                ? '可用'
+                : '待诊断'
+            }}</strong>
           </div>
-          <NButton size="small" secondary :loading="modelDiagnosticLoading" @click="runModelDiagnostic">
+          <NButton
+            size="small"
+            secondary
+            :loading="modelDiagnosticLoading"
+            @click="runModelDiagnostic"
+          >
             运行诊断
           </NButton>
         </div>
@@ -857,7 +948,9 @@ watch(
           <div class="settings-group-title">运维维护</div>
           <div class="settings-row">
             <span>版本更新</span>
-            <strong>{{ hermesCurrentTag || (hermesVersion ? `v${hermesVersion}` : `v${desktopVersion}`) }}</strong>
+            <strong>{{
+              hermesCurrentTag || (hermesVersion ? `v${hermesVersion}` : `v${desktopVersion}`)
+            }}</strong>
           </div>
           <div class="settings-row">
             <span>系统日志</span>
@@ -919,18 +1012,23 @@ watch(
           <NText code>{{ currentServer.url }}</NText>
         </NDescriptionsItem>
         <NDescriptionsItem :label="t('pages.settings.authMethod')">
-          <NTag v-if="isNoAuth" size="small" type="success" :bordered="false">{{ t('pages.settings.noAuth') }}</NTag>
+          <NTag v-if="isNoAuth" size="small" type="success" :bordered="false">{{
+            t('pages.settings.noAuth')
+          }}</NTag>
           <NSpace v-else align="center" :size="6">
             <NTag size="small" :bordered="false">{{ t('pages.settings.accountAuth') }}</NTag>
-            <NText depth="3" style="font-size: 12px;">{{ currentServer.username }}</NText>
+            <NText depth="3" style="font-size: 12px">{{ currentServer.username }}</NText>
           </NSpace>
         </NDescriptionsItem>
-        <NDescriptionsItem :label="t('pages.settings.gatewayVersion')" v-if="wsStore.gatewayVersion">
+        <NDescriptionsItem
+          :label="t('pages.settings.gatewayVersion')"
+          v-if="wsStore.gatewayVersion"
+        >
           {{ wsStore.gatewayVersion }}
         </NDescriptionsItem>
       </NDescriptions>
 
-      <NSpace style="margin-top: 16px;" :size="12">
+      <NSpace style="margin-top: 16px" :size="12">
         <NButton size="small" @click="handleSwitchServer">
           <template #icon><NIcon :component="SwapHorizontalOutline" /></template>
           {{ t('pages.settings.switchServer') }}
@@ -946,12 +1044,10 @@ watch(
       <template #header>
         <NSpace align="center" :size="8">
           <NIcon :component="CogOutline" size="18" />
-          <span>系统设置二级功能</span>
+          <span>维护工具</span>
         </NSpace>
       </template>
-      <NText depth="3" style="display: block; margin-bottom: 12px; font-size: 13px;">
-        渠道、日志和备份已从主侧边栏收纳到系统设置，保持日常主流程聚焦在对话、任务和 Skill。
-      </NText>
+      <NText depth="3" class="settings-section-note"> 渠道、日志和备份收纳在这里。 </NText>
       <NGrid cols="1 m:3" responsive="screen" :x-gap="10" :y-gap="10">
         <NGridItem>
           <div class="settings-module-card">
@@ -1008,13 +1104,22 @@ watch(
             round
             :bordered="false"
           >
-            {{ modelDiagnosticItems.length ? modelDiagnosticSummary.label : modelDiagnosticCheckedText }}
+            {{
+              modelDiagnosticItems.length
+                ? modelDiagnosticSummary.label
+                : modelDiagnosticCheckedText
+            }}
           </NTag>
           <NButton size="small" :loading="modelDiagnosticLoading" @click="runModelDiagnostic">
             <template #icon><NIcon :component="RefreshOutline" /></template>
             运行诊断
           </NButton>
-          <NButton v-if="modelDiagnosticItems.length" size="small" secondary @click="copyModelDiagnostic">
+          <NButton
+            v-if="modelDiagnosticItems.length"
+            size="small"
+            secondary
+            @click="copyModelDiagnostic"
+          >
             <template #icon><NIcon :component="CopyOutline" /></template>
             复制摘要
           </NButton>
@@ -1026,7 +1131,12 @@ watch(
           <NText code>{{ currentServer?.url || '-' }}</NText>
         </NDescriptionsItem>
         <NDescriptionsItem label="当前识别模型">
-          <NTag size="small" :bordered="false" round :type="connectionStore.hermesRealModel ? 'success' : 'warning'">
+          <NTag
+            size="small"
+            :bordered="false"
+            round
+            :type="connectionStore.hermesRealModel ? 'success' : 'warning'"
+          >
             {{ connectionStore.hermesRealModel || 'unknown' }}
           </NTag>
         </NDescriptionsItem>
@@ -1045,7 +1155,7 @@ watch(
             <NText depth="3" class="diagnostic-item-detail">{{ item.detail }}</NText>
           </div>
         </div>
-        <NAlert v-else type="info" :closable="false" style="margin-top: 12px;">
+        <NAlert v-else type="info" :closable="false" style="margin-top: 12px">
           点击运行诊断后，会检查服务健康、模型接口、主模型配置、备用模型和关键环境变量。
         </NAlert>
       </NSpin>
@@ -1064,7 +1174,10 @@ watch(
         <NDescriptionsItem :label="t('pages.settings.serverPlatform')">
           <NTag size="small" :bordered="false" round type="info">Hermes Agent</NTag>
         </NDescriptionsItem>
-        <NDescriptionsItem :label="t('pages.settings.serverModel')" v-if="connectionStore.hermesRealModel">
+        <NDescriptionsItem
+          :label="t('pages.settings.serverModel')"
+          v-if="connectionStore.hermesRealModel"
+        >
           <NTag size="small" :bordered="false" round type="success">
             {{ connectionStore.hermesRealModel }}
           </NTag>
@@ -1072,7 +1185,7 @@ watch(
       </NDescriptions>
 
       <!-- Probe status / diagnostic + Retry -->
-      <div style="margin-top: 12px;">
+      <div style="margin-top: 12px">
         <NAlert v-if="remoteProbeBusy" type="default" :closable="false">
           <template #icon><NSpin :size="14" /></template>
           {{ t('pages.settings.mgmtProbing') }}
@@ -1083,14 +1196,19 @@ watch(
           :closable="false"
           :title="t('pages.settings.mgmtNotAvailable')"
         >
-          <div style="font-size: 13px; margin-bottom: 6px;">{{ mgmtErrorMessage }}</div>
+          <div style="font-size: 13px; margin-bottom: 6px">{{ mgmtErrorMessage }}</div>
           <div
             v-if="mgmtErrorDetail"
-            style="font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 12px; opacity: 0.75; word-break: break-word;"
+            style="
+              font-family: ui-monospace, Menlo, Monaco, monospace;
+              font-size: 12px;
+              opacity: 0.75;
+              word-break: break-word;
+            "
           >
             {{ mgmtErrorDetail }}
           </div>
-          <div style="font-size: 12px; margin-top: 8px; opacity: 0.85;">
+          <div style="font-size: 12px; margin-top: 8px; opacity: 0.85">
             {{ t('pages.settings.mgmtInstallHint') }}
           </div>
         </NAlert>
@@ -1099,7 +1217,7 @@ watch(
         </NAlert>
       </div>
 
-      <NSpace style="margin-top: 12px;" :size="8">
+      <NSpace style="margin-top: 12px" :size="8">
         <NButton size="small" :loading="remoteProbeBusy" @click="triggerMgmtProbe">
           <template #icon><NIcon :component="RefreshOutline" /></template>
           {{ t('pages.settings.mgmtRetryProbe') }}
@@ -1129,10 +1247,10 @@ watch(
           {{ hermesDate }}
         </NDescriptionsItem>
       </NDescriptions>
-      <NSpin v-else-if="hermesVersionLoading" :show="true" size="small" style="padding: 12px 0;" />
+      <NSpin v-else-if="hermesVersionLoading" :show="true" size="small" style="padding: 12px 0" />
 
       <!-- Auto-check status -->
-      <div style="margin-top: 12px;">
+      <div style="margin-top: 12px">
         <!-- Checking spinner -->
         <NAlert v-if="hermesCheckingUpdate" type="default" :closable="false">
           <template #icon><NSpin :size="14" /></template>
@@ -1146,9 +1264,19 @@ watch(
           :title="t('pages.settings.updateFailed')"
           @close="hermesUpdateError = ''"
         >
-          <div style="word-break: break-word; font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 12px;">{{ hermesUpdateError }}</div>
-          <div v-if="updateAdvice" style="margin-top: 6px; font-size: 12px;">{{ updateAdvice }}</div>
-          <div style="margin-top: 6px; font-size: 12px; opacity: 0.8;">{{ t('pages.settings.updateRetryHint') }}</div>
+          <div
+            style="
+              word-break: break-word;
+              font-family: ui-monospace, Menlo, Monaco, monospace;
+              font-size: 12px;
+            "
+          >
+            {{ hermesUpdateError }}
+          </div>
+          <div v-if="updateAdvice" style="margin-top: 6px; font-size: 12px">{{ updateAdvice }}</div>
+          <div style="margin-top: 6px; font-size: 12px; opacity: 0.8">
+            {{ t('pages.settings.updateRetryHint') }}
+          </div>
         </NAlert>
         <!-- Check failure (persistent, user can retry) -->
         <NAlert
@@ -1158,23 +1286,53 @@ watch(
           :title="t('pages.settings.checkUpdateFailed')"
           @close="hermesCheckError = ''"
         >
-          <div style="word-break: break-word; font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 12px;">{{ hermesCheckError }}</div>
-          <div v-if="updateAdvice" style="margin-top: 6px; font-size: 12px;">{{ updateAdvice }}</div>
-          <div style="margin-top: 6px; font-size: 12px; opacity: 0.8;">{{ t('pages.settings.updateRetryHint') }}</div>
+          <div
+            style="
+              word-break: break-word;
+              font-family: ui-monospace, Menlo, Monaco, monospace;
+              font-size: 12px;
+            "
+          >
+            {{ hermesCheckError }}
+          </div>
+          <div v-if="updateAdvice" style="margin-top: 6px; font-size: 12px">{{ updateAdvice }}</div>
+          <div style="margin-top: 6px; font-size: 12px; opacity: 0.8">
+            {{ t('pages.settings.updateRetryHint') }}
+          </div>
         </NAlert>
         <!-- Update available -->
         <NAlert v-else-if="hermesUpdateAvailable" type="warning" :closable="false">
           {{ t('pages.settings.updateAvailable', { version: hermesLatestTag }) }}
         </NAlert>
         <!-- Up to date -->
-        <NAlert v-else-if="hermesUpdateChecked && !hermesUpdateAvailable" type="success" :closable="false">
+        <NAlert
+          v-else-if="hermesUpdateChecked && !hermesUpdateAvailable"
+          type="success"
+          :closable="false"
+        >
           {{ t('pages.settings.noUpdate') }}
         </NAlert>
       </div>
 
-      <div v-if="hermesUpdating && hermesUpdateLog" style="margin-top: 12px; max-height: 120px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 4px; padding: 8px; font-family: monospace; font-size: 12px; white-space: pre-wrap; color: #aaa;">{{ hermesUpdateLog }}</div>
+      <div
+        v-if="hermesUpdating && hermesUpdateLog"
+        style="
+          margin-top: 12px;
+          max-height: 120px;
+          overflow-y: auto;
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 4px;
+          padding: 8px;
+          font-family: monospace;
+          font-size: 12px;
+          white-space: pre-wrap;
+          color: #aaa;
+        "
+      >
+        {{ hermesUpdateLog }}
+      </div>
 
-      <NSpace style="margin-top: 12px;" :size="8">
+      <NSpace style="margin-top: 12px" :size="8">
         <NButton
           size="small"
           :loading="hermesCheckingUpdate"
@@ -1203,32 +1361,46 @@ watch(
     <!-- Hermes Config (config.yaml) — local only -->
     <NCard class="app-card app-card--collapsible" v-if="canManage">
       <template #header>
-        <NSpace align="center" :size="8" style="cursor: pointer;" @click="configExpanded = !configExpanded">
+        <NSpace
+          align="center"
+          :size="8"
+          style="cursor: pointer"
+          @click="configExpanded = !configExpanded"
+        >
           <NIcon :component="configExpanded ? ChevronUpOutline : ChevronDownOutline" size="18" />
           <NIcon :component="DocumentTextOutline" size="18" />
           <span>{{ t('pages.settings.hermesConfig') }}</span>
         </NSpace>
       </template>
       <template #header-extra>
-        <NText depth="3" style="font-size: 12px;">{{ t('pages.settings.hermesConfigDesc') }}</NText>
+        <NText depth="3" style="font-size: 12px">{{ t('pages.settings.hermesConfigDesc') }}</NText>
       </template>
 
       <div v-show="configExpanded">
         <NSpin :show="configYamlLoading">
-          <NAlert v-if="configYamlNotFound" type="info" style="margin-bottom: 12px;" :closable="false">
+          <NAlert
+            v-if="configYamlNotFound"
+            type="info"
+            style="margin-bottom: 12px"
+            :closable="false"
+          >
             {{ t('pages.settings.fileNotFound') }}
           </NAlert>
-          <NAlert v-if="configYamlError" type="error" style="margin-bottom: 12px;" :closable="false">
+          <NAlert v-if="configYamlError" type="error" style="margin-bottom: 12px" :closable="false">
             {{ configYamlError }}
           </NAlert>
           <NInput
             v-model:value="configYaml"
             type="textarea"
             :autosize="{ minRows: 8, maxRows: 24 }"
-            :placeholder="configYamlLoading ? t('pages.settings.loadingFile') : 'model:\n  default: openai-codex/gpt-5.4\n  provider: openai-codex'"
-            style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 13px;"
+            :placeholder="
+              configYamlLoading
+                ? t('pages.settings.loadingFile')
+                : 'model:\n  default: openai-codex/gpt-5.4\n  provider: openai-codex'
+            "
+            style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 13px"
           />
-          <NSpace style="margin-top: 12px;" :size="8">
+          <NSpace style="margin-top: 12px" :size="8">
             <NButton
               type="primary"
               size="small"
@@ -1247,32 +1419,41 @@ watch(
     <!-- Hermes .env — local only -->
     <NCard class="app-card app-card--collapsible" v-if="canManage">
       <template #header>
-        <NSpace align="center" :size="8" style="cursor: pointer;" @click="envExpanded = !envExpanded">
+        <NSpace
+          align="center"
+          :size="8"
+          style="cursor: pointer"
+          @click="envExpanded = !envExpanded"
+        >
           <NIcon :component="envExpanded ? ChevronUpOutline : ChevronDownOutline" size="18" />
           <NIcon :component="DocumentTextOutline" size="18" />
           <span>{{ t('pages.settings.hermesEnv') }}</span>
         </NSpace>
       </template>
       <template #header-extra>
-        <NText depth="3" style="font-size: 12px;">{{ t('pages.settings.hermesEnvDesc') }}</NText>
+        <NText depth="3" style="font-size: 12px">{{ t('pages.settings.hermesEnvDesc') }}</NText>
       </template>
 
       <div v-show="envExpanded">
         <NSpin :show="envLoading">
-          <NAlert v-if="envNotFound" type="info" style="margin-bottom: 12px;" :closable="false">
+          <NAlert v-if="envNotFound" type="info" style="margin-bottom: 12px" :closable="false">
             {{ t('pages.settings.fileNotFound') }}
           </NAlert>
-          <NAlert v-if="envError" type="error" style="margin-bottom: 12px;" :closable="false">
+          <NAlert v-if="envError" type="error" style="margin-bottom: 12px" :closable="false">
             {{ envError }}
           </NAlert>
           <NInput
             v-model:value="envContent"
             type="textarea"
             :autosize="{ minRows: 6, maxRows: 20 }"
-            :placeholder="envLoading ? t('pages.settings.loadingFile') : 'API_SERVER_KEY=\nOPENAI_API_KEY=sk-...'"
-            style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 13px;"
+            :placeholder="
+              envLoading
+                ? t('pages.settings.loadingFile')
+                : 'API_SERVER_KEY=\nOPENAI_API_KEY=sk-...'
+            "
+            style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 13px"
           />
-          <NSpace style="margin-top: 12px;" :size="8">
+          <NSpace style="margin-top: 12px" :size="8">
             <NButton
               type="primary"
               size="small"
@@ -1297,15 +1478,10 @@ watch(
         </NSpace>
       </template>
 
-      <NAlert type="info" :closable="false" style="margin-bottom: 12px;">
+      <NAlert type="info" :closable="false" style="margin-bottom: 12px">
         {{ t('pages.settings.restartTip') }}
       </NAlert>
-      <NButton
-        type="warning"
-        size="small"
-        :loading="restarting"
-        @click="restartHermes"
-      >
+      <NButton type="warning" size="small" :loading="restarting" @click="restartHermes">
         <template #icon><NIcon :component="RefreshOutline" /></template>
         {{ restarting ? t('pages.settings.restarting') : t('pages.settings.restartHermes') }}
       </NButton>
@@ -1316,12 +1492,21 @@ watch(
       <NGridItem>
         <NCard title="通知中心" class="app-card settings-ops-card">
           <template #header-extra>
-            <NTag size="small" :type="opsStore.activeNotices.length ? 'warning' : 'success'" round :bordered="false">
+            <NTag
+              size="small"
+              :type="opsStore.activeNotices.length ? 'warning' : 'success'"
+              round
+              :bordered="false"
+            >
               {{ opsStore.activeNotices.length }} 待处理
             </NTag>
           </template>
           <NSpace v-if="opsStore.recentNotices.length" vertical :size="8">
-            <div v-for="notice in opsStore.recentNotices.slice(0, 4)" :key="notice.id" class="settings-ops-row">
+            <div
+              v-for="notice in opsStore.recentNotices.slice(0, 4)"
+              :key="notice.id"
+              class="settings-ops-row"
+            >
               <div class="settings-ops-row-head">
                 <NText strong>{{ notice.title }}</NText>
                 <NTag size="tiny" :type="opsTagType(notice.severity)" round :bordered="false">
@@ -1329,7 +1514,12 @@ watch(
                 </NTag>
               </div>
               <NText depth="3" class="settings-ops-row-detail">{{ notice.detail }}</NText>
-              <NButton v-if="!notice.resolvedAt" size="tiny" secondary @click="opsStore.resolveNotice(notice.id)">
+              <NButton
+                v-if="!notice.resolvedAt"
+                size="tiny"
+                secondary
+                @click="opsStore.resolveNotice(notice.id)"
+              >
                 标记已处理
               </NButton>
             </div>
@@ -1340,13 +1530,19 @@ watch(
       <NGridItem>
         <NCard title="配置变更审计" class="app-card settings-ops-card">
           <NSpace v-if="opsStore.recentAudits.length" vertical :size="8">
-            <div v-for="audit in opsStore.recentAudits.slice(0, 5)" :key="audit.id" class="settings-ops-row">
+            <div
+              v-for="audit in opsStore.recentAudits.slice(0, 5)"
+              :key="audit.id"
+              class="settings-ops-row"
+            >
               <div class="settings-ops-row-head">
                 <NText strong>{{ audit.target }}</NText>
                 <NTag size="tiny" round :bordered="false">{{ audit.action }}</NTag>
               </div>
               <NText depth="3" class="settings-ops-row-detail">{{ audit.detail }}</NText>
-              <NText depth="3" style="font-size: 12px;">{{ formatRelativeTime(audit.createdAt) }}</NText>
+              <NText depth="3" style="font-size: 12px">{{
+                formatRelativeTime(audit.createdAt)
+              }}</NText>
             </div>
           </NSpace>
           <NText v-else depth="3">保存 config.yaml 或 .env 后会自动记录审计摘要。</NText>
@@ -1361,7 +1557,12 @@ watch(
             <NButton size="small" type="primary" secondary @click="exportDiagnosticReport">
               导出诊断包
             </NButton>
-            <NButton size="small" secondary :loading="modelDiagnosticLoading" @click="runModelDiagnostic">
+            <NButton
+              size="small"
+              secondary
+              :loading="modelDiagnosticLoading"
+              @click="runModelDiagnostic"
+            >
               重新测试主备模型
             </NButton>
           </NSpace>
@@ -1371,7 +1572,7 @@ watch(
 
     <!-- Appearance -->
     <NCard :title="t('pages.settings.appearanceSettings')" class="app-card">
-      <NForm label-placement="left" label-width="120" style="max-width: 500px;">
+      <NForm label-placement="left" label-width="120" style="max-width: 500px">
         <NFormItem :label="t('pages.settings.themeMode')">
           <NSelect
             :value="themeStore.mode"
@@ -1386,10 +1587,10 @@ watch(
     <NCard :title="t('pages.settings.about')" class="app-card">
       <NSpace vertical :size="8">
         <NText>Hermes Desktop</NText>
-        <NText depth="3" style="font-size: 13px;">
+        <NText depth="3" style="font-size: 13px">
           {{ t('pages.settings.aboutLine1') }}
         </NText>
-        <NText depth="3" style="font-size: 13px;">
+        <NText depth="3" style="font-size: 13px">
           {{ t('pages.settings.aboutLine2') }}
         </NText>
       </NSpace>
@@ -1398,44 +1599,49 @@ watch(
 </template>
 
 <style scoped>
+.settings-page {
+  font-size: var(--font-body);
+}
+
 .settings-overview-card {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .settings-overview-note {
   display: block;
-  margin-bottom: 14px;
-  font-size: 13px;
+  margin-bottom: var(--ui-gap);
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
 }
 
 .settings-groups {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--ui-gap);
 }
 
 .settings-group {
-  padding: 14px;
+  padding: var(--ui-panel-padding);
   border: 1px solid var(--n-border-color);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--n-color-embedded);
   min-width: 0;
 }
 
 .settings-group-title {
-  font-size: 15px;
+  font-size: var(--font-section-title);
   font-weight: 760;
-  margin-bottom: 10px;
+  margin-bottom: var(--ui-gap-sm);
 }
 
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--ui-gap);
   padding: 7px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 13px;
+  font-size: var(--font-body);
 }
 
 .settings-row span {
@@ -1445,9 +1651,8 @@ watch(
 
 .settings-row strong {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .settings-group .n-button {
@@ -1457,14 +1662,14 @@ watch(
 .diagnostic-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--ui-gap-sm);
   margin-top: 12px;
 }
 
 .diagnostic-item {
   border: 1px solid var(--n-border-color);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: var(--radius);
+  padding: var(--ui-panel-padding-sm) 12px;
   min-width: 0;
 }
 
@@ -1479,16 +1684,23 @@ watch(
 .diagnostic-item-detail {
   display: block;
   margin-top: 8px;
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
   overflow-wrap: anywhere;
+}
+
+.settings-section-note {
+  display: block;
+  margin-bottom: var(--ui-gap);
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
 }
 
 .settings-module-card {
   border: 1px solid var(--n-border-color);
-  border-radius: 10px;
-  padding: 12px;
-  min-height: 132px;
+  border-radius: var(--radius);
+  padding: var(--ui-panel-padding-sm);
+  min-height: 124px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1503,8 +1715,8 @@ watch(
 .settings-module-detail {
   display: block;
   flex: 1;
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
 }
 
 .settings-ops-card {
@@ -1513,8 +1725,8 @@ watch(
 
 .settings-ops-row {
   border: 1px solid var(--n-border-color);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: var(--radius);
+  padding: var(--ui-panel-padding-sm) 12px;
 }
 
 .settings-ops-row-head {
@@ -1527,8 +1739,8 @@ watch(
 .settings-ops-row-detail {
   display: block;
   margin: 6px 0 8px;
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
   overflow-wrap: anywhere;
 }
 

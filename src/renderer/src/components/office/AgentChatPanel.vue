@@ -3739,7 +3739,7 @@ watch(selectedSessionKey, async (newSessionKey) => {
   margin: 16px 0 4px;
   line-height: 1.4;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .chat-markdown :deep(h1) {

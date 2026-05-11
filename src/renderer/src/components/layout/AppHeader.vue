@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NBreadcrumb, NBreadcrumbItem, NBadge, NButton, NIcon, NSpace, NTag, NTooltip } from 'naive-ui'
-import { NotificationsOutline } from '@vicons/ionicons5'
+import {
+  NBreadcrumb,
+  NBreadcrumbItem,
+  NBadge,
+  NButton,
+  NIcon,
+  NPopover,
+  NSpace,
+  NTooltip
+} from 'naive-ui'
+import { InformationCircleOutline, NotificationsOutline } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useConnectionStore } from '@/stores/connection'
 import { useLocaleStore } from '@/stores/locale'
@@ -80,16 +89,42 @@ function goNotifications() {
 
     <NSpace :size="8" align="center" class="app-header-actions">
       <ModelStateBadge v-if="showModelBadge" />
-      <NTag
-        v-if="fallbackModelLabel"
-        size="small"
-        round
-        :bordered="false"
-        class="app-header-fallback"
-      >
-        备用 {{ fallbackModelLabel }}
-      </NTag>
       <ConnectionStatus />
+
+      <NPopover trigger="click" placement="bottom-end" class="app-header-status-popover">
+        <template #trigger>
+          <NButton quaternary circle>
+            <template #icon>
+              <NIcon :component="InformationCircleOutline" />
+            </template>
+          </NButton>
+        </template>
+        <div class="app-header-status-panel">
+          <div class="app-header-status-title">状态详情</div>
+          <div class="app-header-status-row">
+            <span>服务器</span>
+            <strong>{{ connectionStore.currentServer?.url || '-' }}</strong>
+          </div>
+          <div class="app-header-status-row">
+            <span>连接</span>
+            <strong>{{ connectionStore.status }}</strong>
+          </div>
+          <div class="app-header-status-row">
+            <span>主模型</span>
+            <strong>{{
+              modelStore.displayModel || connectionStore.hermesRealModel || 'unknown'
+            }}</strong>
+          </div>
+          <div class="app-header-status-row">
+            <span>备用模型</span>
+            <strong>{{ fallbackModelLabel || '-' }}</strong>
+          </div>
+          <div class="app-header-status-row">
+            <span>通知</span>
+            <strong>{{ opsStore.activeNotices.length }} 条待处理</strong>
+          </div>
+        </div>
+      </NPopover>
 
       <NTooltip>
         <template #trigger>
@@ -129,12 +164,12 @@ function goNotifications() {
 
 .app-header-crumb {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-kicker);
 }
 
 .app-header-title {
   color: var(--text-primary);
-  font-size: 20px;
+  font-size: var(--font-page-title);
   font-weight: 780;
   line-height: 1.12;
   overflow: hidden;
@@ -146,10 +181,34 @@ function goNotifications() {
   flex-shrink: 0;
 }
 
-.app-header-fallback.n-tag {
-  background: rgba(96, 165, 250, 0.14);
-  color: #93c5fd;
+.app-header-status-panel {
+  width: min(340px, 72vw);
+  display: grid;
+  gap: 8px;
+}
+
+.app-header-status-title {
+  font-size: var(--font-card-title);
+  font-weight: 760;
+}
+
+.app-header-status-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
+}
+
+.app-header-status-row span {
+  color: var(--text-secondary);
+}
+
+.app-header-status-row strong {
+  min-width: 0;
   font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 760px) {

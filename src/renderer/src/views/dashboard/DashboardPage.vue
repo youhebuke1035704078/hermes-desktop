@@ -1388,13 +1388,13 @@ onMounted(() => {
 .dashboard-page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-gap);
 }
 
 .control-tower-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
-  gap: 14px;
+  gap: var(--ui-gap);
   align-items: stretch;
 }
 
@@ -1403,7 +1403,7 @@ onMounted(() => {
   border: 1px solid var(--n-border-color);
   border-radius: 10px;
   background: var(--n-card-color);
-  padding: 16px;
+  padding: var(--ui-panel-padding);
   min-width: 0;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
 }
@@ -1419,13 +1419,13 @@ onMounted(() => {
 .control-todo-detail,
 .control-stage-meta {
   display: block;
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
 }
 
 .control-status-panel h2 {
   margin: 8px 0 10px;
-  font-size: clamp(28px, 3vw, 42px);
+  font-size: var(--font-hero);
   line-height: 1.08;
   white-space: pre-line;
   letter-spacing: 0;
@@ -1434,25 +1434,25 @@ onMounted(() => {
 .control-status-strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-  gap: 10px;
+  gap: var(--ui-gap-sm);
   margin-top: 16px;
 }
 
 .control-mini {
   border: 1px solid var(--n-border-color);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.03);
-  padding: 9px 10px;
+  padding: 9px var(--ui-panel-padding-sm);
   min-width: 0;
 }
 
 .control-mini-label {
-  font-size: 12px;
+  font-size: var(--font-kicker);
 }
 
 .control-mini-value {
   margin-top: 6px;
-  font-size: 15px;
+  font-size: var(--font-card-title);
   font-weight: 760;
   line-height: 1.2;
   overflow: hidden;
@@ -1470,7 +1470,7 @@ onMounted(() => {
 }
 
 .control-section-title {
-  font-size: 16px;
+  font-size: var(--font-section-title);
   font-weight: 760;
 }
 
@@ -1482,7 +1482,7 @@ onMounted(() => {
 .control-todo-row {
   display: grid;
   grid-template-columns: 12px minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: var(--ui-gap-sm);
   align-items: start;
   padding: 12px 0;
   border-bottom: 1px solid var(--n-border-color);
@@ -1518,25 +1518,25 @@ onMounted(() => {
 
 .control-todo-title {
   display: block;
-  font-size: 14px;
+  font-size: var(--font-card-title);
   line-height: 1.35;
 }
 
 .control-price-card {
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .control-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--ui-gap-sm);
 }
 
 .control-summary-tile {
   border: 1px solid var(--n-border-color);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--n-card-color);
-  padding: 10px 12px;
+  padding: var(--ui-panel-padding-sm) 12px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -1544,13 +1544,13 @@ onMounted(() => {
 
 .control-summary-label {
   color: #63e2b7;
-  font-size: 13px;
+  font-size: var(--font-body);
   font-weight: 760;
 }
 
 .control-summary-value {
   margin-top: 6px;
-  font-size: 15px;
+  font-size: var(--font-card-title);
   font-weight: 760;
 }
 
@@ -1560,7 +1560,7 @@ onMounted(() => {
 }
 
 .dashboard-card {
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .dashboard-hero {

@@ -2,12 +2,27 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  NButton, NCard, NGrid, NGridItem, NIcon, NInput, NSelect,
-  NSpace, NSwitch, NTag, NText, useMessage,
+  NButton,
+  NCard,
+  NGrid,
+  NGridItem,
+  NIcon,
+  NInput,
+  NSelect,
+  NSpace,
+  NSwitch,
+  NTag,
+  NText,
+  useMessage
 } from 'naive-ui'
 import {
-  DocumentTextOutline, RefreshOutline, TrashBinOutline,
-  PlayCircleOutline, PauseCircleOutline, ArrowDownOutline, CopyOutline,
+  DocumentTextOutline,
+  RefreshOutline,
+  TrashBinOutline,
+  PlayCircleOutline,
+  PauseCircleOutline,
+  ArrowDownOutline,
+  CopyOutline
 } from '@vicons/ionicons5'
 import { useLogsStore } from '@/stores/logs'
 import { writeTextToClipboard } from '@/utils/clipboard'
@@ -35,9 +50,12 @@ async function forceScrollToBottom() {
   autoScroll.value = true
 }
 
-watch(() => logsStore.filteredEntries.length, () => {
-  scrollToBottom()
-})
+watch(
+  () => logsStore.filteredEntries.length,
+  () => {
+    scrollToBottom()
+  }
+)
 
 // ── Filter options ──
 const levelOptions = computed(() => [
@@ -47,42 +65,54 @@ const levelOptions = computed(() => [
   { label: 'INFO', value: 'info' },
   { label: 'WARN', value: 'warn' },
   { label: 'ERROR', value: 'error' },
-  { label: 'FATAL', value: 'fatal' },
+  { label: 'FATAL', value: 'fatal' }
 ])
 
 const subsystemOptions = computed(() => [
   { label: t('pages.logs.subsystemAll'), value: null as any },
-  ...logsStore.availableSubsystems.map((s) => ({ label: s, value: s })),
+  ...logsStore.availableSubsystems.map((s) => ({ label: s, value: s }))
 ])
 
 const refreshIntervalOptions = [
   { label: '1s', value: 1000 },
   { label: '3s', value: 3000 },
   { label: '5s', value: 5000 },
-  { label: '10s', value: 10000 },
+  { label: '10s', value: 10000 }
 ]
 
 const importantEntries = computed(() =>
   logsStore.entries
-    .filter(entry => entry.level === 'error' || entry.level === 'fatal' || entry.level === 'warn')
+    .filter((entry) => entry.level === 'error' || entry.level === 'fatal' || entry.level === 'warn')
     .slice(-5)
-    .reverse(),
+    .reverse()
 )
 
 const visibleLogText = computed(() =>
-  logsStore.filteredEntries.map(entry => entry.raw || entry.message || '').filter(Boolean).join('\n'),
+  logsStore.filteredEntries
+    .map((entry) => entry.raw || entry.message || '')
+    .filter(Boolean)
+    .join('\n')
 )
 
 // ── Level tag style ──
-function levelType(level: LogLevel | null | undefined): 'default' | 'success' | 'info' | 'warning' | 'error' {
+function levelType(
+  level: LogLevel | null | undefined
+): 'default' | 'success' | 'info' | 'warning' | 'error' {
   switch (level) {
-    case 'trace': return 'default'
-    case 'debug': return 'default'
-    case 'info': return 'info'
-    case 'warn': return 'warning'
-    case 'error': return 'error'
-    case 'fatal': return 'error'
-    default: return 'default'
+    case 'trace':
+      return 'default'
+    case 'debug':
+      return 'default'
+    case 'info':
+      return 'info'
+    case 'warn':
+      return 'warning'
+    case 'error':
+      return 'error'
+    case 'fatal':
+      return 'error'
+    default:
+      return 'default'
   }
 }
 
@@ -171,198 +201,234 @@ onUnmounted(() => {
 
 <template>
   <NSpace vertical :size="16">
-      <!-- Header + Metrics + Actions -->
-      <NCard>
-        <template #header>
-          <NSpace align="center" :size="8">
-            <NIcon :component="DocumentTextOutline" :size="20" />
-            <span>{{ t('pages.logs.title') }}</span>
-          </NSpace>
-        </template>
-        <template #header-extra>
-          <NSpace :size="8">
-            <NButton secondary size="small" @click="handleRefresh" :loading="logsStore.loading">
-              <template #icon><NIcon :component="RefreshOutline" /></template>
-              {{ t('pages.logs.refresh') }}
-            </NButton>
-            <NButton
-              :type="logsStore.autoRefresh ? 'warning' : 'primary'"
-              secondary
-              size="small"
-              @click="handleToggleAutoRefresh"
-            >
-              <template #icon>
-                <NIcon :component="logsStore.autoRefresh ? PauseCircleOutline : PlayCircleOutline" />
-              </template>
-              {{ logsStore.autoRefresh ? t('pages.logs.pause') : t('pages.logs.autoRefresh') }}
-            </NButton>
-            <NButton secondary size="small" @click="copyVisibleLogs">
-              <template #icon><NIcon :component="CopyOutline" /></template>
-              复制可见日志
-            </NButton>
-          </NSpace>
-        </template>
+    <!-- Header + Metrics + Actions -->
+    <NCard>
+      <template #header>
+        <NSpace align="center" :size="8">
+          <NIcon :component="DocumentTextOutline" :size="20" />
+          <span>{{ t('pages.logs.title') }}</span>
+        </NSpace>
+      </template>
+      <template #header-extra>
+        <NSpace :size="8">
+          <NButton secondary size="small" @click="handleRefresh" :loading="logsStore.loading">
+            <template #icon><NIcon :component="RefreshOutline" /></template>
+            {{ t('pages.logs.refresh') }}
+          </NButton>
+          <NButton
+            :type="logsStore.autoRefresh ? 'warning' : 'primary'"
+            secondary
+            size="small"
+            @click="handleToggleAutoRefresh"
+          >
+            <template #icon>
+              <NIcon :component="logsStore.autoRefresh ? PauseCircleOutline : PlayCircleOutline" />
+            </template>
+            {{ logsStore.autoRefresh ? t('pages.logs.pause') : t('pages.logs.autoRefresh') }}
+          </NButton>
+          <NButton secondary size="small" @click="copyVisibleLogs">
+            <template #icon><NIcon :component="CopyOutline" /></template>
+            复制可见日志
+          </NButton>
+        </NSpace>
+      </template>
 
-        <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="10" :y-gap="10">
-          <NGridItem>
-            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.metrics.total') }}</NText>
-              <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">{{ logsStore.counts.total }}</div>
-            </NCard>
-          </NGridItem>
-          <NGridItem>
-            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.metrics.errors') }}</NText>
-              <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
-                <NText type="error">{{ logsStore.counts.error }}</NText>
-              </div>
-            </NCard>
-          </NGridItem>
-          <NGridItem>
-            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.metrics.warns') }}</NText>
-              <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
-                <NText type="warning">{{ logsStore.counts.warn }}</NText>
-              </div>
-            </NCard>
-          </NGridItem>
-          <NGridItem>
-            <NCard embedded :bordered="false" size="small" style="border-radius: 10px;">
-              <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.metrics.fileSize') }}</NText>
-              <div style="font-size: 22px; font-weight: 700; margin-top: 6px;">
-                <NText type="info">{{ formatBytes(logsStore.fileSize) }}</NText>
-              </div>
-            </NCard>
-          </NGridItem>
-        </NGrid>
+      <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="10" :y-gap="10">
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px">
+            <NText depth="3" style="font-size: var(--font-body-sm)">{{
+              t('pages.logs.metrics.total')
+            }}</NText>
+            <div style="font-size: var(--font-metric); font-weight: 700; margin-top: 6px">
+              {{ logsStore.counts.total }}
+            </div>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px">
+            <NText depth="3" style="font-size: var(--font-body-sm)">{{
+              t('pages.logs.metrics.errors')
+            }}</NText>
+            <div style="font-size: var(--font-metric); font-weight: 700; margin-top: 6px">
+              <NText type="error">{{ logsStore.counts.error }}</NText>
+            </div>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px">
+            <NText depth="3" style="font-size: var(--font-body-sm)">{{
+              t('pages.logs.metrics.warns')
+            }}</NText>
+            <div style="font-size: var(--font-metric); font-weight: 700; margin-top: 6px">
+              <NText type="warning">{{ logsStore.counts.warn }}</NText>
+            </div>
+          </NCard>
+        </NGridItem>
+        <NGridItem>
+          <NCard embedded :bordered="false" size="small" style="border-radius: 10px">
+            <NText depth="3" style="font-size: var(--font-body-sm)">{{
+              t('pages.logs.metrics.fileSize')
+            }}</NText>
+            <div style="font-size: var(--font-metric); font-weight: 700; margin-top: 6px">
+              <NText type="info">{{ formatBytes(logsStore.fileSize) }}</NText>
+            </div>
+          </NCard>
+        </NGridItem>
+      </NGrid>
 
-        <!-- Filter bar -->
-        <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center;">
-          <NInput
-            v-model:value="logsStore.searchQuery"
-            clearable
-            :placeholder="t('pages.logs.searchPlaceholder')"
-            style="flex: 1; min-width: 200px;"
-          />
-          <NSelect
-            v-model:value="logsStore.levelFilter"
-            :options="levelOptions"
-            :placeholder="t('pages.logs.levelFilter')"
-            clearable
-            style="width: 140px;"
-          />
-          <NSelect
-            v-model:value="logsStore.subsystemFilter"
-            :options="subsystemOptions"
-            :placeholder="t('pages.logs.subsystemFilter')"
-            clearable
-            style="width: 160px;"
-          />
-          <NSelect
-            :value="logsStore.refreshIntervalMs"
-            :options="refreshIntervalOptions"
-            style="width: 90px;"
-            @update:value="handleIntervalChange"
-          />
-          <NSpace :size="6" align="center">
-            <NText depth="3" style="font-size: 12px;">{{ t('pages.logs.autoScroll') }}</NText>
-            <NSwitch v-model:value="autoScroll" size="small" />
-          </NSpace>
-          <NSpace :size="6" align="center">
-            <NButton size="tiny" secondary :type="logsStore.levelFilter === 'error' ? 'error' : 'default'" @click="focusLevel('error')">
-              只看错误
-            </NButton>
-            <NButton size="tiny" secondary :type="logsStore.levelFilter === 'warn' ? 'warning' : 'default'" @click="focusLevel('warn')">
-              只看警告
-            </NButton>
-            <NButton size="tiny" quaternary @click="focusLevel(null)">
-              全部
-            </NButton>
-          </NSpace>
-        </div>
+      <!-- Filter bar -->
+      <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center">
+        <NInput
+          v-model:value="logsStore.searchQuery"
+          clearable
+          :placeholder="t('pages.logs.searchPlaceholder')"
+          style="flex: 1; min-width: 200px"
+        />
+        <NSelect
+          v-model:value="logsStore.levelFilter"
+          :options="levelOptions"
+          :placeholder="t('pages.logs.levelFilter')"
+          clearable
+          style="width: 140px"
+        />
+        <NSelect
+          v-model:value="logsStore.subsystemFilter"
+          :options="subsystemOptions"
+          :placeholder="t('pages.logs.subsystemFilter')"
+          clearable
+          style="width: 160px"
+        />
+        <NSelect
+          :value="logsStore.refreshIntervalMs"
+          :options="refreshIntervalOptions"
+          style="width: 90px"
+          @update:value="handleIntervalChange"
+        />
+        <NSpace :size="6" align="center">
+          <NText depth="3" style="font-size: var(--font-body-sm)">{{
+            t('pages.logs.autoScroll')
+          }}</NText>
+          <NSwitch v-model:value="autoScroll" size="small" />
+        </NSpace>
+        <NSpace :size="6" align="center">
+          <NButton
+            size="tiny"
+            secondary
+            :type="logsStore.levelFilter === 'error' ? 'error' : 'default'"
+            @click="focusLevel('error')"
+          >
+            只看错误
+          </NButton>
+          <NButton
+            size="tiny"
+            secondary
+            :type="logsStore.levelFilter === 'warn' ? 'warning' : 'default'"
+            @click="focusLevel('warn')"
+          >
+            只看警告
+          </NButton>
+          <NButton size="tiny" quaternary @click="focusLevel(null)"> 全部 </NButton>
+        </NSpace>
+      </div>
 
-        <!-- File info line -->
-        <div v-if="logsStore.fileName" style="margin-top: 8px;">
-          <NText depth="3" code style="font-size: 11px;">{{ logsStore.fileName }}</NText>
-          <NText v-if="logsStore.error" type="error" style="font-size: 12px; margin-left: 8px;">
-            {{ logsStore.error }}
-          </NText>
-        </div>
-      </NCard>
-
-      <NCard v-if="importantEntries.length">
-        <template #header>
-          <NSpace align="center" :size="8">
-            <NText strong>最近异常摘要</NText>
-            <NTag size="small" type="warning" round :bordered="false">{{ importantEntries.length }} 条</NTag>
-          </NSpace>
-        </template>
-        <div class="important-log-list">
-          <div v-for="(entry, idx) in importantEntries" :key="`${entry.time ?? ''}:${idx}`" class="important-log-row">
-            <NTag size="tiny" :type="levelType(entry.level)" :bordered="false">{{ levelLabel(entry.level) }}</NTag>
-            <NText depth="3" class="important-log-time">{{ formatEntryTime(entry) || '-' }}</NText>
-            <NText class="important-log-message">{{ entry.message || entry.raw }}</NText>
-          </div>
-        </div>
-      </NCard>
-
-      <!-- Log viewer -->
-      <NCard content-style="padding: 0;">
-        <div
-          ref="logContainer"
-          class="log-viewer"
+      <!-- File info line -->
+      <div v-if="logsStore.fileName" style="margin-top: 8px">
+        <NText depth="3" code style="font-size: 11px">{{ logsStore.fileName }}</NText>
+        <NText
+          v-if="logsStore.error"
+          type="error"
+          style="font-size: var(--font-body-sm); margin-left: 8px"
         >
-          <div
-            v-if="logsStore.filteredEntries.length === 0"
-            style="text-align: center; padding: 60px 16px;"
-          >
-            <NText depth="3">{{ logsStore.loading ? t('pages.logs.loading') : t('pages.logs.empty') }}</NText>
-          </div>
-          <div
-            v-for="(entry, idx) in logsStore.filteredEntries"
-            :key="`${entry.time ?? ''}:${entry.level ?? ''}:${idx}:${entry.raw?.length ?? 0}`"
-            class="log-line"
-            :class="{
-              'log-line--error': entry.level === 'error' || entry.level === 'fatal',
-              'log-line--warn': entry.level === 'warn',
-            }"
-          >
-            <span class="log-time">{{ formatEntryTime(entry) }}</span>
-            <NTag
-              v-if="entry.level"
-              size="tiny"
-              :type="levelType(entry.level)"
-              :bordered="false"
-              style="margin-right: 6px; min-width: 46px; text-align: center;"
-            >
-              {{ levelLabel(entry.level) }}
-            </NTag>
-            <span v-if="entry.subsystem" class="log-subsystem">[{{ entry.subsystem }}]</span>
-            <span class="log-message">{{ entry.message || entry.raw }}</span>
-          </div>
-        </div>
+          {{ logsStore.error }}
+        </NText>
+      </div>
+    </NCard>
 
-        <!-- Footer controls -->
-        <div class="log-footer">
-          <NText depth="3" style="font-size: 11px;">
-            {{ t('pages.logs.showing', { filtered: logsStore.filteredEntries.length, total: logsStore.counts.total }) }}
-          </NText>
-          <NSpace :size="6">
-            <NButton size="tiny" quaternary @click="handleClear">
-              <template #icon><NIcon :component="TrashBinOutline" /></template>
-              {{ t('pages.logs.clear') }}
-            </NButton>
-            <NButton size="tiny" quaternary @click="handleReset">
-              <template #icon><NIcon :component="RefreshOutline" /></template>
-              {{ t('pages.logs.reload') }}
-            </NButton>
-            <NButton size="tiny" quaternary @click="forceScrollToBottom">
-              <template #icon><NIcon :component="ArrowDownOutline" /></template>
-              {{ t('pages.logs.scrollBottom') }}
-            </NButton>
-          </NSpace>
+    <NCard v-if="importantEntries.length">
+      <template #header>
+        <NSpace align="center" :size="8">
+          <NText strong>最近异常摘要</NText>
+          <NTag size="small" type="warning" round :bordered="false"
+            >{{ importantEntries.length }} 条</NTag
+          >
+        </NSpace>
+      </template>
+      <div class="important-log-list">
+        <div
+          v-for="(entry, idx) in importantEntries"
+          :key="`${entry.time ?? ''}:${idx}`"
+          class="important-log-row"
+        >
+          <NTag size="tiny" :type="levelType(entry.level)" :bordered="false">{{
+            levelLabel(entry.level)
+          }}</NTag>
+          <NText depth="3" class="important-log-time">{{ formatEntryTime(entry) || '-' }}</NText>
+          <NText class="important-log-message">{{ entry.message || entry.raw }}</NText>
         </div>
-      </NCard>
+      </div>
+    </NCard>
+
+    <!-- Log viewer -->
+    <NCard content-style="padding: 0;">
+      <div ref="logContainer" class="log-viewer">
+        <div
+          v-if="logsStore.filteredEntries.length === 0"
+          style="text-align: center; padding: 60px 16px"
+        >
+          <NText depth="3">{{
+            logsStore.loading ? t('pages.logs.loading') : t('pages.logs.empty')
+          }}</NText>
+        </div>
+        <div
+          v-for="(entry, idx) in logsStore.filteredEntries"
+          :key="`${entry.time ?? ''}:${entry.level ?? ''}:${idx}:${entry.raw?.length ?? 0}`"
+          class="log-line"
+          :class="{
+            'log-line--error': entry.level === 'error' || entry.level === 'fatal',
+            'log-line--warn': entry.level === 'warn'
+          }"
+        >
+          <span class="log-time">{{ formatEntryTime(entry) }}</span>
+          <NTag
+            v-if="entry.level"
+            size="tiny"
+            :type="levelType(entry.level)"
+            :bordered="false"
+            style="margin-right: 6px; min-width: 46px; text-align: center"
+          >
+            {{ levelLabel(entry.level) }}
+          </NTag>
+          <span v-if="entry.subsystem" class="log-subsystem">[{{ entry.subsystem }}]</span>
+          <span class="log-message">{{ entry.message || entry.raw }}</span>
+        </div>
+      </div>
+
+      <!-- Footer controls -->
+      <div class="log-footer">
+        <NText depth="3" style="font-size: 11px">
+          {{
+            t('pages.logs.showing', {
+              filtered: logsStore.filteredEntries.length,
+              total: logsStore.counts.total
+            })
+          }}
+        </NText>
+        <NSpace :size="6">
+          <NButton size="tiny" quaternary @click="handleClear">
+            <template #icon><NIcon :component="TrashBinOutline" /></template>
+            {{ t('pages.logs.clear') }}
+          </NButton>
+          <NButton size="tiny" quaternary @click="handleReset">
+            <template #icon><NIcon :component="RefreshOutline" /></template>
+            {{ t('pages.logs.reload') }}
+          </NButton>
+          <NButton size="tiny" quaternary @click="forceScrollToBottom">
+            <template #icon><NIcon :component="ArrowDownOutline" /></template>
+            {{ t('pages.logs.scrollBottom') }}
+          </NButton>
+        </NSpace>
+      </div>
+    </NCard>
   </NSpace>
 </template>
 
@@ -373,7 +439,7 @@ onUnmounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Cascadia Code', monospace;
-  font-size: 12px;
+  font-size: var(--font-body-sm);
   line-height: 1.6;
   padding: 8px 12px;
   background: var(--n-color-embedded);
@@ -402,7 +468,7 @@ onUnmounted(() => {
 
 .important-log-message {
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--font-body-sm);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
