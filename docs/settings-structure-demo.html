@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hermes Desktop Settings Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #121214;
+        --panel: #19191d;
+        --panel-2: #202126;
+        --panel-3: #25262c;
+        --line: #303139;
+        --text: #ececf0;
+        --muted: #a3a6ad;
+        --soft: #747984;
+        --green: #60d7ac;
+        --green-bg: #123326;
+        --amber: #e2b85a;
+        --amber-bg: #3a2d16;
+        --red: #ef7d82;
+        --red-bg: #3a2024;
+        --blue: #78b7ff;
+        --blue-bg: #17304c;
+        --shadow: 0 18px 54px rgba(0, 0, 0, 0.26);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'PingFang SC',
+          'Microsoft YaHei',
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 1px solid var(--line);
+        color: var(--text);
+        background: #24252b;
+        border-radius: 8px;
+        min-height: 34px;
+        padding: 0 12px;
+        cursor: pointer;
+      }
+
+      button.primary {
+        color: #08140f;
+        background: var(--green);
+        border-color: var(--green);
+        font-weight: 720;
+      }
+
+      button.ghost {
+        background: transparent;
+      }
+
+      button:hover {
+        border-color: #4b4d56;
+        background: #2b2c33;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 232px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--line);
+        background: #15161a;
+        padding: 22px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 8px;
+      }
+
+      .brand-mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #60d7ac, #78b7ff);
+        display: grid;
+        place-items: center;
+        color: #101114;
+        font-weight: 860;
+      }
+
+      .brand-title {
+        font-size: 16px;
+        font-weight: 780;
+        line-height: 1.1;
+      }
+
+      .brand-subtitle {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 2px;
+      }
+
+      .nav {
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        border: 0;
+        background: transparent;
+        color: #c9ccd3;
+        padding: 10px 12px;
+      }
+
+      .nav button.active {
+        color: var(--green);
+        background: rgba(96, 215, 172, 0.12);
+      }
+
+      .nav-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .sidebar-foot {
+        margin-top: auto;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #18191e;
+      }
+
+      .sidebar-foot strong {
+        display: block;
+        font-size: 13px;
+      }
+
+      .sidebar-foot span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 4px;
+        line-height: 1.45;
+      }
+
+      .main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .topbar {
+        height: 60px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        background: rgba(25, 25, 29, 0.96);
+        position: sticky;
+        top: 0;
+        z-index: 8;
+      }
+
+      .crumb {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .title {
+        font-size: 18px;
+        font-weight: 780;
+        margin-top: 2px;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 30px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #24252a;
+        font-size: 13px;
+        color: #d9dbe1;
+        white-space: nowrap;
+      }
+
+      .pill.green {
+        color: var(--green);
+        background: var(--green-bg);
+        border-color: rgba(96, 215, 172, 0.3);
+      }
+
+      .pill.amber {
+        color: var(--amber);
+        background: var(--amber-bg);
+        border-color: rgba(226, 184, 90, 0.35);
+      }
+
+      .pill.blue {
+        color: var(--blue);
+        background: var(--blue-bg);
+        border-color: rgba(120, 183, 255, 0.34);
+      }
+
+      .content {
+        padding: 20px 24px 34px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .page-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .eyebrow {
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 30px;
+        line-height: 1.12;
+        font-weight: 820;
+      }
+
+      .lead {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(126px, 1fr));
+        gap: 10px;
+      }
+
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 12px;
+        min-height: 86px;
+      }
+
+      .metric-label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric-value {
+        margin-top: 8px;
+        font-size: 20px;
+        line-height: 1.15;
+        font-weight: 800;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .metric-detail {
+        margin-top: 7px;
+        color: var(--soft);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .settings-shell {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+      }
+
+      .subnav {
+        position: sticky;
+        top: 76px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 8px;
+        display: grid;
+        gap: 4px;
+      }
+
+      .subnav a {
+        text-decoration: none;
+        color: #c9ccd3;
+        display: grid;
+        gap: 3px;
+        padding: 10px;
+        border-radius: 7px;
+      }
+
+      .subnav a.active {
+        color: var(--green);
+        background: rgba(96, 215, 172, 0.1);
+      }
+
+      .subnav strong {
+        font-size: 13px;
+      }
+
+      .subnav span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .panel-head {
+        min-height: 50px;
+        padding: 13px 16px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 780;
+        font-size: 16px;
+      }
+
+      .panel-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        display: grid;
+        place-items: center;
+        background: rgba(96, 215, 172, 0.14);
+        color: var(--green);
+        font-size: 13px;
+        font-weight: 820;
+      }
+
+      .panel-body {
+        padding: 14px 16px 16px;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .three-col {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .info-table {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .info-row {
+        display: grid;
+        grid-template-columns: 136px minmax(0, 1fr);
+        border-bottom: 1px solid var(--line);
+        min-height: 44px;
+      }
+
+      .info-row:last-child {
+        border-bottom: 0;
+      }
+
+      .info-row span,
+      .info-row strong {
+        padding: 11px 12px;
+        display: flex;
+        align-items: center;
+        min-width: 0;
+      }
+
+      .info-row span {
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.025);
+        border-right: 1px solid var(--line);
+        font-size: 13px;
+      }
+
+      .info-row strong {
+        font-size: 13px;
+        font-weight: 680;
+        word-break: break-word;
+      }
+
+      .mini-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-2);
+        padding: 13px;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .mini-card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .mini-card h3 {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.25;
+      }
+
+      .mini-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .mini-card button {
+        margin-top: auto;
+        width: 100%;
+      }
+
+      .diagnostic-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .diag-row {
+        display: grid;
+        grid-template-columns: 170px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-2);
+      }
+
+      .diag-row strong {
+        font-size: 13px;
+      }
+
+      .diag-row span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .advanced {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-2);
+        overflow: hidden;
+      }
+
+      .advanced-head {
+        padding: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .code-box {
+        margin: 0;
+        padding: 12px;
+        color: #cbd1d9;
+        background: #111216;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .foot-note {
+        color: var(--soft);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      @media (max-width: 1180px) {
+        .summary-grid {
+          grid-template-columns: repeat(3, minmax(126px, 1fr));
+        }
+
+        .settings-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .subnav {
+          position: static;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 860px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .page-head,
+        .panel-head {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .summary-grid,
+        .two-col,
+        .three-col,
+        .subnav {
+          grid-template-columns: 1fr;
+        }
+
+        .diag-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">H</div>
+          <div>
+            <div class="brand-title">Hermes Desktop</div>
+            <div class="brand-subtitle">控制塔</div>
+          </div>
+        </div>
+        <nav class="nav" aria-label="主导航">
+          <button><span class="nav-dot"></span>首页</button>
+          <button><span class="nav-dot"></span>在线对话</button>
+          <button><span class="nav-dot"></span>任务计划</button>
+          <button><span class="nav-dot"></span>技能管理</button>
+          <button class="active"><span class="nav-dot"></span>系统设置</button>
+        </nav>
+        <div class="sidebar-foot">
+          <strong>设置页目标</strong>
+          <span>把旧的大模块堆叠收敛成少量可执行分区，减少重复信息。</span>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <div class="crumb">首页 / 系统设置</div>
+            <div class="title">系统设置</div>
+          </div>
+          <div class="top-actions">
+            <span class="pill green">主模型 gpt-5.4</span>
+            <span class="pill blue">Desktop v0.5.39</span>
+            <button class="ghost">导出诊断包</button>
+          </div>
+        </header>
+
+        <section class="content">
+          <div class="page-head">
+            <div>
+              <div class="eyebrow">设置总览</div>
+              <h1>连接、模型、更新和维护集中管理</h1>
+              <p class="lead">
+                旧的连接、服务器信息、日志、备份、关于和偏好不再各占一个大卡；状态放总览，操作进对应分区。
+              </p>
+            </div>
+            <div class="toolbar">
+              <button>切换服务器</button>
+              <button class="primary">运行诊断</button>
+            </div>
+          </div>
+
+          <div class="summary-grid" aria-label="系统设置摘要">
+            <div class="metric">
+              <div class="metric-label">连接</div>
+              <div class="metric-value">网关可用</div>
+              <div class="metric-detail">100.84.113.118:8642</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">主模型</div>
+              <div class="metric-value">gpt-5.4</div>
+              <div class="metric-detail">最近诊断通过</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">备用模型</div>
+              <div class="metric-value">gemini</div>
+              <div class="metric-detail">可用，待定期复测</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">更新</div>
+              <div class="metric-value">已最新</div>
+              <div class="metric-detail">Desktop v0.5.39</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">维护</div>
+              <div class="metric-value">3 项入口</div>
+              <div class="metric-detail">渠道 / 日志 / 备份</div>
+            </div>
+          </div>
+
+          <div class="settings-shell">
+            <nav class="subnav" aria-label="系统设置分区">
+              <a class="active" href="#overview">
+                <strong>总览</strong>
+                <span>只放状态，不重复详情</span>
+              </a>
+              <a href="#connection">
+                <strong>连接与模型</strong>
+                <span>服务器、令牌、主备诊断</span>
+              </a>
+              <a href="#updates">
+                <strong>更新与配置</strong>
+                <span>版本、配置、高级维护</span>
+              </a>
+              <a href="#tools">
+                <strong>维护工具</strong>
+                <span>渠道、日志、备份入口</span>
+              </a>
+              <a href="#diagnostics">
+                <strong>诊断与偏好</strong>
+                <span>通知、审计、主题、关于</span>
+              </a>
+            </nav>
+
+            <div class="stack">
+              <section id="overview" class="panel">
+                <div class="panel-head">
+                  <div class="panel-title"><span class="panel-icon">1</span>总览</div>
+                  <span class="pill green">没有阻断项</span>
+                </div>
+                <div class="panel-body">
+                  <div class="info-table">
+                    <div class="info-row">
+                      <span>服务器</span>
+                      <strong>http://100.84.113.118:8642 · Bearer token 已配置</strong>
+                    </div>
+                    <div class="info-row">
+                      <span>模型状态</span>
+                      <strong>主模型可用，备用模型可用；上次诊断 3 分钟前</strong>
+                    </div>
+                    <div class="info-row">
+                      <span>维护状态</span>
+                      <strong>日志可打开，备份可创建，渠道配置只读展示</strong>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section id="connection" class="panel">
+                <div class="panel-head">
+                  <div class="panel-title"><span class="panel-icon">2</span>连接与模型</div>
+                  <div class="toolbar">
+                    <button>切换服务器</button>
+                    <button class="ghost">断开连接</button>
+                  </div>
+                </div>
+                <div class="panel-body">
+                  <div class="two-col">
+                    <div class="mini-card">
+                      <div class="mini-card-head">
+                        <h3>当前连接</h3>
+                        <span class="pill green">已连接</span>
+                      </div>
+                      <p>旧「当前连接」卡片合并到这里，只保留必要字段和切换/断开操作。</p>
+                      <div class="foot-note">用户名：免认证或已配置访问令牌</div>
+                    </div>
+                    <div class="mini-card">
+                      <div class="mini-card-head">
+                        <h3>模型健康</h3>
+                        <span class="pill green">通过</span>
+                      </div>
+                      <p>总览只显示状态；具体主模型、备用模型、环境变量检测在这里展开。</p>
+                      <button>运行主备模型诊断</button>
+                    </div>
+                  </div>
+                  <div class="diagnostic-list" style="margin-top: 12px">
+                    <div class="diag-row">
+                      <strong>Hermes REST 健康检查</strong>
+                      <span>/health 与 /v1/models 均返回正常。</span>
+                      <span class="pill green">OK</span>
+                    </div>
+                    <div class="diag-row">
+                      <strong>主模型</strong>
+                      <span>gpt-5.4 可完成最小回复测试。</span>
+                      <span class="pill green">可用</span>
+                    </div>
+                    <div class="diag-row">
+                      <strong>备用模型</strong>
+                      <span>gemini-3-flash-preview 凭据存在，作为 fallback 保留。</span>
+                      <span class="pill amber">需定期复测</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section id="updates" class="panel">
+                <div class="panel-head">
+                  <div class="panel-title"><span class="panel-icon">3</span>更新与配置</div>
+                  <div class="toolbar">
+                    <button>检查更新</button>
+                    <button>打开 Releases</button>
+                  </div>
+                </div>
+                <div class="panel-body">
+                  <div class="two-col">
+                    <div class="mini-card">
+                      <div class="mini-card-head">
+                        <h3>Desktop 更新</h3>
+                        <span class="pill green">v0.5.39</span>
+                      </div>
+                      <p>
+                        替代旧顶部弹层里的单点信息，把检查失败、下载入口和当前版本都收进同一区域。
+                      </p>
+                      <button class="primary">下载 Windows 新版本</button>
+                    </div>
+                    <div class="mini-card">
+                      <div class="mini-card-head">
+                        <h3>Hermes Agent 更新</h3>
+                        <span class="pill green">已最新</span>
+                      </div>
+                      <p>本地或远程管理接口可用时显示；不可用时只给诊断提示，不单独占大卡。</p>
+                      <button>重新检测远程管理接口</button>
+                    </div>
+                  </div>
+
+                  <div class="advanced" style="margin-top: 12px">
+                    <div class="advanced-head">
+                      <div>
+                        <strong>高级维护</strong>
+                        <div class="foot-note">
+                          config.yaml、.env、重启服务默认折叠，减少误操作。
+                        </div>
+                      </div>
+                      <span class="pill blue">折叠区</span>
+                    </div>
+                    <pre class="code-box">
+model:
+  default: openai-codex/gpt-5.4
+fallback:
+  provider: gemini
+  model: gemini-3-flash-preview
+
+API_SERVER_KEY=********
+GEMINI_API_KEY=********</pre
+                    >
+                  </div>
+                </div>
+              </section>
+
+              <section id="tools" class="panel">
+                <div class="panel-head">
+                  <div class="panel-title"><span class="panel-icon">4</span>维护工具</div>
+                  <span class="muted">旧隐藏路由统一从这里进入</span>
+                </div>
+                <div class="panel-body">
+                  <div class="three-col">
+                    <div class="mini-card">
+                      <div class="mini-card-head">
+                        <h3>渠道设置</h3>
+                        <span class="pill blue">只读/配置</span>
+                      </div>
+                      <p>管理外部消息渠道、账号认证和连接状态。主导航不再单独展示。</p>
+                      <button>打开渠道设置</button>
+                    </div>
+                    <div class="mini-card">
+                      <div class="mini-card-head">
+                        <h3>诊断日志</h3>
+                        <span class="pill green">可打开</span>
+                      </div>
+                      <p>查看运行日志、筛选错误和复制排障线索。</p>
+                      <button>打开系统日志</button>
+                    </div>
+                    <div class="mini-card">
+                      <div class="mini-card-head">
+                        <h3>数据备份</h3>
+                        <span class="pill amber">维护项</span>
+                      </div>
+                      <p>创建、恢复、上传和下载 Hermes 数据备份。</p>
+                      <button>打开数据备份</button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section id="diagnostics" class="panel">
+                <div class="panel-head">
+                  <div class="panel-title"><span class="panel-icon">5</span>诊断与偏好</div>
+                  <button class="primary">导出诊断包</button>
+                </div>
+                <div class="panel-body">
+                  <div class="three-col">
+                    <div class="mini-card">
+                      <div class="mini-card-head">
+                        <h3>通知中心</h3>
+                        <span class="pill green">0 待处理</span>
+                      </div>
+                      <p>不再和仪表盘重复，只保留设置相关的系统通知和处理状态。</p>
+                      <button>查看通知</button>
+                    </div>
+                    <div class="mini-card">
+                      <div class="mini-card-head">
+                        <h3>配置审计</h3>
+                        <span class="pill blue">12 条</span>
+                      </div>
+                      <p>记录 config.yaml、.env 和关键设置变更，方便回滚排查。</p>
+                      <button>查看审计摘要</button>
+                    </div>
+                    <div class="mini-card">
+                      <div class="mini-card-head">
+                        <h3>偏好与关于</h3>
+                        <span class="pill">深色</span>
+                      </div>
+                      <p>主题、语言和版本信息合并到底部小区块，不再拆成两个大卡。</p>
+                      <button>保存偏好</button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

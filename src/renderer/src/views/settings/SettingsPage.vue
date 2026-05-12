@@ -6,8 +6,6 @@ import {
   NSpace,
   NSelect,
   NText,
-  NForm,
-  NFormItem,
   NButton,
   NTag,
   NIcon,
@@ -45,6 +43,7 @@ import { useMgmtProbe, type MgmtFetchResult } from '@/composables/useMgmtProbe'
 import { hermesRestRequest } from '@/api/hermes-rest-client'
 import { downloadJSON, formatRelativeTime } from '@/utils/format'
 import { writeTextToClipboard } from '@/utils/clipboard'
+import ConnectionStatus from '@/components/common/ConnectionStatus.vue'
 
 const router = useRouter()
 const themeStore = useThemeStore()
@@ -890,783 +889,1041 @@ watch(
 </script>
 
 <template>
-  <NSpace vertical :size="12" class="settings-page">
-    <NCard class="app-card settings-overview-card">
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NIcon :component="CogOutline" size="18" />
-          <span>系统设置</span>
-        </NSpace>
-      </template>
-      <template #header-extra>
-        <NButton size="small" type="primary" secondary @click="exportDiagnosticReport">
-          导出诊断包
-        </NButton>
-      </template>
-
-      <NText depth="3" class="settings-overview-note">
-        连接、模型、更新、诊断和偏好集中管理。
-      </NText>
-      <div class="settings-groups">
-        <div class="settings-group">
-          <div class="settings-group-title">连接与模型</div>
-          <div class="settings-row">
-            <span>服务器</span>
-            <strong>{{ currentServer?.url || '-' }}</strong>
-          </div>
-          <div class="settings-row">
-            <span>访问令牌</span>
-            <strong>{{
-              isNoAuth ? '免认证' : currentServer?.username ? '已配置' : '未配置'
-            }}</strong>
-          </div>
-          <div class="settings-row">
-            <span>主模型</span>
-            <strong>{{ connectionStore.hermesRealModel || 'unknown' }}</strong>
-          </div>
-          <div class="settings-row">
-            <span>备用模型</span>
-            <strong>{{
-              modelDiagnosticItems.some(
-                (item) => item.key.includes('fallback') && item.type === 'success'
-              )
-                ? '可用'
-                : '待诊断'
-            }}</strong>
-          </div>
-          <NButton
-            size="small"
-            secondary
-            :loading="modelDiagnosticLoading"
-            @click="runModelDiagnostic"
-          >
-            运行诊断
-          </NButton>
-        </div>
-
-        <div class="settings-group">
-          <div class="settings-group-title">运维维护</div>
-          <div class="settings-row">
-            <span>版本更新</span>
-            <strong>{{
-              hermesCurrentTag || (hermesVersion ? `v${hermesVersion}` : `v${desktopVersion}`)
-            }}</strong>
-          </div>
-          <div class="settings-row">
-            <span>系统日志</span>
-            <strong>可打开</strong>
-          </div>
-          <div class="settings-row">
-            <span>数据备份</span>
-            <strong>{{ t('routes.backup') }}</strong>
-          </div>
-          <div class="settings-row">
-            <span>配置审计</span>
-            <strong>{{ opsStore.recentAudits.length }} 条</strong>
-          </div>
-          <NButton size="small" secondary @click="goLogs">打开维护工具</NButton>
-        </div>
-
-        <div class="settings-group">
-          <div class="settings-group-title">偏好设置</div>
-          <div class="settings-row">
-            <span>主题</span>
-            <strong>{{ themeStore.mode }}</strong>
-          </div>
-          <div class="settings-row">
-            <span>语言</span>
-            <strong>中文 / English</strong>
-          </div>
-          <div class="settings-row">
-            <span>侧栏</span>
-            <strong>竖版固定</strong>
-          </div>
-          <div class="settings-row">
-            <span>关于</span>
-            <strong>Hermes Desktop</strong>
-          </div>
-          <NButton size="small" secondary @click="message.success('偏好已保存')">保存偏好</NButton>
-        </div>
+  <div class="settings-page">
+    <section class="settings-page-head">
+      <div>
+        <div class="settings-eyebrow">设置总览</div>
+        <h1>连接、模型、更新和维护集中管理</h1>
+        <p>
+          旧的连接、服务器信息、日志、备份、关于和偏好不再各占一个大卡；状态放总览，操作进对应分区。
+        </p>
       </div>
-    </NCard>
-
-    <!-- Current Connection -->
-    <NCard class="app-card">
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NIcon :component="ServerOutline" size="18" />
-          <span>{{ t('pages.settings.currentConnection') }}</span>
-        </NSpace>
-      </template>
-      <template #header-extra>
-        <NTag :type="connectionStatus.type" size="small" round :bordered="false">
-          {{ connectionStatus.text }}
-        </NTag>
-      </template>
-
-      <NDescriptions label-placement="left" :column="1" bordered size="small" v-if="currentServer">
-        <NDescriptionsItem :label="t('pages.settings.serverName')">
-          {{ currentServer.name }}
-        </NDescriptionsItem>
-        <NDescriptionsItem :label="t('pages.settings.serverAddress')">
-          <NText code>{{ currentServer.url }}</NText>
-        </NDescriptionsItem>
-        <NDescriptionsItem :label="t('pages.settings.authMethod')">
-          <NTag v-if="isNoAuth" size="small" type="success" :bordered="false">{{
-            t('pages.settings.noAuth')
-          }}</NTag>
-          <NSpace v-else align="center" :size="6">
-            <NTag size="small" :bordered="false">{{ t('pages.settings.accountAuth') }}</NTag>
-            <NText depth="3" style="font-size: 12px">{{ currentServer.username }}</NText>
-          </NSpace>
-        </NDescriptionsItem>
-        <NDescriptionsItem
-          :label="t('pages.settings.gatewayVersion')"
-          v-if="wsStore.gatewayVersion"
-        >
-          {{ wsStore.gatewayVersion }}
-        </NDescriptionsItem>
-      </NDescriptions>
-
-      <NSpace style="margin-top: 16px" :size="12">
-        <NButton size="small" @click="handleSwitchServer">
+      <NSpace align="center" :size="8" class="settings-head-actions">
+        <NButton size="small" secondary @click="handleSwitchServer">
           <template #icon><NIcon :component="SwapHorizontalOutline" /></template>
-          {{ t('pages.settings.switchServer') }}
-        </NButton>
-        <NButton size="small" type="error" quaternary @click="handleDisconnect">
-          {{ t('pages.settings.disconnect') }}
-        </NButton>
-      </NSpace>
-    </NCard>
-
-    <!-- Secondary maintenance entry points -->
-    <NCard class="app-card">
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NIcon :component="CogOutline" size="18" />
-          <span>维护工具</span>
-        </NSpace>
-      </template>
-      <NText depth="3" class="settings-section-note"> 渠道、日志和备份收纳在这里。 </NText>
-      <NGrid cols="1 m:3" responsive="screen" :x-gap="10" :y-gap="10">
-        <NGridItem>
-          <div class="settings-module-card">
-            <div class="settings-module-head">
-              <NIcon :component="PaperPlaneOutline" size="18" />
-              <NText strong>{{ t('routes.channels') }}</NText>
-            </div>
-            <NText depth="3" class="settings-module-detail">
-              管理外部消息渠道、账号认证和连接状态。
-            </NText>
-            <NButton size="small" secondary block @click="goChannels">打开渠道设置</NButton>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="settings-module-card">
-            <div class="settings-module-head">
-              <NIcon :component="DocumentTextOutline" size="18" />
-              <NText strong>{{ t('routes.logs') }}</NText>
-            </div>
-            <NText depth="3" class="settings-module-detail">
-              查看运行日志、筛选错误和导出排障线索。
-            </NText>
-            <NButton size="small" secondary block @click="goLogs">打开诊断日志</NButton>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="settings-module-card">
-            <div class="settings-module-head">
-              <NIcon :component="SaveOutline" size="18" />
-              <NText strong>{{ t('routes.backup') }}</NText>
-            </div>
-            <NText depth="3" class="settings-module-detail">
-              创建、恢复、上传和下载 Hermes 数据备份。
-            </NText>
-            <NButton size="small" secondary block @click="goBackup">打开数据维护</NButton>
-          </div>
-        </NGridItem>
-      </NGrid>
-    </NCard>
-
-    <!-- Model & credential diagnostics -->
-    <NCard class="app-card" v-if="isHermesRest">
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NIcon :component="InformationCircleOutline" size="18" />
-          <span>模型与凭据诊断</span>
-        </NSpace>
-      </template>
-      <template #header-extra>
-        <NSpace align="center" :size="8">
-          <NTag
-            size="small"
-            :type="modelDiagnosticItems.length ? modelDiagnosticSummary.type : 'default'"
-            round
-            :bordered="false"
-          >
-            {{
-              modelDiagnosticItems.length
-                ? modelDiagnosticSummary.label
-                : modelDiagnosticCheckedText
-            }}
-          </NTag>
-          <NButton size="small" :loading="modelDiagnosticLoading" @click="runModelDiagnostic">
-            <template #icon><NIcon :component="RefreshOutline" /></template>
-            运行诊断
-          </NButton>
-          <NButton
-            v-if="modelDiagnosticItems.length"
-            size="small"
-            secondary
-            @click="copyModelDiagnostic"
-          >
-            <template #icon><NIcon :component="CopyOutline" /></template>
-            复制摘要
-          </NButton>
-        </NSpace>
-      </template>
-
-      <NDescriptions label-placement="left" :column="1" bordered size="small">
-        <NDescriptionsItem label="服务器">
-          <NText code>{{ currentServer?.url || '-' }}</NText>
-        </NDescriptionsItem>
-        <NDescriptionsItem label="当前识别模型">
-          <NTag
-            size="small"
-            :bordered="false"
-            round
-            :type="connectionStore.hermesRealModel ? 'success' : 'warning'"
-          >
-            {{ connectionStore.hermesRealModel || 'unknown' }}
-          </NTag>
-        </NDescriptionsItem>
-        <NDescriptionsItem label="上次诊断">
-          {{ modelDiagnosticCheckedText }}
-        </NDescriptionsItem>
-      </NDescriptions>
-
-      <NSpin :show="modelDiagnosticLoading">
-        <div v-if="modelDiagnosticItems.length" class="diagnostic-grid">
-          <div v-for="item in modelDiagnosticItems" :key="item.key" class="diagnostic-item">
-            <div class="diagnostic-item-head">
-              <NText strong>{{ item.label }}</NText>
-              <NTag size="small" :type="item.type" round :bordered="false">{{ item.value }}</NTag>
-            </div>
-            <NText depth="3" class="diagnostic-item-detail">{{ item.detail }}</NText>
-          </div>
-        </div>
-        <NAlert v-else type="info" :closable="false" style="margin-top: 12px">
-          点击运行诊断后，会检查服务健康、模型接口、主模型配置、备用模型和关键环境变量。
-        </NAlert>
-      </NSpin>
-    </NCard>
-
-    <!-- Server Info (remote without management API — basic fallback) -->
-    <NCard class="app-card" v-if="isHermesRest && !isLocalServer && !remoteManageAvailable">
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NIcon :component="InformationCircleOutline" size="18" />
-          <span>{{ t('pages.settings.serverInfo') }}</span>
-        </NSpace>
-      </template>
-
-      <NDescriptions label-placement="left" :column="1" bordered size="small">
-        <NDescriptionsItem :label="t('pages.settings.serverPlatform')">
-          <NTag size="small" :bordered="false" round type="info">Hermes Agent</NTag>
-        </NDescriptionsItem>
-        <NDescriptionsItem
-          :label="t('pages.settings.serverModel')"
-          v-if="connectionStore.hermesRealModel"
-        >
-          <NTag size="small" :bordered="false" round type="success">
-            {{ connectionStore.hermesRealModel }}
-          </NTag>
-        </NDescriptionsItem>
-      </NDescriptions>
-
-      <!-- Probe status / diagnostic + Retry -->
-      <div style="margin-top: 12px">
-        <NAlert v-if="remoteProbeBusy" type="default" :closable="false">
-          <template #icon><NSpin :size="14" /></template>
-          {{ t('pages.settings.mgmtProbing') }}
-        </NAlert>
-        <NAlert
-          v-else-if="restSettingsError || (mgmtErrorKind && mgmtErrorKind !== 'empty-url')"
-          type="info"
-          :closable="false"
-          :title="t('pages.settings.mgmtNotAvailable')"
-        >
-          <div style="font-size: 13px; margin-bottom: 6px">{{ mgmtErrorMessage }}</div>
-          <div
-            v-if="mgmtErrorDetail"
-            style="
-              font-family: ui-monospace, Menlo, Monaco, monospace;
-              font-size: 12px;
-              opacity: 0.75;
-              word-break: break-word;
-            "
-          >
-            {{ mgmtErrorDetail }}
-          </div>
-          <div style="font-size: 12px; margin-top: 8px; opacity: 0.85">
-            {{ t('pages.settings.mgmtInstallHint') }}
-          </div>
-        </NAlert>
-        <NAlert v-else type="info" :closable="false">
-          {{ t('pages.settings.serverLocalOnly') }}
-        </NAlert>
-      </div>
-
-      <NSpace style="margin-top: 12px" :size="8">
-        <NButton size="small" :loading="remoteProbeBusy" @click="triggerMgmtProbe">
-          <template #icon><NIcon :component="RefreshOutline" /></template>
-          {{ t('pages.settings.mgmtRetryProbe') }}
-        </NButton>
-      </NSpace>
-    </NCard>
-
-    <!-- Hermes Agent Version & Update (local server only — uses local git/binary) -->
-    <NCard class="app-card" v-if="canManage">
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NIcon :component="RocketOutline" size="18" />
-          <span>{{ t('pages.settings.hermesVersion') }}</span>
-        </NSpace>
-      </template>
-      <template #header-extra>
-        <NTag v-if="hermesVersion" size="small" :bordered="false" round type="info">
-          v{{ hermesVersion }}
-        </NTag>
-      </template>
-
-      <NDescriptions label-placement="left" :column="1" bordered size="small" v-if="hermesVersion">
-        <NDescriptionsItem :label="t('pages.settings.currentVersion')">
-          <NText strong>v{{ hermesVersion }}</NText>
-        </NDescriptionsItem>
-        <NDescriptionsItem :label="t('pages.settings.releaseDate')" v-if="hermesDate">
-          {{ hermesDate }}
-        </NDescriptionsItem>
-      </NDescriptions>
-      <NSpin v-else-if="hermesVersionLoading" :show="true" size="small" style="padding: 12px 0" />
-
-      <!-- Auto-check status -->
-      <div style="margin-top: 12px">
-        <!-- Checking spinner -->
-        <NAlert v-if="hermesCheckingUpdate" type="default" :closable="false">
-          <template #icon><NSpin :size="14" /></template>
-          {{ t('pages.settings.checking') }}
-        </NAlert>
-        <!-- Update failure (persistent, user can retry) -->
-        <NAlert
-          v-else-if="hermesUpdateError"
-          type="error"
-          :closable="true"
-          :title="t('pages.settings.updateFailed')"
-          @close="hermesUpdateError = ''"
-        >
-          <div
-            style="
-              word-break: break-word;
-              font-family: ui-monospace, Menlo, Monaco, monospace;
-              font-size: 12px;
-            "
-          >
-            {{ hermesUpdateError }}
-          </div>
-          <div v-if="updateAdvice" style="margin-top: 6px; font-size: 12px">{{ updateAdvice }}</div>
-          <div style="margin-top: 6px; font-size: 12px; opacity: 0.8">
-            {{ t('pages.settings.updateRetryHint') }}
-          </div>
-        </NAlert>
-        <!-- Check failure (persistent, user can retry) -->
-        <NAlert
-          v-else-if="hermesCheckError"
-          type="error"
-          :closable="true"
-          :title="t('pages.settings.checkUpdateFailed')"
-          @close="hermesCheckError = ''"
-        >
-          <div
-            style="
-              word-break: break-word;
-              font-family: ui-monospace, Menlo, Monaco, monospace;
-              font-size: 12px;
-            "
-          >
-            {{ hermesCheckError }}
-          </div>
-          <div v-if="updateAdvice" style="margin-top: 6px; font-size: 12px">{{ updateAdvice }}</div>
-          <div style="margin-top: 6px; font-size: 12px; opacity: 0.8">
-            {{ t('pages.settings.updateRetryHint') }}
-          </div>
-        </NAlert>
-        <!-- Update available -->
-        <NAlert v-else-if="hermesUpdateAvailable" type="warning" :closable="false">
-          {{ t('pages.settings.updateAvailable', { version: hermesLatestTag }) }}
-        </NAlert>
-        <!-- Up to date -->
-        <NAlert
-          v-else-if="hermesUpdateChecked && !hermesUpdateAvailable"
-          type="success"
-          :closable="false"
-        >
-          {{ t('pages.settings.noUpdate') }}
-        </NAlert>
-      </div>
-
-      <div
-        v-if="hermesUpdating && hermesUpdateLog"
-        style="
-          margin-top: 12px;
-          max-height: 120px;
-          overflow-y: auto;
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 4px;
-          padding: 8px;
-          font-family: monospace;
-          font-size: 12px;
-          white-space: pre-wrap;
-          color: #aaa;
-        "
-      >
-        {{ hermesUpdateLog }}
-      </div>
-
-      <NSpace style="margin-top: 12px" :size="8">
-        <NButton
-          size="small"
-          :loading="hermesCheckingUpdate"
-          :disabled="hermesUpdating"
-          @click="checkHermesUpdate"
-        >
-          <template #icon><NIcon :component="RefreshOutline" /></template>
-          {{ t('pages.settings.checkUpdate') }}
+          切换服务器
         </NButton>
         <NButton
-          v-if="hermesUpdateAvailable"
           size="small"
           type="primary"
-          :loading="hermesUpdating"
-          @click="doHermesUpdate"
+          :loading="modelDiagnosticLoading"
+          @click="runModelDiagnostic"
         >
-          <template #icon><NIcon :component="CloudDownloadOutline" /></template>
-          {{ hermesUpdating ? t('pages.settings.updating') : t('pages.settings.updateNow') }}
+          运行诊断
         </NButton>
-        <NButton size="small" tag="a" :href="hermesReleaseUrl" target="_blank">
-          打开 Releases
-        </NButton>
+        <NButton size="small" secondary @click="exportDiagnosticReport">导出诊断包</NButton>
       </NSpace>
-    </NCard>
+    </section>
 
-    <!-- Hermes Config (config.yaml) — local only -->
-    <NCard class="app-card app-card--collapsible" v-if="canManage">
-      <template #header>
-        <NSpace
-          align="center"
-          :size="8"
-          style="cursor: pointer"
-          @click="configExpanded = !configExpanded"
-        >
-          <NIcon :component="configExpanded ? ChevronUpOutline : ChevronDownOutline" size="18" />
-          <NIcon :component="DocumentTextOutline" size="18" />
-          <span>{{ t('pages.settings.hermesConfig') }}</span>
-        </NSpace>
-      </template>
-      <template #header-extra>
-        <NText depth="3" style="font-size: 12px">{{ t('pages.settings.hermesConfigDesc') }}</NText>
-      </template>
-
-      <div v-show="configExpanded">
-        <NSpin :show="configYamlLoading">
-          <NAlert
-            v-if="configYamlNotFound"
-            type="info"
-            style="margin-bottom: 12px"
-            :closable="false"
-          >
-            {{ t('pages.settings.fileNotFound') }}
-          </NAlert>
-          <NAlert v-if="configYamlError" type="error" style="margin-bottom: 12px" :closable="false">
-            {{ configYamlError }}
-          </NAlert>
-          <NInput
-            v-model:value="configYaml"
-            type="textarea"
-            :autosize="{ minRows: 8, maxRows: 24 }"
-            :placeholder="
-              configYamlLoading
-                ? t('pages.settings.loadingFile')
-                : 'model:\n  default: openai-codex/gpt-5.4\n  provider: openai-codex'
-            "
-            style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 13px"
-          />
-          <NSpace style="margin-top: 12px" :size="8">
-            <NButton
-              type="primary"
-              size="small"
-              :loading="configYamlSaving"
-              :disabled="configYamlLoading"
-              @click="saveConfigYaml"
-            >
-              <template #icon><NIcon :component="SaveOutline" /></template>
-              {{ configYamlSaving ? t('pages.settings.saving') : t('pages.settings.saveFile') }}
-            </NButton>
-          </NSpace>
-        </NSpin>
+    <section class="settings-summary-grid" aria-label="系统设置摘要">
+      <div class="settings-metric">
+        <span>连接</span>
+        <strong>{{ connectionStatus.text }}</strong>
+        <small>{{ currentServer?.url || '-' }}</small>
       </div>
-    </NCard>
-
-    <!-- Hermes .env — local only -->
-    <NCard class="app-card app-card--collapsible" v-if="canManage">
-      <template #header>
-        <NSpace
-          align="center"
-          :size="8"
-          style="cursor: pointer"
-          @click="envExpanded = !envExpanded"
-        >
-          <NIcon :component="envExpanded ? ChevronUpOutline : ChevronDownOutline" size="18" />
-          <NIcon :component="DocumentTextOutline" size="18" />
-          <span>{{ t('pages.settings.hermesEnv') }}</span>
-        </NSpace>
-      </template>
-      <template #header-extra>
-        <NText depth="3" style="font-size: 12px">{{ t('pages.settings.hermesEnvDesc') }}</NText>
-      </template>
-
-      <div v-show="envExpanded">
-        <NSpin :show="envLoading">
-          <NAlert v-if="envNotFound" type="info" style="margin-bottom: 12px" :closable="false">
-            {{ t('pages.settings.fileNotFound') }}
-          </NAlert>
-          <NAlert v-if="envError" type="error" style="margin-bottom: 12px" :closable="false">
-            {{ envError }}
-          </NAlert>
-          <NInput
-            v-model:value="envContent"
-            type="textarea"
-            :autosize="{ minRows: 6, maxRows: 20 }"
-            :placeholder="
-              envLoading
-                ? t('pages.settings.loadingFile')
-                : 'API_SERVER_KEY=\nOPENAI_API_KEY=sk-...'
-            "
-            style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 13px"
-          />
-          <NSpace style="margin-top: 12px" :size="8">
-            <NButton
-              type="primary"
-              size="small"
-              :loading="envSaving"
-              :disabled="envLoading"
-              @click="saveEnv"
-            >
-              <template #icon><NIcon :component="SaveOutline" /></template>
-              {{ envSaving ? t('pages.settings.saving') : t('pages.settings.saveFile') }}
-            </NButton>
-          </NSpace>
-        </NSpin>
+      <div class="settings-metric">
+        <span>主模型</span>
+        <strong>{{ connectionStore.hermesRealModel || 'unknown' }}</strong>
+        <small>{{ modelDiagnosticCheckedText }}</small>
       </div>
-    </NCard>
+      <div class="settings-metric">
+        <span>备用模型</span>
+        <strong>{{
+          modelDiagnosticItems.some(
+            (item) => item.key.includes('fallback') && item.type === 'success'
+          )
+            ? '可用'
+            : '待诊断'
+        }}</strong>
+        <small>失败时接管模型请求</small>
+      </div>
+      <div class="settings-metric">
+        <span>更新</span>
+        <strong>{{ hermesUpdateAvailable ? '可更新' : '已最新' }}</strong>
+        <small>Desktop v{{ desktopVersion }}</small>
+      </div>
+      <div class="settings-metric">
+        <span>维护</span>
+        <strong>3 项入口</strong>
+        <small>渠道 / 日志 / 备份</small>
+      </div>
+    </section>
 
-    <!-- Restart Hermes service — local only (macOS launchd) -->
-    <NCard class="app-card" v-if="canManage">
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NIcon :component="RefreshOutline" size="18" />
-          <span>{{ t('pages.settings.restartHermes') }}</span>
-        </NSpace>
-      </template>
+    <div class="settings-shell">
+      <nav class="settings-subnav" aria-label="系统设置分区">
+        <a class="active" href="#settings-overview">
+          <strong>总览</strong>
+          <span>只放状态，不重复详情</span>
+        </a>
+        <a href="#settings-connection">
+          <strong>连接与模型</strong>
+          <span>服务器、令牌、主备诊断</span>
+        </a>
+        <a href="#settings-updates">
+          <strong>更新与配置</strong>
+          <span>版本、配置、高级维护</span>
+        </a>
+        <a href="#settings-tools">
+          <strong>维护工具</strong>
+          <span>渠道、日志、备份入口</span>
+        </a>
+        <a href="#settings-diagnostics">
+          <strong>诊断与偏好</strong>
+          <span>通知、审计、主题、关于</span>
+        </a>
+      </nav>
 
-      <NAlert type="info" :closable="false" style="margin-bottom: 12px">
-        {{ t('pages.settings.restartTip') }}
-      </NAlert>
-      <NButton type="warning" size="small" :loading="restarting" @click="restartHermes">
-        <template #icon><NIcon :component="RefreshOutline" /></template>
-        {{ restarting ? t('pages.settings.restarting') : t('pages.settings.restartHermes') }}
-      </NButton>
-    </NCard>
-
-    <!-- Notifications, audit and diagnostic export -->
-    <NGrid cols="1 l:3" responsive="screen" :x-gap="12" :y-gap="12">
-      <NGridItem>
-        <NCard title="通知中心" class="app-card settings-ops-card">
+      <div class="settings-stack">
+        <NCard id="settings-overview" class="app-card settings-panel">
+          <template #header>
+            <div class="settings-panel-title">
+              <span class="settings-panel-index">1</span>
+              <span>总览</span>
+            </div>
+          </template>
           <template #header-extra>
-            <NTag
-              size="small"
-              :type="opsStore.activeNotices.length ? 'warning' : 'success'"
-              round
-              :bordered="false"
-            >
-              {{ opsStore.activeNotices.length }} 待处理
+            <NTag :type="connectionStatus.type" size="small" round :bordered="false">
+              {{ connectionStatus.text }}
             </NTag>
           </template>
-          <NSpace v-if="opsStore.recentNotices.length" vertical :size="8">
-            <div
-              v-for="notice in opsStore.recentNotices.slice(0, 4)"
-              :key="notice.id"
-              class="settings-ops-row"
-            >
-              <div class="settings-ops-row-head">
-                <NText strong>{{ notice.title }}</NText>
-                <NTag size="tiny" :type="opsTagType(notice.severity)" round :bordered="false">
-                  {{ notice.source }}
-                </NTag>
-              </div>
-              <NText depth="3" class="settings-ops-row-detail">{{ notice.detail }}</NText>
-              <NButton
-                v-if="!notice.resolvedAt"
-                size="tiny"
-                secondary
-                @click="opsStore.resolveNotice(notice.id)"
-              >
-                标记已处理
+
+          <div class="settings-info-table">
+            <div class="settings-info-row">
+              <span>服务器</span>
+              <strong>{{ currentServer?.url || '-' }}</strong>
+            </div>
+            <div class="settings-info-row">
+              <span>访问令牌</span>
+              <strong>{{
+                isNoAuth ? '免认证' : currentServer?.username ? '已配置' : '未配置'
+              }}</strong>
+            </div>
+            <div class="settings-info-row">
+              <span>模型状态</span>
+              <strong>
+                主模型 {{ connectionStore.hermesRealModel || 'unknown' }}，备用模型
+                {{
+                  modelDiagnosticItems.some(
+                    (item) => item.key.includes('fallback') && item.type === 'success'
+                  )
+                    ? '可用'
+                    : '待诊断'
+                }}
+              </strong>
+            </div>
+            <div class="settings-info-row">
+              <span>维护状态</span>
+              <strong>
+                {{ opsStore.activeNotices.length }} 个待处理通知，
+                {{ opsStore.recentAudits.length }} 条配置审计
+              </strong>
+            </div>
+          </div>
+        </NCard>
+
+        <NCard id="settings-connection" class="app-card settings-panel">
+          <template #header>
+            <div class="settings-panel-title">
+              <span class="settings-panel-index">2</span>
+              <NIcon :component="ServerOutline" size="18" />
+              <span>连接与模型</span>
+            </div>
+          </template>
+          <template #header-extra>
+            <NSpace align="center" :size="8">
+              <NButton size="small" secondary @click="handleSwitchServer">
+                <template #icon><NIcon :component="SwapHorizontalOutline" /></template>
+                {{ t('pages.settings.switchServer') }}
               </NButton>
-            </div>
-          </NSpace>
-          <NText v-else depth="3">暂无通知。</NText>
-        </NCard>
-      </NGridItem>
-      <NGridItem>
-        <NCard title="配置变更审计" class="app-card settings-ops-card">
-          <NSpace v-if="opsStore.recentAudits.length" vertical :size="8">
-            <div
-              v-for="audit in opsStore.recentAudits.slice(0, 5)"
-              :key="audit.id"
-              class="settings-ops-row"
-            >
-              <div class="settings-ops-row-head">
-                <NText strong>{{ audit.target }}</NText>
-                <NTag size="tiny" round :bordered="false">{{ audit.action }}</NTag>
+              <NButton size="small" type="error" quaternary @click="handleDisconnect">
+                {{ t('pages.settings.disconnect') }}
+              </NButton>
+            </NSpace>
+          </template>
+
+          <NGrid cols="1 m:2" responsive="screen" :x-gap="12" :y-gap="12">
+            <NGridItem>
+              <div class="settings-mini-card">
+                <div class="settings-mini-head">
+                  <NText strong>{{ t('pages.settings.currentConnection') }}</NText>
+                  <NTag :type="connectionStatus.type" size="small" round :bordered="false">
+                    {{ connectionStatus.text }}
+                  </NTag>
+                </div>
+                <NDescriptions
+                  v-if="currentServer"
+                  label-placement="left"
+                  :column="1"
+                  bordered
+                  size="small"
+                >
+                  <NDescriptionsItem :label="t('pages.settings.serverName')">
+                    {{ currentServer.name }}
+                  </NDescriptionsItem>
+                  <NDescriptionsItem :label="t('pages.settings.serverAddress')">
+                    <NText code>{{ currentServer.url }}</NText>
+                  </NDescriptionsItem>
+                  <NDescriptionsItem :label="t('pages.settings.authMethod')">
+                    <NTag v-if="isNoAuth" size="small" type="success" :bordered="false">
+                      {{ t('pages.settings.noAuth') }}
+                    </NTag>
+                    <NSpace v-else align="center" :size="6">
+                      <NTag size="small" :bordered="false">
+                        {{ t('pages.settings.accountAuth') }}
+                      </NTag>
+                      <NText depth="3" style="font-size: 12px">{{ currentServer.username }}</NText>
+                    </NSpace>
+                  </NDescriptionsItem>
+                  <NDescriptionsItem
+                    v-if="wsStore.gatewayVersion"
+                    :label="t('pages.settings.gatewayVersion')"
+                  >
+                    {{ wsStore.gatewayVersion }}
+                  </NDescriptionsItem>
+                </NDescriptions>
               </div>
-              <NText depth="3" class="settings-ops-row-detail">{{ audit.detail }}</NText>
-              <NText depth="3" style="font-size: 12px">{{
-                formatRelativeTime(audit.createdAt)
-              }}</NText>
+            </NGridItem>
+
+            <NGridItem>
+              <div class="settings-mini-card">
+                <div class="settings-mini-head">
+                  <NText strong>模型健康</NText>
+                  <NTag
+                    size="small"
+                    :type="modelDiagnosticItems.length ? modelDiagnosticSummary.type : 'default'"
+                    round
+                    :bordered="false"
+                  >
+                    {{
+                      modelDiagnosticItems.length
+                        ? modelDiagnosticSummary.label
+                        : modelDiagnosticCheckedText
+                    }}
+                  </NTag>
+                </div>
+                <NText depth="3" class="settings-mini-detail">
+                  检查服务健康、模型接口、主模型配置、备用模型和关键环境变量。
+                </NText>
+                <NSpace :size="8">
+                  <NButton
+                    size="small"
+                    type="primary"
+                    :loading="modelDiagnosticLoading"
+                    @click="runModelDiagnostic"
+                  >
+                    <template #icon><NIcon :component="RefreshOutline" /></template>
+                    运行诊断
+                  </NButton>
+                  <NButton
+                    v-if="modelDiagnosticItems.length"
+                    size="small"
+                    secondary
+                    @click="copyModelDiagnostic"
+                  >
+                    <template #icon><NIcon :component="CopyOutline" /></template>
+                    复制摘要
+                  </NButton>
+                </NSpace>
+              </div>
+            </NGridItem>
+          </NGrid>
+
+          <NAlert
+            v-if="isHermesRest && !isLocalServer && !remoteManageAvailable"
+            type="info"
+            :closable="false"
+            class="settings-inline-alert"
+            :title="
+              remoteProbeBusy
+                ? t('pages.settings.mgmtProbing')
+                : t('pages.settings.mgmtNotAvailable')
+            "
+          >
+            <template #icon>
+              <NSpin v-if="remoteProbeBusy" :size="14" />
+            </template>
+            <div class="settings-alert-text">
+              {{ remoteProbeBusy ? t('pages.settings.mgmtProbing') : mgmtErrorMessage }}
             </div>
-          </NSpace>
-          <NText v-else depth="3">保存 config.yaml 或 .env 后会自动记录审计摘要。</NText>
-        </NCard>
-      </NGridItem>
-      <NGridItem>
-        <NCard title="故障报告导出" class="app-card settings-ops-card">
-          <NText depth="3" class="settings-ops-row-detail">
-            导出 Desktop 连接状态、模型诊断、通知中心和配置审计摘要，方便跨设备排障。
-          </NText>
-          <NSpace vertical :size="8">
-            <NButton size="small" type="primary" secondary @click="exportDiagnosticReport">
-              导出诊断包
-            </NButton>
+            <div v-if="mgmtErrorDetail" class="settings-monospace">{{ mgmtErrorDetail }}</div>
+            <div class="settings-alert-text">{{ t('pages.settings.mgmtInstallHint') }}</div>
             <NButton
               size="small"
               secondary
-              :loading="modelDiagnosticLoading"
-              @click="runModelDiagnostic"
+              :loading="remoteProbeBusy"
+              style="margin-top: 10px"
+              @click="triggerMgmtProbe"
             >
-              重新测试主备模型
+              <template #icon><NIcon :component="RefreshOutline" /></template>
+              {{ t('pages.settings.mgmtRetryProbe') }}
             </NButton>
-          </NSpace>
+          </NAlert>
+
+          <NSpin v-if="isHermesRest" :show="modelDiagnosticLoading">
+            <div v-if="modelDiagnosticItems.length" class="diagnostic-grid">
+              <div v-for="item in modelDiagnosticItems" :key="item.key" class="diagnostic-item">
+                <div class="diagnostic-item-head">
+                  <NText strong>{{ item.label }}</NText>
+                  <NTag size="small" :type="item.type" round :bordered="false">
+                    {{ item.value }}
+                  </NTag>
+                </div>
+                <NText depth="3" class="diagnostic-item-detail">{{ item.detail }}</NText>
+              </div>
+            </div>
+            <NAlert v-else type="info" :closable="false" class="settings-inline-alert">
+              点击运行诊断后，会检查服务健康、模型接口、主模型配置、备用模型和关键环境变量。
+            </NAlert>
+          </NSpin>
         </NCard>
-      </NGridItem>
-    </NGrid>
 
-    <!-- Appearance -->
-    <NCard :title="t('pages.settings.appearanceSettings')" class="app-card">
-      <NForm label-placement="left" label-width="120" style="max-width: 500px">
-        <NFormItem :label="t('pages.settings.themeMode')">
-          <NSelect
-            :value="themeStore.mode"
-            :options="themeOptions"
-            @update:value="handleThemeChange"
-          />
-        </NFormItem>
-      </NForm>
-    </NCard>
+        <NCard id="settings-updates" class="app-card settings-panel">
+          <template #header>
+            <div class="settings-panel-title">
+              <span class="settings-panel-index">3</span>
+              <NIcon :component="RocketOutline" size="18" />
+              <span>更新与配置</span>
+            </div>
+          </template>
+          <template #header-extra>
+            <NTag size="small" round :bordered="false"> Desktop v{{ desktopVersion }} </NTag>
+          </template>
 
-    <!-- About -->
-    <NCard :title="t('pages.settings.about')" class="app-card">
-      <NSpace vertical :size="8">
-        <NText>Hermes Desktop</NText>
-        <NText depth="3" style="font-size: 13px">
-          {{ t('pages.settings.aboutLine1') }}
-        </NText>
-        <NText depth="3" style="font-size: 13px">
-          {{ t('pages.settings.aboutLine2') }}
-        </NText>
-      </NSpace>
-    </NCard>
-  </NSpace>
+          <NGrid cols="1 m:2" responsive="screen" :x-gap="12" :y-gap="12">
+            <NGridItem>
+              <div class="settings-mini-card">
+                <div class="settings-mini-head">
+                  <NText strong>Desktop 更新</NText>
+                  <ConnectionStatus />
+                </div>
+                <NText depth="3" class="settings-mini-detail">
+                  Windows 新版本下载、失败重试和 Releases 入口集中在这里。
+                </NText>
+                <NButton
+                  size="small"
+                  tag="a"
+                  href="https://github.com/youhebuke1035704078/hermes-desktop/releases/latest"
+                  target="_blank"
+                >
+                  打开 Desktop Releases
+                </NButton>
+              </div>
+            </NGridItem>
+
+            <NGridItem>
+              <div class="settings-mini-card">
+                <div class="settings-mini-head">
+                  <NText strong>{{ t('pages.settings.hermesVersion') }}</NText>
+                  <NTag v-if="hermesVersion" size="small" :bordered="false" round type="info">
+                    v{{ hermesVersion }}
+                  </NTag>
+                  <NTag v-else size="small" :bordered="false" round>
+                    {{ canManage ? '待检测' : '管理接口不可用' }}
+                  </NTag>
+                </div>
+                <NDescriptions
+                  v-if="hermesVersion"
+                  label-placement="left"
+                  :column="1"
+                  bordered
+                  size="small"
+                >
+                  <NDescriptionsItem :label="t('pages.settings.currentVersion')">
+                    <NText strong>v{{ hermesVersion }}</NText>
+                  </NDescriptionsItem>
+                  <NDescriptionsItem v-if="hermesDate" :label="t('pages.settings.releaseDate')">
+                    {{ hermesDate }}
+                  </NDescriptionsItem>
+                </NDescriptions>
+                <NSpin
+                  v-else-if="hermesVersionLoading"
+                  :show="true"
+                  size="small"
+                  style="padding: 12px 0"
+                />
+                <NSpace :size="8" style="margin-top: 10px">
+                  <NButton
+                    size="small"
+                    :loading="hermesCheckingUpdate"
+                    :disabled="hermesUpdating || !canManage"
+                    @click="checkHermesUpdate"
+                  >
+                    <template #icon><NIcon :component="RefreshOutline" /></template>
+                    {{ t('pages.settings.checkUpdate') }}
+                  </NButton>
+                  <NButton
+                    v-if="hermesUpdateAvailable"
+                    size="small"
+                    type="primary"
+                    :loading="hermesUpdating"
+                    @click="doHermesUpdate"
+                  >
+                    <template #icon><NIcon :component="CloudDownloadOutline" /></template>
+                    {{
+                      hermesUpdating ? t('pages.settings.updating') : t('pages.settings.updateNow')
+                    }}
+                  </NButton>
+                  <NButton size="small" tag="a" :href="hermesReleaseUrl" target="_blank">
+                    打开 Agent Releases
+                  </NButton>
+                </NSpace>
+              </div>
+            </NGridItem>
+          </NGrid>
+
+          <div class="settings-alert-stack">
+            <NAlert v-if="hermesCheckingUpdate" type="default" :closable="false">
+              <template #icon><NSpin :size="14" /></template>
+              {{ t('pages.settings.checking') }}
+            </NAlert>
+            <NAlert
+              v-else-if="hermesUpdateError"
+              type="error"
+              :closable="true"
+              :title="t('pages.settings.updateFailed')"
+              @close="hermesUpdateError = ''"
+            >
+              <div class="settings-monospace">{{ hermesUpdateError }}</div>
+              <div v-if="updateAdvice" class="settings-alert-text">{{ updateAdvice }}</div>
+              <div class="settings-alert-text">{{ t('pages.settings.updateRetryHint') }}</div>
+            </NAlert>
+            <NAlert
+              v-else-if="hermesCheckError"
+              type="error"
+              :closable="true"
+              :title="t('pages.settings.checkUpdateFailed')"
+              @close="hermesCheckError = ''"
+            >
+              <div class="settings-monospace">{{ hermesCheckError }}</div>
+              <div v-if="updateAdvice" class="settings-alert-text">{{ updateAdvice }}</div>
+              <div class="settings-alert-text">{{ t('pages.settings.updateRetryHint') }}</div>
+            </NAlert>
+            <NAlert v-else-if="hermesUpdateAvailable" type="warning" :closable="false">
+              {{ t('pages.settings.updateAvailable', { version: hermesLatestTag }) }}
+            </NAlert>
+            <NAlert
+              v-else-if="hermesUpdateChecked && !hermesUpdateAvailable"
+              type="success"
+              :closable="false"
+            >
+              {{ t('pages.settings.noUpdate') }}
+            </NAlert>
+          </div>
+
+          <div v-if="hermesUpdating && hermesUpdateLog" class="settings-log-box">
+            {{ hermesUpdateLog }}
+          </div>
+
+          <div class="settings-advanced">
+            <div class="settings-advanced-head">
+              <div>
+                <NText strong>高级维护</NText>
+                <NText depth="3" class="settings-mini-detail">
+                  config.yaml、.env 和重启服务默认收拢，减少误操作。
+                </NText>
+              </div>
+              <NTag size="small" round :bordered="false" type="info">
+                {{ canManage ? '可管理' : '需要管理接口' }}
+              </NTag>
+            </div>
+
+            <NAlert v-if="!canManage" type="info" :closable="false" class="settings-inline-alert">
+              当前连接没有可用的远程管理接口，配置编辑和重启暂不可用。
+              <NButton
+                v-if="isHermesRest && !isLocalServer"
+                size="small"
+                secondary
+                :loading="remoteProbeBusy"
+                style="margin-left: 8px"
+                @click="triggerMgmtProbe"
+              >
+                重新检测
+              </NButton>
+            </NAlert>
+
+            <template v-else>
+              <div class="settings-collapse-row" @click="configExpanded = !configExpanded">
+                <div>
+                  <NText strong>{{ t('pages.settings.hermesConfig') }}</NText>
+                  <NText depth="3">{{ t('pages.settings.hermesConfigDesc') }}</NText>
+                </div>
+                <NIcon :component="configExpanded ? ChevronUpOutline : ChevronDownOutline" />
+              </div>
+              <div v-show="configExpanded" class="settings-editor-block">
+                <NSpin :show="configYamlLoading">
+                  <NAlert
+                    v-if="configYamlNotFound"
+                    type="info"
+                    class="settings-editor-alert"
+                    :closable="false"
+                  >
+                    {{ t('pages.settings.fileNotFound') }}
+                  </NAlert>
+                  <NAlert
+                    v-if="configYamlError"
+                    type="error"
+                    class="settings-editor-alert"
+                    :closable="false"
+                  >
+                    {{ configYamlError }}
+                  </NAlert>
+                  <NInput
+                    v-model:value="configYaml"
+                    type="textarea"
+                    :autosize="{ minRows: 8, maxRows: 24 }"
+                    :placeholder="
+                      configYamlLoading
+                        ? t('pages.settings.loadingFile')
+                        : 'model:\n  default: openai-codex/gpt-5.4\n  provider: openai-codex'
+                    "
+                    class="settings-code-input"
+                  />
+                  <NButton
+                    type="primary"
+                    size="small"
+                    :loading="configYamlSaving"
+                    :disabled="configYamlLoading"
+                    style="margin-top: 10px"
+                    @click="saveConfigYaml"
+                  >
+                    <template #icon><NIcon :component="SaveOutline" /></template>
+                    {{
+                      configYamlSaving ? t('pages.settings.saving') : t('pages.settings.saveFile')
+                    }}
+                  </NButton>
+                </NSpin>
+              </div>
+
+              <div class="settings-collapse-row" @click="envExpanded = !envExpanded">
+                <div>
+                  <NText strong>{{ t('pages.settings.hermesEnv') }}</NText>
+                  <NText depth="3">{{ t('pages.settings.hermesEnvDesc') }}</NText>
+                </div>
+                <NIcon :component="envExpanded ? ChevronUpOutline : ChevronDownOutline" />
+              </div>
+              <div v-show="envExpanded" class="settings-editor-block">
+                <NSpin :show="envLoading">
+                  <NAlert
+                    v-if="envNotFound"
+                    type="info"
+                    class="settings-editor-alert"
+                    :closable="false"
+                  >
+                    {{ t('pages.settings.fileNotFound') }}
+                  </NAlert>
+                  <NAlert
+                    v-if="envError"
+                    type="error"
+                    class="settings-editor-alert"
+                    :closable="false"
+                  >
+                    {{ envError }}
+                  </NAlert>
+                  <NInput
+                    v-model:value="envContent"
+                    type="textarea"
+                    :autosize="{ minRows: 6, maxRows: 20 }"
+                    :placeholder="
+                      envLoading
+                        ? t('pages.settings.loadingFile')
+                        : 'API_SERVER_KEY=\nOPENAI_API_KEY=sk-...'
+                    "
+                    class="settings-code-input"
+                  />
+                  <NButton
+                    type="primary"
+                    size="small"
+                    :loading="envSaving"
+                    :disabled="envLoading"
+                    style="margin-top: 10px"
+                    @click="saveEnv"
+                  >
+                    <template #icon><NIcon :component="SaveOutline" /></template>
+                    {{ envSaving ? t('pages.settings.saving') : t('pages.settings.saveFile') }}
+                  </NButton>
+                </NSpin>
+              </div>
+
+              <div class="settings-restart-row">
+                <div>
+                  <NText strong>{{ t('pages.settings.restartHermes') }}</NText>
+                  <NText depth="3" class="settings-mini-detail">{{
+                    t('pages.settings.restartTip')
+                  }}</NText>
+                </div>
+                <NButton type="warning" size="small" :loading="restarting" @click="restartHermes">
+                  <template #icon><NIcon :component="RefreshOutline" /></template>
+                  {{
+                    restarting ? t('pages.settings.restarting') : t('pages.settings.restartHermes')
+                  }}
+                </NButton>
+              </div>
+            </template>
+          </div>
+        </NCard>
+
+        <NCard id="settings-tools" class="app-card settings-panel">
+          <template #header>
+            <div class="settings-panel-title">
+              <span class="settings-panel-index">4</span>
+              <NIcon :component="CogOutline" size="18" />
+              <span>维护工具</span>
+            </div>
+          </template>
+          <template #header-extra>
+            <NText depth="3" class="settings-card-note">旧隐藏路由统一从这里进入</NText>
+          </template>
+
+          <NGrid cols="1 m:3" responsive="screen" :x-gap="12" :y-gap="12">
+            <NGridItem>
+              <div class="settings-module-card">
+                <div class="settings-module-head">
+                  <NIcon :component="PaperPlaneOutline" size="18" />
+                  <NText strong>{{ t('routes.channels') }}</NText>
+                </div>
+                <NText depth="3" class="settings-module-detail">
+                  管理外部消息渠道、账号认证和连接状态。主导航不再单独展示。
+                </NText>
+                <NButton size="small" secondary block @click="goChannels">打开渠道设置</NButton>
+              </div>
+            </NGridItem>
+            <NGridItem>
+              <div class="settings-module-card">
+                <div class="settings-module-head">
+                  <NIcon :component="DocumentTextOutline" size="18" />
+                  <NText strong>{{ t('routes.logs') }}</NText>
+                </div>
+                <NText depth="3" class="settings-module-detail">
+                  查看运行日志、筛选错误和复制排障线索。
+                </NText>
+                <NButton size="small" secondary block @click="goLogs">打开系统日志</NButton>
+              </div>
+            </NGridItem>
+            <NGridItem>
+              <div class="settings-module-card">
+                <div class="settings-module-head">
+                  <NIcon :component="SaveOutline" size="18" />
+                  <NText strong>{{ t('routes.backup') }}</NText>
+                </div>
+                <NText depth="3" class="settings-module-detail">
+                  创建、恢复、上传和下载 Hermes 数据备份。
+                </NText>
+                <NButton size="small" secondary block @click="goBackup">打开数据备份</NButton>
+              </div>
+            </NGridItem>
+          </NGrid>
+        </NCard>
+
+        <NCard id="settings-diagnostics" class="app-card settings-panel">
+          <template #header>
+            <div class="settings-panel-title">
+              <span class="settings-panel-index">5</span>
+              <NIcon :component="InformationCircleOutline" size="18" />
+              <span>诊断与偏好</span>
+            </div>
+          </template>
+          <template #header-extra>
+            <NButton size="small" type="primary" secondary @click="exportDiagnosticReport">
+              导出诊断包
+            </NButton>
+          </template>
+
+          <NGrid cols="1 m:3" responsive="screen" :x-gap="12" :y-gap="12">
+            <NGridItem>
+              <div class="settings-mini-card">
+                <div class="settings-mini-head">
+                  <NText strong>通知中心</NText>
+                  <NTag
+                    size="small"
+                    :type="opsStore.activeNotices.length ? 'warning' : 'success'"
+                    round
+                    :bordered="false"
+                  >
+                    {{ opsStore.activeNotices.length }} 待处理
+                  </NTag>
+                </div>
+                <NSpace v-if="opsStore.recentNotices.length" vertical :size="8">
+                  <div
+                    v-for="notice in opsStore.recentNotices.slice(0, 3)"
+                    :key="notice.id"
+                    class="settings-ops-row"
+                  >
+                    <div class="settings-ops-row-head">
+                      <NText strong>{{ notice.title }}</NText>
+                      <NTag size="tiny" :type="opsTagType(notice.severity)" round :bordered="false">
+                        {{ notice.source }}
+                      </NTag>
+                    </div>
+                    <NText depth="3" class="settings-ops-row-detail">{{ notice.detail }}</NText>
+                    <NButton
+                      v-if="!notice.resolvedAt"
+                      size="tiny"
+                      secondary
+                      @click="opsStore.resolveNotice(notice.id)"
+                    >
+                      标记已处理
+                    </NButton>
+                  </div>
+                </NSpace>
+                <NText v-else depth="3" class="settings-mini-detail">暂无通知。</NText>
+              </div>
+            </NGridItem>
+
+            <NGridItem>
+              <div class="settings-mini-card">
+                <div class="settings-mini-head">
+                  <NText strong>配置审计</NText>
+                  <NTag size="small" round :bordered="false" type="info">
+                    {{ opsStore.recentAudits.length }} 条
+                  </NTag>
+                </div>
+                <NSpace v-if="opsStore.recentAudits.length" vertical :size="8">
+                  <div
+                    v-for="audit in opsStore.recentAudits.slice(0, 4)"
+                    :key="audit.id"
+                    class="settings-ops-row"
+                  >
+                    <div class="settings-ops-row-head">
+                      <NText strong>{{ audit.target }}</NText>
+                      <NTag size="tiny" round :bordered="false">{{ audit.action }}</NTag>
+                    </div>
+                    <NText depth="3" class="settings-ops-row-detail">{{ audit.detail }}</NText>
+                    <NText depth="3" class="settings-tiny-text">
+                      {{ formatRelativeTime(audit.createdAt) }}
+                    </NText>
+                  </div>
+                </NSpace>
+                <NText v-else depth="3" class="settings-mini-detail">
+                  保存 config.yaml 或 .env 后会自动记录审计摘要。
+                </NText>
+              </div>
+            </NGridItem>
+
+            <NGridItem>
+              <div class="settings-mini-card">
+                <div class="settings-mini-head">
+                  <NText strong>偏好与关于</NText>
+                  <NTag size="small" round :bordered="false">{{ themeStore.mode }}</NTag>
+                </div>
+                <div class="settings-field">
+                  <span>{{ t('pages.settings.themeMode') }}</span>
+                  <NSelect
+                    size="small"
+                    :value="themeStore.mode"
+                    :options="themeOptions"
+                    @update:value="handleThemeChange"
+                  />
+                </div>
+                <div class="settings-about">
+                  <NText strong>Hermes Desktop</NText>
+                  <NText depth="3" class="settings-mini-detail">
+                    {{ t('pages.settings.aboutLine1') }}
+                  </NText>
+                  <NText depth="3" class="settings-mini-detail">
+                    {{ t('pages.settings.aboutLine2') }}
+                  </NText>
+                </div>
+                <NSpace :size="8">
+                  <NButton size="small" type="primary" secondary @click="exportDiagnosticReport">
+                    导出诊断包
+                  </NButton>
+                  <NButton
+                    size="small"
+                    secondary
+                    :loading="modelDiagnosticLoading"
+                    @click="runModelDiagnostic"
+                  >
+                    重新测试主备模型
+                  </NButton>
+                </NSpace>
+              </div>
+            </NGridItem>
+          </NGrid>
+        </NCard>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
 .settings-page {
+  display: grid;
+  gap: var(--ui-gap);
   font-size: var(--font-body);
 }
 
-.settings-overview-card {
-  border-radius: var(--radius);
+.settings-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-gap-lg);
 }
 
-.settings-overview-note {
-  display: block;
-  margin-bottom: var(--ui-gap);
-  font-size: var(--font-body-sm);
+.settings-page-head h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.12;
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.settings-page-head p {
+  margin: 8px 0 0;
+  max-width: 760px;
+  color: var(--text-secondary);
+  font-size: var(--font-body);
   line-height: var(--line-normal);
 }
 
-.settings-groups {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--ui-gap);
+.settings-eyebrow {
+  color: var(--text-secondary);
+  font-size: var(--font-body-sm);
+  margin-bottom: 6px;
 }
 
-.settings-group {
-  padding: var(--ui-panel-padding);
+.settings-head-actions {
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+
+.settings-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(126px, 1fr));
+  gap: var(--ui-gap-sm);
+}
+
+.settings-metric {
+  min-height: 86px;
+  padding: 12px;
+  border: 1px solid var(--n-border-color);
+  border-radius: var(--radius);
+  background: var(--n-color);
+  min-width: 0;
+}
+
+.settings-metric span,
+.settings-metric small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: var(--font-body-xs);
+  line-height: var(--line-normal);
+}
+
+.settings-metric strong {
+  display: block;
+  margin-top: 7px;
+  font-size: var(--font-metric-sm);
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-metric small {
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+}
+
+.settings-shell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--ui-gap);
+  align-items: start;
+}
+
+.settings-subnav {
+  position: sticky;
+  top: calc(var(--header-height) + 16px);
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--n-border-color);
+  border-radius: var(--radius);
+  background: var(--n-color);
+}
+
+.settings-subnav a {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.settings-subnav a.active,
+.settings-subnav a:hover {
+  color: var(--accent-green);
+  background: rgba(96, 215, 172, 0.1);
+}
+
+.settings-subnav strong {
+  font-size: var(--font-body-sm);
+}
+
+.settings-subnav span {
+  color: var(--text-secondary);
+  font-size: var(--font-body-xs);
+  line-height: var(--line-normal);
+}
+
+.settings-stack {
+  display: grid;
+  gap: var(--ui-gap);
+  min-width: 0;
+}
+
+.settings-panel {
+  scroll-margin-top: calc(var(--header-height) + 18px);
+}
+
+.settings-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-section-title);
+  font-weight: 780;
+}
+
+.settings-panel-index {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  background: rgba(96, 215, 172, 0.14);
+  color: var(--accent-green);
+  font-size: var(--font-body-xs);
+  font-weight: 820;
+}
+
+.settings-info-table {
+  border: 1px solid var(--n-border-color);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.settings-info-row {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  min-height: 44px;
+  border-bottom: 1px solid var(--n-border-color);
+}
+
+.settings-info-row:last-child {
+  border-bottom: 0;
+}
+
+.settings-info-row span,
+.settings-info-row strong {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.settings-info-row span {
+  border-right: 1px solid var(--n-border-color);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text-secondary);
+  font-size: var(--font-body-sm);
+}
+
+.settings-info-row strong {
+  font-size: var(--font-body-sm);
+  font-weight: 680;
+  overflow-wrap: anywhere;
+}
+
+.settings-mini-card,
+.settings-module-card {
+  min-height: 124px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--ui-panel-padding-sm);
   border: 1px solid var(--n-border-color);
   border-radius: var(--radius);
   background: var(--n-color-embedded);
   min-width: 0;
 }
 
-.settings-group-title {
-  font-size: var(--font-section-title);
-  font-weight: 760;
-  margin-bottom: var(--ui-gap-sm);
-}
-
-.settings-row {
+.settings-mini-head,
+.settings-module-head,
+.settings-ops-row-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--ui-gap);
-  padding: 7px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: var(--font-body);
-}
-
-.settings-row span {
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-
-.settings-row strong {
+  gap: 8px;
   min-width: 0;
-  text-align: right;
+}
+
+.settings-module-head {
+  justify-content: flex-start;
+}
+
+.settings-mini-detail,
+.settings-module-detail,
+.settings-card-note,
+.settings-alert-text {
+  display: block;
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
   overflow-wrap: anywhere;
 }
 
-.settings-group .n-button {
-  margin-top: 10px;
+.settings-mini-detail,
+.settings-module-detail {
+  color: var(--text-secondary);
+}
+
+.settings-module-detail {
+  flex: 1;
+}
+
+.settings-inline-alert,
+.settings-alert-stack {
+  margin-top: var(--ui-gap);
+}
+
+.settings-alert-stack {
+  display: grid;
+  gap: var(--ui-gap-sm);
+}
+
+.settings-monospace,
+.settings-log-box {
+  font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--font-body-xs);
+  line-height: var(--line-normal);
+  word-break: break-word;
+}
+
+.settings-monospace {
+  margin: 6px 0;
+  opacity: 0.78;
+}
+
+.settings-log-box {
+  margin-top: var(--ui-gap);
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
 }
 
 .diagnostic-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--ui-gap-sm);
-  margin-top: 12px;
+  margin-top: var(--ui-gap);
 }
 
-.diagnostic-item {
+.diagnostic-item,
+.settings-ops-row {
   border: 1px solid var(--n-border-color);
   border-radius: var(--radius);
   padding: var(--ui-panel-padding-sm) 12px;
@@ -1681,76 +1938,119 @@ watch(
   min-width: 0;
 }
 
-.diagnostic-item-detail {
+.diagnostic-item-detail,
+.settings-ops-row-detail,
+.settings-tiny-text {
   display: block;
-  margin-top: 8px;
-  font-size: var(--font-body-sm);
+  margin-top: 6px;
+  font-size: var(--font-body-xs);
   line-height: var(--line-normal);
   overflow-wrap: anywhere;
 }
 
-.settings-section-note {
-  display: block;
-  margin-bottom: var(--ui-gap);
-  font-size: var(--font-body-sm);
-  line-height: var(--line-normal);
-}
-
-.settings-module-card {
+.settings-advanced {
+  margin-top: var(--ui-gap);
   border: 1px solid var(--n-border-color);
   border-radius: var(--radius);
-  padding: var(--ui-panel-padding-sm);
-  min-height: 124px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  background: var(--n-color-embedded);
+  overflow: hidden;
 }
 
-.settings-module-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.settings-module-detail {
-  display: block;
-  flex: 1;
-  font-size: var(--font-body-sm);
-  line-height: var(--line-normal);
-}
-
-.settings-ops-card {
-  height: 100%;
-}
-
-.settings-ops-row {
-  border: 1px solid var(--n-border-color);
-  border-radius: var(--radius);
-  padding: var(--ui-panel-padding-sm) 12px;
-}
-
-.settings-ops-row-head {
+.settings-advanced-head,
+.settings-collapse-row,
+.settings-restart-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--ui-gap);
+  padding: 12px;
 }
 
-.settings-ops-row-detail {
-  display: block;
-  margin: 6px 0 8px;
+.settings-advanced-head,
+.settings-collapse-row {
+  border-bottom: 1px solid var(--n-border-color);
+}
+
+.settings-collapse-row {
+  cursor: pointer;
+}
+
+.settings-collapse-row > div,
+.settings-restart-row > div {
+  display: grid;
+  gap: 3px;
+}
+
+.settings-editor-block {
+  padding: 12px;
+  border-bottom: 1px solid var(--n-border-color);
+}
+
+.settings-editor-alert {
+  margin-bottom: 10px;
+}
+
+.settings-code-input {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+}
+
+.settings-field {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-field span {
+  color: var(--text-secondary);
   font-size: var(--font-body-sm);
-  line-height: var(--line-normal);
-  overflow-wrap: anywhere;
 }
 
-@media (max-width: 720px) {
-  .settings-groups {
+.settings-about {
+  display: grid;
+  gap: 6px;
+}
+
+@media (max-width: 1180px) {
+  .settings-summary-grid {
+    grid-template-columns: repeat(3, minmax(126px, 1fr));
+  }
+
+  .settings-shell {
     grid-template-columns: 1fr;
   }
 
+  .settings-subnav {
+    position: static;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-page-head,
+  .settings-mini-head,
+  .settings-advanced-head,
+  .settings-restart-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-head-actions {
+    justify-content: flex-start;
+  }
+
+  .settings-summary-grid,
+  .settings-subnav,
   .diagnostic-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-info-row {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-info-row span {
+    border-right: 0;
+    border-bottom: 1px solid var(--n-border-color);
   }
 }
 </style>
