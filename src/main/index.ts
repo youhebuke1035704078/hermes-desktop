@@ -957,8 +957,15 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('hermes:update', async (event) => {
+    const sendUpdateProgress = (payload: { phase: string; percent: number; detail?: string }) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('hermes:update:progress', payload)
+      }
+    }
+
     return await withGitLock(async () => {
       try {
+        sendUpdateProgress({ phase: '准备更新', percent: 5, detail: '正在保护本地改动' })
         // Auto-stash any local changes (e.g. package-lock.json, __pycache__)
         // that would block `git checkout` during `hermes update`. Silent fail OK.
         await runGit(
@@ -974,33 +981,64 @@ function registerIpcHandlers(): void {
           10000
         )
 
+        sendUpdateProgress({ phase: '同步代码', percent: 18, detail: '正在拉取远程更新' })
         // Pre-fetch with retry so a transient blip doesn't abort the whole update.
         const preFetch = await gitFetchWithRetry(HERMES_REPO, 60000)
-        if (!preFetch.ok) return { ok: false, error: 'fetch failed: ' + preFetch.error }
+        if (!preFetch.ok) {
+          sendUpdateProgress({ phase: '更新失败', percent: 25, detail: preFetch.error })
+          return { ok: false, error: 'fetch failed: ' + preFetch.error }
+        }
 
+        sendUpdateProgress({ phase: '执行更新', percent: 35, detail: '正在运行 hermes update' })
         // Run the CLI update (streams progress to renderer)
         return await new Promise<{ ok: boolean; error?: string }>((resolve) => {
           const child = execFile(HERMES_BIN, ['update'], { timeout: 180000 })
           let output = ''
+          let streamedPercent = 35
           child.stdout?.on('data', (data: string) => {
-            output += data
+            const chunk = data.toString()
+            output += chunk
+            streamedPercent = Math.min(streamedPercent + 6, 88)
             if (!event.sender.isDestroyed()) {
-              event.sender.send('hermes:update:progress', data.toString())
+              event.sender.send('hermes:update:progress', {
+                phase: '执行更新',
+                percent: streamedPercent,
+                detail: chunk
+              })
             }
           })
           child.stderr?.on('data', (data: string) => {
-            output += data
+            const chunk = data.toString()
+            output += chunk
+            streamedPercent = Math.min(streamedPercent + 4, 88)
             if (!event.sender.isDestroyed()) {
-              event.sender.send('hermes:update:progress', data.toString())
+              event.sender.send('hermes:update:progress', {
+                phase: '执行更新',
+                percent: streamedPercent,
+                detail: chunk
+              })
             }
           })
           child.on('close', (code) => {
-            if (code === 0) resolve({ ok: true })
-            else resolve({ ok: false, error: output || `Exit code ${code}` })
+            if (code === 0) {
+              sendUpdateProgress({ phase: '更新完成', percent: 100, detail: 'Hermes Agent 已更新' })
+              resolve({ ok: true })
+            } else {
+              sendUpdateProgress({
+                phase: '更新失败',
+                percent: Math.max(streamedPercent, 90),
+                detail: output || `Exit code ${code}`
+              })
+              resolve({ ok: false, error: output || `Exit code ${code}` })
+            }
           })
-          child.on('error', (err) => resolve({ ok: false, error: err.message }))
+          child.on('error', (err) => {
+            sendUpdateProgress({ phase: '更新失败', percent: 90, detail: err.message })
+            resolve({ ok: false, error: err.message })
+          })
         })
       } catch (e: any) {
+        sendUpdateProgress({ phase: '更新失败', percent: 90, detail: e.message })
         return { ok: false, error: e.message }
       }
     })
@@ -1373,8 +1411,11 @@ async function fetchLatestDesktopRelease(): Promise<DesktopReleaseInfo> {
   const tagName = row.tag_name || ''
   const assets = row.assets || []
   const exeAsset =
-    assets.find((asset) => /\.exe$/i.test(asset.name || '') && /(setup|installer|hermes.*desktop)/i.test(asset.name || '')) ||
-    assets.find((asset) => /\.exe$/i.test(asset.name || ''))
+    assets.find(
+      (asset) =>
+        /\.exe$/i.test(asset.name || '') &&
+        /(setup|installer|hermes.*desktop)/i.test(asset.name || '')
+    ) || assets.find((asset) => /\.exe$/i.test(asset.name || ''))
   const downloadUrl = exeAsset?.browser_download_url || ''
   if (!tagName || !downloadUrl) {
     throw new Error('Latest release does not include a Windows installer asset')
@@ -1505,9 +1546,7 @@ function setupAutoUpdater(): void {
 
   ipcMain.handle('updater:openDownload', async (_event, url?: string) => {
     const target =
-      typeof url === 'string' && url.startsWith('https://')
-        ? url
-        : DESKTOP_RELEASES_LATEST_URL
+      typeof url === 'string' && url.startsWith('https://') ? url : DESKTOP_RELEASES_LATEST_URL
     await shell.openExternal(target)
     return { ok: true }
   })

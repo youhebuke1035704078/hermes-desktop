@@ -166,7 +166,9 @@ interface HermesAPI {
     error?: string
   }>
   hermesUpdate(): Promise<{ ok: boolean; error?: string }>
-  onHermesUpdateProgress(cb: (data: string) => void): () => void
+  onHermesUpdateProgress(
+    cb: (data: string | { phase?: string; percent?: number; detail?: string }) => void
+  ): () => void
 
   // Device identity (main-process Ed25519; private key stays in main)
   deviceEnsure(migration?: { publicKey: string; privateKey: string } | null): Promise<{

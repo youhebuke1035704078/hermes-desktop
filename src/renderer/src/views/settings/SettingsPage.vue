@@ -16,6 +16,7 @@ import {
   NInput,
   NSpin,
   NAlert,
+  NProgress,
   useMessage
 } from 'naive-ui'
 import {
@@ -337,6 +338,9 @@ const hermesUpdateAvailable = ref(false)
 const hermesUpdateChecked = ref(false) // true after first check completes
 const hermesCheckingUpdate = ref(false)
 const hermesUpdating = ref(false)
+const hermesUpdateProgress = ref(0)
+const hermesUpdatePhase = ref('')
+const hermesUpdateLastLine = ref('')
 const hermesUpdateLog = ref('')
 // Persistent error state so users don't lose context when the auto-dismiss
 // toast fades. Cleared at the start of each check/update attempt.
@@ -362,6 +366,41 @@ const hermesReleaseUrl = computed(() =>
     ? `https://github.com/NousResearch/hermes-agent/releases/tag/${hermesLatestTag.value}`
     : 'https://github.com/NousResearch/hermes-agent/releases'
 )
+
+type HermesUpdateProgressPayload =
+  | string
+  | {
+      phase?: string
+      percent?: number
+      detail?: string
+    }
+
+const hermesUpdateProgressStatus = computed(() =>
+  hermesUpdateError.value ? 'error' : hermesUpdateProgress.value >= 100 ? 'success' : 'default'
+)
+
+function updateHermesProgress(payload: HermesUpdateProgressPayload) {
+  if (typeof payload === 'string') {
+    hermesUpdateLog.value += payload
+    const trimmed = payload.trim()
+    if (trimmed)
+      hermesUpdateLastLine.value = trimmed.split(/\r?\n/).filter(Boolean).at(-1) || trimmed
+    return
+  }
+
+  const nextPercent =
+    typeof payload.percent === 'number' && Number.isFinite(payload.percent)
+      ? Math.max(0, Math.min(100, Math.round(payload.percent)))
+      : hermesUpdateProgress.value
+  hermesUpdateProgress.value = Math.max(hermesUpdateProgress.value, nextPercent)
+  if (payload.phase) hermesUpdatePhase.value = payload.phase
+  if (payload.detail) {
+    hermesUpdateLog.value += payload.detail
+    const trimmed = payload.detail.trim()
+    if (trimmed)
+      hermesUpdateLastLine.value = trimmed.split(/\r?\n/).filter(Boolean).at(-1) || trimmed
+  }
+}
 
 const modelDiagnosticSummary = computed(() => {
   const hasError = modelDiagnosticItems.value.some((item) => item.type === 'error')
@@ -683,32 +722,43 @@ async function checkHermesUpdate() {
 
 async function doHermesUpdate() {
   hermesUpdating.value = true
+  hermesUpdateProgress.value = 8
+  hermesUpdatePhase.value = isLocalServer.value ? '准备更新' : '连接远程管理接口'
+  hermesUpdateLastLine.value = ''
   hermesUpdateLog.value = ''
   // Clear stale error so a retry starts from a clean slate.
   hermesUpdateError.value = ''
   hermesCheckError.value = ''
   let unsub: (() => void) | null = null
   if (isLocalServer.value && window.api) {
-    unsub = window.api.onHermesUpdateProgress((data: string) => {
-      hermesUpdateLog.value += data
-    })
+    unsub = window.api.onHermesUpdateProgress(updateHermesProgress)
   }
   try {
+    if (!isLocalServer.value) {
+      updateHermesProgress({
+        phase: '发送更新请求',
+        percent: 30,
+        detail: '正在调用远程 Hermes Agent 管理接口'
+      })
+    }
     const res =
       isLocalServer.value && window.api
         ? await window.api.hermesUpdate()
         : await remoteSettingsFetch('/update', { method: 'POST' })
     if (res.ok) {
+      updateHermesProgress({ phase: '更新完成', percent: 100, detail: 'Hermes Agent 已更新' })
       message.success(t('pages.settings.updateSuccess'))
       hermesUpdateAvailable.value = false
       hermesUpdateError.value = ''
       await fetchHermesVersion()
     } else {
       const err = res.error || 'Unknown error'
+      updateHermesProgress({ phase: '更新失败', percent: 90, detail: err })
       hermesUpdateError.value = err
       message.error(`${t('pages.settings.updateFailed')}: ${err}`)
     }
   } catch (e: any) {
+    updateHermesProgress({ phase: '更新失败', percent: 90, detail: e.message })
     hermesUpdateError.value = e.message
     message.error(`${t('pages.settings.updateFailed')}: ${e.message}`)
   } finally {
@@ -1299,6 +1349,30 @@ watch(
                     打开 Agent Releases
                   </NButton>
                 </NSpace>
+                <div
+                  v-if="hermesUpdating || hermesUpdateProgress > 0 || hermesUpdateError"
+                  class="settings-update-progress"
+                >
+                  <div class="settings-update-progress-head">
+                    <NText strong>{{ hermesUpdatePhase || t('pages.settings.updating') }}</NText>
+                    <NText depth="3">{{ hermesUpdateProgress }}%</NText>
+                  </div>
+                  <NProgress
+                    type="line"
+                    :percentage="hermesUpdateProgress"
+                    :status="hermesUpdateProgressStatus"
+                    :height="10"
+                    :border-radius="5"
+                    :show-indicator="false"
+                  />
+                  <NText
+                    v-if="hermesUpdateLastLine"
+                    depth="3"
+                    class="settings-update-progress-line"
+                  >
+                    {{ hermesUpdateLastLine }}
+                  </NText>
+                </div>
               </div>
             </NGridItem>
           </NGrid>
@@ -1924,6 +1998,32 @@ watch(
 .settings-alert-stack {
   display: grid;
   gap: var(--ui-gap-sm);
+}
+
+.settings-update-progress {
+  display: grid;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 10px;
+  border: 1px solid var(--n-border-color);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.settings-update-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-update-progress-line {
+  display: block;
+  font-size: var(--font-body-xs);
+  line-height: var(--line-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-monospace,

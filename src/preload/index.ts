@@ -220,8 +220,13 @@ const api = {
     error?: string
   }> => ipcRenderer.invoke('hermes:checkUpdate'),
   hermesUpdate: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('hermes:update'),
-  onHermesUpdateProgress: (cb: (data: string) => void): (() => void) => {
-    const handler = (_: unknown, data: string) => cb(data)
+  onHermesUpdateProgress: (
+    cb: (data: string | { phase?: string; percent?: number; detail?: string }) => void
+  ): (() => void) => {
+    const handler = (
+      _: unknown,
+      data: string | { phase?: string; percent?: number; detail?: string }
+    ) => cb(data)
     ipcRenderer.on('hermes:update:progress', handler)
     return () => ipcRenderer.removeListener('hermes:update:progress', handler)
   },
