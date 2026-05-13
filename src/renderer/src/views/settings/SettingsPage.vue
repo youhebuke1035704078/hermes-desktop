@@ -59,6 +59,29 @@ const themeOptions = computed(() => [
   { label: t('pages.settings.themeDark'), value: 'dark' }
 ])
 
+type SettingsSectionKey = 'overview' | 'connection' | 'updates' | 'tools' | 'diagnostics'
+
+const activeSettingsSection = ref<SettingsSectionKey>('overview')
+const settingsSections: Array<{
+  key: SettingsSectionKey
+  title: string
+  detail: string
+}> = [
+  { key: 'overview', title: '总览', detail: '只放状态，不重复详情' },
+  { key: 'connection', title: '连接与模型', detail: '服务器、令牌、主备诊断' },
+  { key: 'updates', title: '更新与配置', detail: '版本、配置、高级维护' },
+  { key: 'tools', title: '维护工具', detail: '渠道、日志、备份入口' },
+  { key: 'diagnostics', title: '诊断与偏好', detail: '通知、审计、主题、关于' }
+]
+
+function scrollToSettingsSection(key: SettingsSectionKey) {
+  activeSettingsSection.value = key
+  document.getElementById(`settings-${key}`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  })
+}
+
 // ── Connection status ──
 const connectionStatus = computed(() => {
   // Local Hermes REST mode has no WebSocket — derive status from connectionStore
@@ -951,26 +974,17 @@ watch(
 
     <div class="settings-shell">
       <nav class="settings-subnav" aria-label="系统设置分区">
-        <a class="active" href="#settings-overview">
-          <strong>总览</strong>
-          <span>只放状态，不重复详情</span>
-        </a>
-        <a href="#settings-connection">
-          <strong>连接与模型</strong>
-          <span>服务器、令牌、主备诊断</span>
-        </a>
-        <a href="#settings-updates">
-          <strong>更新与配置</strong>
-          <span>版本、配置、高级维护</span>
-        </a>
-        <a href="#settings-tools">
-          <strong>维护工具</strong>
-          <span>渠道、日志、备份入口</span>
-        </a>
-        <a href="#settings-diagnostics">
-          <strong>诊断与偏好</strong>
-          <span>通知、审计、主题、关于</span>
-        </a>
+        <button
+          v-for="section in settingsSections"
+          :key="section.key"
+          type="button"
+          :class="{ active: activeSettingsSection === section.key }"
+          :aria-current="activeSettingsSection === section.key ? 'true' : undefined"
+          @click="scrollToSettingsSection(section.key)"
+        >
+          <strong>{{ section.title }}</strong>
+          <span>{{ section.detail }}</span>
+        </button>
       </nav>
 
       <div class="settings-stack">
@@ -1742,17 +1756,20 @@ watch(
   background: var(--n-color);
 }
 
-.settings-subnav a {
+.settings-subnav button {
   display: grid;
   gap: 3px;
   padding: 10px;
+  border: 0;
   border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-primary);
-  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
 }
 
-.settings-subnav a.active,
-.settings-subnav a:hover {
+.settings-subnav button.active,
+.settings-subnav button:hover {
   color: var(--accent-green);
   background: rgba(96, 215, 172, 0.1);
 }
