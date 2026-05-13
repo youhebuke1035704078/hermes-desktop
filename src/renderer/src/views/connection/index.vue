@@ -16,7 +16,7 @@ import {
   NTooltip,
   NEmpty,
   NSpin,
-  useMessage,
+  useMessage
 } from 'naive-ui'
 import {
   AddOutline,
@@ -28,7 +28,7 @@ import {
   LogoTux,
   CheckmarkCircleOutline,
   FlashOutline,
-  CreateOutline,
+  CreateOutline
 } from '@vicons/ionicons5'
 import { v4 as uuid } from 'uuid'
 import { useI18n } from 'vue-i18n'
@@ -40,7 +40,7 @@ const connectionStore = useConnectionStore()
 const { t } = useI18n()
 
 const showAddModal = ref(false)
-const editingServerId = ref<string | null>(null)  // null = adding, string = editing
+const editingServerId = ref<string | null>(null) // null = adding, string = editing
 const autoConnecting = ref(true)
 const connecting = ref(false)
 const connectingServerId = ref<string | null>(null)
@@ -63,7 +63,7 @@ const form = ref({
   name: '',
   url: '',
   username: '',
-  password: '',
+  password: ''
 })
 
 const normalizedUrl = computed(() => {
@@ -82,13 +82,16 @@ const isHttpWarning = computed(() => {
 
 // Auto-probe when URL looks complete
 let probeTimer: ReturnType<typeof setTimeout> | null = null
-watch(() => form.value.url, () => {
-  probeResult.value = null
-  if (probeTimer) clearTimeout(probeTimer)
-  if (normalizedUrl.value && normalizedUrl.value.includes(':')) {
-    probeTimer = setTimeout(() => probeServer(), 800)
+watch(
+  () => form.value.url,
+  () => {
+    probeResult.value = null
+    if (probeTimer) clearTimeout(probeTimer)
+    if (normalizedUrl.value && normalizedUrl.value.includes(':')) {
+      probeTimer = setTimeout(() => probeServer(), 800)
+    }
   }
-})
+)
 
 async function probeServer() {
   const url = normalizedUrl.value
@@ -127,7 +130,9 @@ async function probeServer() {
       try {
         const modelsResp = await fetch(`${url}/v1/models`, { signal })
         if (modelsResp.status === 401 || modelsResp.status === 403) needsAuth = true
-      } catch { /* network error — assume no auth needed */ }
+      } catch {
+        /* network error — assume no auth needed */
+      }
       if (signal.aborted) return
       probeResult.value = { reachable: true, authEnabled: needsAuth, isHermesRest: true }
     } else {
@@ -156,10 +161,13 @@ async function probeServer() {
     if (!form.value.name) {
       try {
         const u = new URL(url)
-        form.value.name = u.hostname === 'localhost' || u.hostname === '127.0.0.1'
-          ? t('pages.connection.localServer')
-          : u.hostname
-      } catch { /* ignore */ }
+        form.value.name =
+          u.hostname === 'localhost' || u.hostname === '127.0.0.1'
+            ? t('pages.connection.localServer')
+            : u.hostname
+      } catch {
+        /* ignore */
+      }
     }
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
@@ -186,7 +194,11 @@ onMounted(async () => {
     }
   } else {
     // Manual switch — disconnect current server first
-    try { await connectionStore.disconnect() } catch { /* best-effort */ }
+    try {
+      await connectionStore.disconnect()
+    } catch {
+      /* best-effort */
+    }
   }
 
   // Show manual connection UI
@@ -248,7 +260,7 @@ function openAddModal() {
 }
 
 async function openEditModal(serverId: string) {
-  const server = connectionStore.servers.find(s => s.id === serverId)
+  const server = connectionStore.servers.find((s) => s.id === serverId)
   if (!server) return
 
   editingServerId.value = serverId
@@ -261,7 +273,7 @@ async function openEditModal(serverId: string) {
     name: server.name,
     url: server.url.replace(/^https?:\/\//, ''),
     username: isNoAuth ? '' : server.username,
-    password: isNoAuth ? '' : (decryptedPw || ''),
+    password: isNoAuth ? '' : decryptedPw || ''
   }
 
   probeResult.value = null
@@ -297,9 +309,10 @@ async function handleSave() {
   if (!form.value.name) {
     try {
       const u = new URL(normalizedUrl.value)
-      form.value.name = u.hostname === 'localhost' || u.hostname === '127.0.0.1'
-        ? t('pages.connection.localServer')
-        : u.hostname
+      form.value.name =
+        u.hostname === 'localhost' || u.hostname === '127.0.0.1'
+          ? t('pages.connection.localServer')
+          : u.hostname
     } catch {
       form.value.name = normalizedUrl.value
     }
@@ -315,13 +328,21 @@ async function handleSave() {
       ...form.value,
       url: normalizedUrl.value,
       username: isConfirmedNoAuth ? '_noauth_' : form.value.username,
-      password: isConfirmedNoAuth ? '_noauth_' : form.value.password,
+      password: isConfirmedNoAuth ? '_noauth_' : form.value.password
     })
     showAddModal.value = false
-    message.success(editingServerId.value ? t('pages.connection.updateSuccess') : t('pages.connection.saveSuccess'))
+    message.success(
+      editingServerId.value
+        ? t('pages.connection.updateSuccess')
+        : t('pages.connection.saveSuccess')
+    )
     checkAllServers()
   } catch (e: unknown) {
-    message.error(t('pages.connection.saveFailed') + ': ' + ((e as Error)?.message || t('pages.connection.unknownError')))
+    message.error(
+      t('pages.connection.saveFailed') +
+        ': ' +
+        ((e as Error)?.message || t('pages.connection.unknownError'))
+    )
   }
 }
 
@@ -350,12 +371,12 @@ async function handleConnect(serverId: string) {
           message.error(t('pages.connection.connectFailed') + ': ' + e.message)
       }
     } else {
-      const server = connectionStore.servers.find(s => s.id === serverId)
+      const server = connectionStore.servers.find((s) => s.id === serverId)
       const isNoAuth = server?.username === '_noauth_'
       message.error(
         isNoAuth
           ? t('pages.connection.connectFailedNoAuth')
-          : t('pages.connection.connectFailedAuth'),
+          : t('pages.connection.connectFailedAuth')
       )
     }
   } finally {
@@ -370,7 +391,9 @@ async function handleDelete(serverId: string) {
     message.success(t('pages.connection.deleted'))
   } catch (e) {
     console.error('Failed to delete server:', e)
-    message.error(t('pages.connection.deleteFailed') + ': ' + (e instanceof Error ? e.message : String(e)))
+    message.error(
+      t('pages.connection.deleteFailed') + ': ' + (e instanceof Error ? e.message : String(e))
+    )
   }
 }
 
@@ -391,15 +414,15 @@ async function connectLocalHermes() {
   <div class="connection-page">
     <!-- Auto-connect loading state -->
     <div v-if="autoConnecting" class="auto-connect-overlay">
-      <img src="@/assets/logo.png" alt="Hermes" class="auto-connect-logo" />
-      <NSpin size="medium" style="margin: 20px 0;" />
+      <img src="@/assets/hermes-girl-avatar.svg" alt="Hermes" class="auto-connect-logo" />
+      <NSpin size="medium" style="margin: 20px 0" />
       <p class="auto-connect-text">{{ t('pages.connection.autoConnecting') }}</p>
     </div>
 
     <div v-else class="connection-container">
       <!-- Logo + Title -->
       <div class="connection-header">
-        <img src="@/assets/logo.png" alt="logo" class="connection-logo" />
+        <img src="@/assets/hermes-girl-avatar.svg" alt="Hermes" class="connection-logo" />
         <h1 class="connection-title">Hermes Desktop</h1>
         <p class="connection-subtitle">{{ t('pages.connection.subtitle') }}</p>
       </div>
@@ -409,20 +432,22 @@ async function connectLocalHermes() {
         v-if="!encryptionAvailable"
         type="warning"
         :bordered="false"
-        style="margin-bottom: 16px; border-radius: var(--card-radius-xl, 16px); font-size: 13px;"
+        style="margin-bottom: 16px; border-radius: var(--card-radius-xl, 16px); font-size: 13px"
       >
         {{ t('pages.connection.encryptionWarning') }}
       </NAlert>
 
       <!-- Quick connect to local Hermes -->
-      <NCard class="server-card" style="margin-bottom: 16px;">
+      <NCard class="server-card" style="margin-bottom: 16px">
         <div class="local-hermes-row">
           <div class="local-hermes-info">
             <NSpace align="center" :size="8">
               <NIcon :component="FlashOutline" size="22" color="#63e2b7" />
               <div>
-                <div style="font-size: 15px; font-weight: 600;">{{ t('pages.connection.localHermes') }}</div>
-                <div style="font-size: 12px; opacity: 0.6;">localhost:8642</div>
+                <div style="font-size: 15px; font-weight: 600">
+                  {{ t('pages.connection.localHermes') }}
+                </div>
+                <div style="font-size: 12px; opacity: 0.6">localhost:8642</div>
               </div>
             </NSpace>
           </div>
@@ -441,7 +466,9 @@ async function connectLocalHermes() {
       <NCard class="server-card">
         <template #header>
           <NSpace align="center" justify="space-between" style="width: 100%">
-            <span style="font-size: 16px; font-weight: 600;">{{ t('pages.connection.serverList') }}</span>
+            <span style="font-size: 16px; font-weight: 600">{{
+              t('pages.connection.serverList')
+            }}</span>
             <NSpace :size="8">
               <NTooltip>
                 <template #trigger>
@@ -459,35 +486,63 @@ async function connectLocalHermes() {
           </NSpace>
         </template>
 
-        <div v-if="connectionStore.servers.length === 0" style="padding: 20px 0;">
+        <div v-if="connectionStore.servers.length === 0" style="padding: 20px 0">
           <NEmpty :description="t('pages.connection.emptyHint')">
             <template #extra>
-              <NButton size="small" @click="openAddModal">{{ t('pages.connection.addFirst') }}</NButton>
+              <NButton size="small" @click="openAddModal">{{
+                t('pages.connection.addFirst')
+              }}</NButton>
             </template>
           </NEmpty>
         </div>
 
         <div v-else class="server-list">
-          <div
-            v-for="server in connectionStore.servers"
-            :key="server.id"
-            class="server-item"
-          >
+          <div v-for="server in connectionStore.servers" :key="server.id" class="server-item">
             <div class="server-info">
               <div class="server-name-row">
-                <NIcon :component="DesktopOutline" size="18" style="opacity: 0.6; margin-right: 6px;" />
+                <NIcon
+                  :component="DesktopOutline"
+                  size="18"
+                  style="opacity: 0.6; margin-right: 6px"
+                />
                 <span class="server-name">{{ server.name }}</span>
-                <NTag :type="healthTagType(server.id)" size="small" round :bordered="false" style="margin-left: 8px;">
+                <NTag
+                  :type="healthTagType(server.id)"
+                  size="small"
+                  round
+                  :bordered="false"
+                  style="margin-left: 8px"
+                >
                   {{ healthLabel(server.id) }}
                 </NTag>
-                <NTag v-if="connectionStore.currentServer?.id === server.id" size="small" type="success" round :bordered="false" style="margin-left: 4px;">
+                <NTag
+                  v-if="connectionStore.currentServer?.id === server.id"
+                  size="small"
+                  type="success"
+                  round
+                  :bordered="false"
+                  style="margin-left: 4px"
+                >
                   {{ t('pages.connection.connected') }}
                 </NTag>
               </div>
               <div class="server-meta">
                 <span class="server-url">{{ server.url }}</span>
-                <NTag v-if="server.username && server.username !== '_noauth_'" size="tiny" :bordered="false" style="margin-left: 8px;">{{ server.username }}</NTag>
-                <NTag v-else size="tiny" :bordered="false" type="success" style="margin-left: 8px;">{{ t('pages.connection.noAuth') }}</NTag>
+                <NTag
+                  v-if="server.username && server.username !== '_noauth_'"
+                  size="tiny"
+                  :bordered="false"
+                  style="margin-left: 8px"
+                  >{{ server.username }}</NTag
+                >
+                <NTag
+                  v-else
+                  size="tiny"
+                  :bordered="false"
+                  type="success"
+                  style="margin-left: 8px"
+                  >{{ t('pages.connection.noAuth') }}</NTag
+                >
               </div>
             </div>
             <NSpace :size="8" align="center" class="server-actions">
@@ -498,7 +553,11 @@ async function connectLocalHermes() {
                 :disabled="connecting && connectingServerId !== server.id"
                 @click="handleConnect(server.id)"
               >
-                {{ connectionStore.currentServer?.id === server.id ? t('pages.connection.reconnect') : t('pages.connection.connect') }}
+                {{
+                  connectionStore.currentServer?.id === server.id
+                    ? t('pages.connection.reconnect')
+                    : t('pages.connection.connect')
+                }}
               </NButton>
               <NTooltip>
                 <template #trigger>
@@ -546,7 +605,9 @@ async function connectLocalHermes() {
     <NModal
       v-model:show="showAddModal"
       preset="card"
-      :title="editingServerId ? t('pages.connection.modalTitleEdit') : t('pages.connection.modalTitleAdd')"
+      :title="
+        editingServerId ? t('pages.connection.modalTitleEdit') : t('pages.connection.modalTitleAdd')
+      "
       style="width: 520px"
       :bordered="false"
     >
@@ -556,40 +617,71 @@ async function connectLocalHermes() {
           <template #label>
             <NSpace :size="6" align="center">
               <span>{{ t('pages.connection.labelAddress') }}</span>
-              <NTag size="tiny" type="warning" :bordered="false">{{ t('pages.connection.labelAddressRequired') }}</NTag>
+              <NTag size="tiny" type="warning" :bordered="false">{{
+                t('pages.connection.labelAddressRequired')
+              }}</NTag>
             </NSpace>
           </template>
           <NInput v-model:value="form.url" :placeholder="t('pages.connection.placeholderAddress')">
             <template #suffix>
               <NSpin v-if="probing" :size="14" />
-              <NIcon v-else-if="probeResult?.reachable" :component="CheckmarkCircleOutline" color="#18a058" />
+              <NIcon
+                v-else-if="probeResult?.reachable"
+                :component="CheckmarkCircleOutline"
+                color="#18a058"
+              />
             </template>
           </NInput>
         </NFormItem>
 
         <!-- Probe feedback -->
-        <div v-if="probeResult && !probing" style="margin-bottom: 16px;">
-          <NAlert v-if="probeResult.isHermesRest && !probeResult.authEnabled" type="success" :bordered="false" style="font-size: 13px;">
+        <div v-if="probeResult && !probing" style="margin-bottom: 16px">
+          <NAlert
+            v-if="probeResult.isHermesRest && !probeResult.authEnabled"
+            type="success"
+            :bordered="false"
+            style="font-size: 13px"
+          >
             <template #icon><NIcon :component="FlashOutline" /></template>
             {{ t('pages.connection.probeHermesRest') }}
           </NAlert>
-          <NAlert v-else-if="probeResult.isHermesRest && probeResult.authEnabled" type="info" :bordered="false" style="font-size: 13px;">
+          <NAlert
+            v-else-if="probeResult.isHermesRest && probeResult.authEnabled"
+            type="info"
+            :bordered="false"
+            style="font-size: 13px"
+          >
             <template #icon><NIcon :component="FlashOutline" /></template>
             {{ t('pages.connection.probeHermesRestAuth') }}
           </NAlert>
-          <NAlert v-else-if="probeResult.reachable && !probeResult.authEnabled" type="success" :bordered="false" style="font-size: 13px;">
+          <NAlert
+            v-else-if="probeResult.reachable && !probeResult.authEnabled"
+            type="success"
+            :bordered="false"
+            style="font-size: 13px"
+          >
             <template #icon><NIcon :component="FlashOutline" /></template>
             {{ t('pages.connection.probeNoAuth') }}
           </NAlert>
-          <NAlert v-else-if="probeResult.reachable && probeResult.authEnabled" type="info" :bordered="false" style="font-size: 13px;">
+          <NAlert
+            v-else-if="probeResult.reachable && probeResult.authEnabled"
+            type="info"
+            :bordered="false"
+            style="font-size: 13px"
+          >
             {{ t('pages.connection.probeAuth') }}
           </NAlert>
-          <NAlert v-else type="error" :bordered="false" style="font-size: 13px;">
+          <NAlert v-else type="error" :bordered="false" style="font-size: 13px">
             {{ t('pages.connection.probeUnreachable') }}
           </NAlert>
         </div>
 
-        <NAlert v-if="isHttpWarning && !probeResult" type="warning" :bordered="false" style="margin-bottom: 16px; font-size: 12px;">
+        <NAlert
+          v-if="isHttpWarning && !probeResult"
+          type="warning"
+          :bordered="false"
+          style="margin-bottom: 16px; font-size: 12px"
+        >
           {{ t('pages.connection.httpWarning') }}
         </NAlert>
 
@@ -599,12 +691,19 @@ async function connectLocalHermes() {
             <template #label>
               <NSpace :size="6" align="center">
                 <span>{{ t('pages.connection.labelToken') }}</span>
-                <NTag size="tiny" type="warning" :bordered="false">{{ t('pages.connection.labelTokenRequired') }}</NTag>
+                <NTag size="tiny" type="warning" :bordered="false">{{
+                  t('pages.connection.labelTokenRequired')
+                }}</NTag>
               </NSpace>
             </template>
-            <NInput v-model:value="form.password" type="password" show-password-on="click" :placeholder="t('pages.connection.placeholderToken')" />
+            <NInput
+              v-model:value="form.password"
+              type="password"
+              show-password-on="click"
+              :placeholder="t('pages.connection.placeholderToken')"
+            />
           </NFormItem>
-          <NAlert :bordered="false" type="info" style="margin-bottom: 16px; font-size: 12px;">
+          <NAlert :bordered="false" type="info" style="margin-bottom: 16px; font-size: 12px">
             {{ t('pages.connection.tokenHint') }}
           </NAlert>
         </template>
@@ -614,7 +713,9 @@ async function connectLocalHermes() {
           <template #label>
             <NSpace :size="6" align="center">
               <span>{{ t('pages.connection.labelName') }}</span>
-              <NTag size="tiny" :bordered="false">{{ t('pages.connection.labelNameOptional') }}</NTag>
+              <NTag size="tiny" :bordered="false">{{
+                t('pages.connection.labelNameOptional')
+              }}</NTag>
             </NSpace>
           </template>
           <NInput v-model:value="form.name" :placeholder="t('pages.connection.placeholderName')" />
@@ -626,16 +727,21 @@ async function connectLocalHermes() {
             <template #label>
               <NSpace :size="6" align="center">
                 <span>{{ t('pages.connection.labelUsername') }}</span>
-                <NTag size="tiny" :bordered="false">{{ t('pages.connection.labelUsernameOptional') }}</NTag>
+                <NTag size="tiny" :bordered="false">{{
+                  t('pages.connection.labelUsernameOptional')
+                }}</NTag>
               </NSpace>
             </template>
-            <NInput v-model:value="form.username" :placeholder="t('pages.connection.placeholderUsername')" />
+            <NInput
+              v-model:value="form.username"
+              :placeholder="t('pages.connection.placeholderUsername')"
+            />
           </NFormItem>
         </template>
 
         <!-- Manual probe button -->
         <NFormItem v-if="!probeResult && normalizedUrl" :show-label="false">
-          <NButton size="small" :loading="probing" @click="probeServer" style="width: 100%;">
+          <NButton size="small" :loading="probing" @click="probeServer" style="width: 100%">
             <template #icon><NIcon :component="FlashOutline" /></template>
             {{ t('pages.connection.probeButton') }}
           </NButton>
@@ -644,7 +750,9 @@ async function connectLocalHermes() {
       <template #footer>
         <NSpace justify="end">
           <NButton @click="showAddModal = false">{{ t('common.cancel') }}</NButton>
-          <NButton type="primary" :disabled="!canSave" @click="handleSave">{{ editingServerId ? t('pages.connection.save') : t('pages.connection.add') }}</NButton>
+          <NButton type="primary" :disabled="!canSave" @click="handleSave">{{
+            editingServerId ? t('pages.connection.save') : t('pages.connection.add')
+          }}</NButton>
         </NSpace>
       </template>
     </NModal>
@@ -674,8 +782,12 @@ async function connectLocalHermes() {
 }
 
 .auto-connect-logo {
-  width: 280px;
-  height: auto;
+  width: 88px;
+  height: 88px;
+  border-radius: 22px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 18px 42px rgba(0, 0, 0, 0.24);
 }
 
 .auto-connect-text {
@@ -696,9 +808,13 @@ async function connectLocalHermes() {
 }
 
 .connection-logo {
-  width: 320px;
-  height: auto;
-  margin-bottom: 16px;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 18px;
+  border-radius: 24px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 20px 48px rgba(0, 0, 0, 0.24);
 }
 
 .connection-title {

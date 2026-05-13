@@ -161,7 +161,7 @@ function resetDrag() {
 <template>
   <div class="sidebar-shell">
     <div class="sidebar-logo" :class="{ 'sidebar-logo--collapsed': collapsed }">
-      <div class="sidebar-brand-mark">H</div>
+      <img class="sidebar-brand-mark" src="@/assets/hermes-girl-avatar.svg" alt="Hermes" />
       <div v-if="!collapsed" class="sidebar-brand-text">
         <div class="sidebar-brand-title">Hermes Desktop</div>
         <div class="sidebar-brand-subtitle">控制塔</div>
@@ -246,13 +246,12 @@ function resetDrag() {
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #60d7ac, #78b7ff);
-  color: #111318;
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  letter-spacing: 0;
+  display: block;
+  object-fit: cover;
   flex: 0 0 auto;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 8px 18px rgba(0, 0, 0, 0.22);
 }
 
 .sidebar-brand-text {
