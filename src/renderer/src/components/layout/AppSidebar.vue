@@ -161,7 +161,7 @@ function resetDrag() {
 <template>
   <div class="sidebar-shell">
     <div class="sidebar-logo" :class="{ 'sidebar-logo--collapsed': collapsed }">
-      <img class="sidebar-brand-mark" src="@/assets/hermes-girl-avatar.svg" alt="Hermes" />
+      <img class="sidebar-brand-mark" src="@/assets/hermes-girl-avatar.png" alt="Hermes" />
       <div v-if="!collapsed" class="sidebar-brand-text">
         <div class="sidebar-brand-title">Hermes Desktop</div>
         <div class="sidebar-brand-subtitle">控制塔</div>

@@ -414,7 +414,7 @@ async function connectLocalHermes() {
   <div class="connection-page">
     <!-- Auto-connect loading state -->
     <div v-if="autoConnecting" class="auto-connect-overlay">
-      <img src="@/assets/hermes-girl-avatar.svg" alt="Hermes" class="auto-connect-logo" />
+      <img src="@/assets/hermes-girl-avatar.png" alt="Hermes" class="auto-connect-logo" />
       <NSpin size="medium" style="margin: 20px 0" />
       <p class="auto-connect-text">{{ t('pages.connection.autoConnecting') }}</p>
     </div>
@@ -422,7 +422,7 @@ async function connectLocalHermes() {
     <div v-else class="connection-container">
       <!-- Logo + Title -->
       <div class="connection-header">
-        <img src="@/assets/hermes-girl-avatar.svg" alt="Hermes" class="connection-logo" />
+        <img src="@/assets/hermes-girl-avatar.png" alt="Hermes" class="connection-logo" />
         <h1 class="connection-title">Hermes Desktop</h1>
         <p class="connection-subtitle">{{ t('pages.connection.subtitle') }}</p>
       </div>
