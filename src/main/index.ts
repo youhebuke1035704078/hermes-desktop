@@ -1295,8 +1295,7 @@ function registerIpcHandlers(): void {
       notification.on('click', () => {
         mainWindow?.show()
         mainWindow?.focus()
-        // Navigate to alerts page
-        mainWindow?.webContents.send('navigate', '/alerts')
+        mainWindow?.webContents.send('navigate', '/settings?section=diagnostics')
       })
       notification.show()
     }

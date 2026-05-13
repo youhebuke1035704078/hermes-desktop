@@ -1,5 +1,18 @@
 import type { RouteRecordRaw } from 'vue-router'
 
+export function redirectUnknownHashRoute(to: { params: Record<string, unknown> }) {
+  const pathMatch = to.params.pathMatch
+  const rawPath = Array.isArray(pathMatch)
+    ? pathMatch.map(String).join('/')
+    : String(pathMatch || '')
+
+  if (rawPath.startsWith('settings-')) {
+    return { name: 'Settings' }
+  }
+
+  return { name: 'Dashboard' }
+}
+
 export const routes: RouteRecordRaw[] = [
   {
     path: '/connection',
@@ -81,11 +94,21 @@ export const routes: RouteRecordRaw[] = [
         meta: { titleKey: 'routes.backup', icon: 'SaveOutline', hidden: true }
       },
       {
+        path: 'alerts',
+        name: 'Alerts',
+        redirect: { name: 'Settings', query: { section: 'diagnostics' } },
+        meta: { titleKey: 'routes.alerts', hidden: true }
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/settings/SettingsPage.vue'),
         meta: { titleKey: 'routes.settings', icon: 'CogOutline' }
       }
     ]
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: redirectUnknownHashRoute
   }
 ]

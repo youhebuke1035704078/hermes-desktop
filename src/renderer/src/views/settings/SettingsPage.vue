@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   NCard,
   NSpace,
@@ -46,6 +46,7 @@ import { writeTextToClipboard } from '@/utils/clipboard'
 import ConnectionStatus from '@/components/common/ConnectionStatus.vue'
 
 const router = useRouter()
+const route = useRoute()
 const themeStore = useThemeStore()
 const wsStore = useWebSocketStore()
 const connectionStore = useConnectionStore()
@@ -80,6 +81,16 @@ function scrollToSettingsSection(key: SettingsSectionKey) {
     behavior: 'smooth',
     block: 'start'
   })
+}
+
+function isSettingsSectionKey(value: unknown): value is SettingsSectionKey {
+  return typeof value === 'string' && settingsSections.some((section) => section.key === value)
+}
+
+function applyRequestedSettingsSection(value: unknown) {
+  const requested = Array.isArray(value) ? value[0] : value
+  if (!isSettingsSectionKey(requested)) return
+  requestAnimationFrame(() => scrollToSettingsSection(requested))
 }
 
 // ── Connection status ──
@@ -878,6 +889,7 @@ onMounted(async () => {
     // config/version/update status for the newly-visible feature cards.
     await triggerMgmtProbe()
   }
+  applyRequestedSettingsSection(route.query.section)
 })
 
 // Auto-re-probe when the connection transitions back to 'connected' after
@@ -908,6 +920,12 @@ watch(
       void triggerMgmtProbe()
     }
   }
+)
+
+watch(
+  () => route.query.section,
+  (section) => applyRequestedSettingsSection(section),
+  { flush: 'post' }
 )
 </script>
 
