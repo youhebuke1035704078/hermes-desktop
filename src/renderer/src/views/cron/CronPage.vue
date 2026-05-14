@@ -725,8 +725,8 @@ function stageActionLabel(stage: PriceWorkflowStage): string {
   return stage.key === 'gate' ? '运行' : '补跑'
 }
 
-function syncTechnicalDetailsOpen(event: Event) {
-  technicalDetailsOpen.value = (event.target as HTMLDetailsElement).open
+function toggleTechnicalDetails() {
+  technicalDetailsOpen.value = !technicalDetailsOpen.value
 }
 
 function focusAttentionJob() {
@@ -1032,17 +1032,18 @@ watch(
       </div>
     </section>
 
-    <details
-      ref="technicalDetailsRef"
-      class="cron-advanced"
-      :open="technicalDetailsOpen"
-      @toggle="syncTechnicalDetailsOpen"
-    >
-      <summary>
+    <section ref="technicalDetailsRef" class="cron-advanced">
+      <button
+        type="button"
+        class="cron-advanced-toggle"
+        :aria-expanded="technicalDetailsOpen"
+        aria-controls="cron-advanced-body"
+        @click="toggleTechnicalDetails"
+      >
         <span>Cron 技术表与最近执行</span>
-        <span class="advanced-label">高级明细</span>
-      </summary>
-      <div class="advanced-body">
+        <span class="advanced-label">{{ technicalDetailsOpen ? '收起明细' : '展开明细' }}</span>
+      </button>
+      <div v-show="technicalDetailsOpen" id="cron-advanced-body" class="advanced-body">
         <div v-if="recentJobs.length" class="recent-strip">
           <div v-for="job in recentJobs" :key="`recent-${job.id}`" class="recent-item">
             <div class="recent-main">
@@ -1090,7 +1091,7 @@ watch(
           </NText>
         </NSpin>
       </div>
-    </details>
+    </section>
 
     <NAlert v-if="cronStore.lastError" type="error" :closable="true" style="margin-top: 12px">
       {{ t('pages.cron.requestFailed', { error: cronStore.lastError }) }}
@@ -1451,8 +1452,12 @@ watch(
   scroll-margin-top: 16px;
 }
 
-.cron-advanced summary {
-  list-style: none;
+.cron-advanced-toggle {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  color: inherit;
+  background: transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1460,10 +1465,18 @@ watch(
   gap: var(--ui-gap);
   padding: 14px var(--ui-panel-padding);
   font-weight: 800;
+  text-align: left;
+  font: inherit;
 }
 
-.cron-advanced summary::-webkit-details-marker {
-  display: none;
+.cron-advanced-toggle:hover,
+.cron-advanced-toggle:focus-visible {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cron-advanced-toggle:focus-visible {
+  outline: 2px solid var(--n-primary-color);
+  outline-offset: -2px;
 }
 
 .advanced-label {
