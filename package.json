@@ -1,6 +1,6 @@
 {
   "name": "hermes-desktop",
-  "version": "0.5.52",
+  "version": "0.5.53",
   "description": "Hermes Desktop - Visual client for Hermes Agent by Nous Research",
   "main": "./out/main/index.js",
   "author": "",

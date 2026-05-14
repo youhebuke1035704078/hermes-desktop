@@ -325,6 +325,7 @@ const envError = ref('')
 const envNotFound = ref(false)
 
 const restarting = ref(false)
+const advancedMaintenanceExpanded = ref(false)
 const configExpanded = ref(false)
 const envExpanded = ref(false)
 
@@ -1421,150 +1422,187 @@ watch(
           </div>
 
           <div class="settings-advanced">
-            <div class="settings-advanced-head">
-              <div>
-                <NText strong>高级维护</NText>
-                <NText depth="3" class="settings-mini-detail">
-                  config.yaml、.env 和重启服务默认收拢，减少误操作。
-                </NText>
-              </div>
-              <NTag size="small" round :bordered="false" type="info">
-                {{ canManage ? '可管理' : '需要管理接口' }}
-              </NTag>
-            </div>
-
-            <NAlert v-if="!canManage" type="info" :closable="false" class="settings-inline-alert">
-              当前连接没有可用的远程管理接口，配置编辑和重启暂不可用。
-              <NButton
-                v-if="isHermesRest && !isLocalServer"
-                size="small"
-                secondary
-                :loading="remoteProbeBusy"
-                style="margin-left: 8px"
-                @click="triggerMgmtProbe"
-              >
-                重新检测
-              </NButton>
-            </NAlert>
-
-            <template v-else>
-              <div class="settings-collapse-row" @click="configExpanded = !configExpanded">
+            <button
+              type="button"
+              class="settings-advanced-toggle"
+              :aria-expanded="advancedMaintenanceExpanded"
+              aria-controls="settings-advanced-body"
+              @click="advancedMaintenanceExpanded = !advancedMaintenanceExpanded"
+            >
+              <div class="settings-advanced-title">
                 <div>
-                  <NText strong>{{ t('pages.settings.hermesConfig') }}</NText>
-                  <NText depth="3">{{ t('pages.settings.hermesConfigDesc') }}</NText>
+                  <NText strong>高级维护</NText>
+                  <NText depth="3" class="settings-mini-detail">
+                    config.yaml、.env 和重启服务默认收拢，减少误操作。
+                  </NText>
                 </div>
-                <NIcon :component="configExpanded ? ChevronUpOutline : ChevronDownOutline" />
-              </div>
-              <div v-show="configExpanded" class="settings-editor-block">
-                <NSpin :show="configYamlLoading">
-                  <NAlert
-                    v-if="configYamlNotFound"
-                    type="info"
-                    class="settings-editor-alert"
-                    :closable="false"
-                  >
-                    {{ t('pages.settings.fileNotFound') }}
-                  </NAlert>
-                  <NAlert
-                    v-if="configYamlError"
-                    type="error"
-                    class="settings-editor-alert"
-                    :closable="false"
-                  >
-                    {{ configYamlError }}
-                  </NAlert>
-                  <NInput
-                    v-model:value="configYaml"
-                    type="textarea"
-                    :autosize="{ minRows: 8, maxRows: 24 }"
-                    :placeholder="
-                      configYamlLoading
-                        ? t('pages.settings.loadingFile')
-                        : 'model:\n  default: openai-codex/gpt-5.4\n  provider: openai-codex'
-                    "
-                    class="settings-code-input"
+                <NSpace align="center" :size="8">
+                  <NTag size="small" round :bordered="false" type="info">
+                    {{ canManage ? '可管理' : '需要管理接口' }}
+                  </NTag>
+                  <NIcon
+                    :component="advancedMaintenanceExpanded ? ChevronUpOutline : ChevronDownOutline"
                   />
+                </NSpace>
+              </div>
+            </button>
+
+            <div
+              v-show="advancedMaintenanceExpanded"
+              id="settings-advanced-body"
+              class="settings-advanced-body"
+            >
+              <NAlert v-if="!canManage" type="info" :closable="false" class="settings-inline-alert">
+                当前连接没有可用的远程管理接口，配置编辑和重启暂不可用。
+                <NButton
+                  v-if="isHermesRest && !isLocalServer"
+                  size="small"
+                  secondary
+                  :loading="remoteProbeBusy"
+                  style="margin-left: 8px"
+                  @click="triggerMgmtProbe"
+                >
+                  重新检测
+                </NButton>
+              </NAlert>
+
+              <template v-else>
+                <button
+                  type="button"
+                  class="settings-collapse-row"
+                  :aria-expanded="configExpanded"
+                  @click="configExpanded = !configExpanded"
+                >
+                  <div>
+                    <NText strong>{{ t('pages.settings.hermesConfig') }}</NText>
+                    <NText depth="3">{{ t('pages.settings.hermesConfigDesc') }}</NText>
+                  </div>
+                  <NIcon :component="configExpanded ? ChevronUpOutline : ChevronDownOutline" />
+                </button>
+                <div v-show="configExpanded" class="settings-editor-block">
+                  <NSpin :show="configYamlLoading">
+                    <NAlert
+                      v-if="configYamlNotFound"
+                      type="info"
+                      class="settings-editor-alert"
+                      :closable="false"
+                    >
+                      {{ t('pages.settings.fileNotFound') }}
+                    </NAlert>
+                    <NAlert
+                      v-if="configYamlError"
+                      type="error"
+                      class="settings-editor-alert"
+                      :closable="false"
+                    >
+                      {{ configYamlError }}
+                    </NAlert>
+                    <NInput
+                      v-model:value="configYaml"
+                      type="textarea"
+                      :autosize="{ minRows: 8, maxRows: 24 }"
+                      :placeholder="
+                        configYamlLoading
+                          ? t('pages.settings.loadingFile')
+                          : 'model:\n  default: openai-codex/gpt-5.4\n  provider: openai-codex'
+                      "
+                      class="settings-code-input"
+                    />
+                    <NButton
+                      type="primary"
+                      size="small"
+                      :loading="configYamlSaving"
+                      :disabled="configYamlLoading"
+                      style="margin-top: 10px"
+                      @click="saveConfigYaml"
+                    >
+                      <template #icon><NIcon :component="SaveOutline" /></template>
+                      {{
+                        configYamlSaving ? t('pages.settings.saving') : t('pages.settings.saveFile')
+                      }}
+                    </NButton>
+                  </NSpin>
+                </div>
+
+                <button
+                  type="button"
+                  class="settings-collapse-row"
+                  :aria-expanded="envExpanded"
+                  @click="envExpanded = !envExpanded"
+                >
+                  <div>
+                    <NText strong>{{ t('pages.settings.hermesEnv') }}</NText>
+                    <NText depth="3">{{ t('pages.settings.hermesEnvDesc') }}</NText>
+                  </div>
+                  <NIcon :component="envExpanded ? ChevronUpOutline : ChevronDownOutline" />
+                </button>
+                <div v-show="envExpanded" class="settings-editor-block">
+                  <NSpin :show="envLoading">
+                    <NAlert
+                      v-if="envNotFound"
+                      type="info"
+                      class="settings-editor-alert"
+                      :closable="false"
+                    >
+                      {{ t('pages.settings.fileNotFound') }}
+                    </NAlert>
+                    <NAlert
+                      v-if="envError"
+                      type="error"
+                      class="settings-editor-alert"
+                      :closable="false"
+                    >
+                      {{ envError }}
+                    </NAlert>
+                    <NInput
+                      v-model:value="envContent"
+                      type="textarea"
+                      :autosize="{ minRows: 6, maxRows: 20 }"
+                      :placeholder="
+                        envLoading
+                          ? t('pages.settings.loadingFile')
+                          : 'API_SERVER_KEY=\nOPENAI_API_KEY=sk-...'
+                      "
+                      class="settings-code-input"
+                    />
+                    <NButton
+                      type="primary"
+                      size="small"
+                      :loading="envSaving"
+                      :disabled="envLoading"
+                      style="margin-top: 10px"
+                      @click="saveEnv"
+                    >
+                      <template #icon><NIcon :component="SaveOutline" /></template>
+                      {{ envSaving ? t('pages.settings.saving') : t('pages.settings.saveFile') }}
+                    </NButton>
+                  </NSpin>
+                </div>
+
+                <div class="settings-restart-row">
+                  <div>
+                    <NText strong>{{ t('pages.settings.restartHermes') }}</NText>
+                    <NText depth="3" class="settings-mini-detail">{{
+                      t('pages.settings.restartTip')
+                    }}</NText>
+                  </div>
                   <NButton
-                    type="primary"
+                    class="settings-restart-button"
+                    secondary
                     size="small"
-                    :loading="configYamlSaving"
-                    :disabled="configYamlLoading"
-                    style="margin-top: 10px"
-                    @click="saveConfigYaml"
+                    :loading="restarting"
+                    @click="restartHermes"
                   >
-                    <template #icon><NIcon :component="SaveOutline" /></template>
+                    <template #icon><NIcon :component="RefreshOutline" /></template>
                     {{
-                      configYamlSaving ? t('pages.settings.saving') : t('pages.settings.saveFile')
+                      restarting
+                        ? t('pages.settings.restarting')
+                        : t('pages.settings.restartHermes')
                     }}
                   </NButton>
-                </NSpin>
-              </div>
-
-              <div class="settings-collapse-row" @click="envExpanded = !envExpanded">
-                <div>
-                  <NText strong>{{ t('pages.settings.hermesEnv') }}</NText>
-                  <NText depth="3">{{ t('pages.settings.hermesEnvDesc') }}</NText>
                 </div>
-                <NIcon :component="envExpanded ? ChevronUpOutline : ChevronDownOutline" />
-              </div>
-              <div v-show="envExpanded" class="settings-editor-block">
-                <NSpin :show="envLoading">
-                  <NAlert
-                    v-if="envNotFound"
-                    type="info"
-                    class="settings-editor-alert"
-                    :closable="false"
-                  >
-                    {{ t('pages.settings.fileNotFound') }}
-                  </NAlert>
-                  <NAlert
-                    v-if="envError"
-                    type="error"
-                    class="settings-editor-alert"
-                    :closable="false"
-                  >
-                    {{ envError }}
-                  </NAlert>
-                  <NInput
-                    v-model:value="envContent"
-                    type="textarea"
-                    :autosize="{ minRows: 6, maxRows: 20 }"
-                    :placeholder="
-                      envLoading
-                        ? t('pages.settings.loadingFile')
-                        : 'API_SERVER_KEY=\nOPENAI_API_KEY=sk-...'
-                    "
-                    class="settings-code-input"
-                  />
-                  <NButton
-                    type="primary"
-                    size="small"
-                    :loading="envSaving"
-                    :disabled="envLoading"
-                    style="margin-top: 10px"
-                    @click="saveEnv"
-                  >
-                    <template #icon><NIcon :component="SaveOutline" /></template>
-                    {{ envSaving ? t('pages.settings.saving') : t('pages.settings.saveFile') }}
-                  </NButton>
-                </NSpin>
-              </div>
-
-              <div class="settings-restart-row">
-                <div>
-                  <NText strong>{{ t('pages.settings.restartHermes') }}</NText>
-                  <NText depth="3" class="settings-mini-detail">{{
-                    t('pages.settings.restartTip')
-                  }}</NText>
-                </div>
-                <NButton type="warning" size="small" :loading="restarting" @click="restartHermes">
-                  <template #icon><NIcon :component="RefreshOutline" /></template>
-                  {{
-                    restarting ? t('pages.settings.restarting') : t('pages.settings.restartHermes')
-                  }}
-                </NButton>
-              </div>
-            </template>
+              </template>
+            </div>
           </div>
         </NCard>
 
@@ -2091,7 +2129,7 @@ watch(
   overflow: hidden;
 }
 
-.settings-advanced-head,
+.settings-advanced-toggle,
 .settings-collapse-row,
 .settings-restart-row {
   display: flex;
@@ -2101,19 +2139,56 @@ watch(
   padding: 12px;
 }
 
-.settings-advanced-head,
+.settings-advanced-toggle,
 .settings-collapse-row {
-  border-bottom: 1px solid var(--n-border-color);
+  appearance: none;
+  width: 100%;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-advanced-title {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap);
+}
+
+.settings-advanced-body {
+  border-top: 1px solid var(--n-border-color);
+}
+
+.settings-advanced-toggle:hover,
+.settings-advanced-toggle:focus-visible,
+.settings-collapse-row:hover,
+.settings-collapse-row:focus-visible {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.settings-advanced-toggle:focus-visible,
+.settings-collapse-row:focus-visible {
+  outline: 2px solid var(--n-primary-color);
+  outline-offset: -2px;
 }
 
 .settings-collapse-row {
-  cursor: pointer;
+  border-bottom: 1px solid var(--n-border-color);
 }
 
 .settings-collapse-row > div,
 .settings-restart-row > div {
   display: grid;
   gap: 3px;
+}
+
+.settings-restart-button {
+  min-width: 170px;
 }
 
 .settings-editor-block {
@@ -2163,7 +2238,7 @@ watch(
 @media (max-width: 760px) {
   .settings-page-head,
   .settings-mini-head,
-  .settings-advanced-head,
+  .settings-advanced-title,
   .settings-restart-row {
     flex-direction: column;
     align-items: stretch;
