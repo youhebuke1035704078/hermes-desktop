@@ -79,7 +79,6 @@ const sourceType = computed(() => (skillStore.source === 'server' ? 'success' : 
 const sourceLabel = computed(() =>
   skillStore.source === 'server' ? t('pages.skills.source.server') : t('pages.skills.source.local')
 )
-const userCreatedSkills = computed(() => skillStore.userCreatedSkills)
 const priceWatchSkill = computed(() =>
   skillStore.skills.find(
     (skill) =>
@@ -520,7 +519,7 @@ function rowProps(row: SkillMeta) {
             <template #icon><NIcon :component="CopyOutline" /></template>
             复制 Skill 路径
           </NButton>
-          <NButton block secondary @click="router.push({ name: 'Settings' })">导出诊断包</NButton>
+          <NButton block secondary @click="router.push({ name: 'Settings' })">跳到系统诊断</NButton>
         </NSpace>
       </NCard>
     </div>
@@ -541,217 +540,214 @@ function rowProps(row: SkillMeta) {
       </div>
     </NCard>
 
-    <!-- Zone 1: Metrics + Filters -->
-    <NCard class="app-card skill-catalog-card">
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NIcon :component="ExtensionPuzzleOutline" :size="20" />
-          <span>{{ t('pages.skills.title') }}</span>
-        </NSpace>
-      </template>
-      <template #header-extra>
-        <NSpace align="center" :size="8">
-          <NTag size="small" :type="sourceType" round>
-            {{ sourceLabel }}
-          </NTag>
-          <NButton
-            secondary
-            size="small"
-            @click="skillStore.fetchSkills()"
-            :loading="skillStore.loading"
-          >
-            <template #icon><NIcon :component="RefreshOutline" /></template>
-            {{ t('pages.skills.refresh') }}
-          </NButton>
-        </NSpace>
-      </template>
+    <NCard class="app-card skill-advanced-card">
+      <NCollapse>
+        <NCollapseItem name="advanced-skills">
+          <template #header>
+            <div class="skill-advanced-header">
+              <NSpace align="center" :size="8">
+                <NIcon :component="ExtensionPuzzleOutline" :size="18" />
+                <span>高级 Skill 管理</span>
+              </NSpace>
+              <NTag size="small" type="warning" round :bordered="false">旧模块收纳区</NTag>
+            </div>
+          </template>
 
-      <NGrid cols="1 s:2 m:5" responsive="screen" :x-gap="8" :y-gap="8">
-        <NGridItem>
-          <div class="console-metric-tile">
-            <div class="console-metric-label">{{ t('pages.skills.metrics.total') }}</div>
-            <div class="console-metric-value">{{ skillStore.skills.length }}</div>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="console-metric-tile">
-            <div class="console-metric-label">{{ t('pages.skills.metrics.enabled') }}</div>
-            <div class="console-metric-value">
-              <NText type="success">{{ skillStore.enabledCount }}</NText>
+          <NSpace vertical :size="12" class="skill-advanced-body">
+            <div class="skill-advanced-note">
+              全量 Skill 表、外部目录和配置变量保留为排查入口；默认收起，避免和价格监控产品页重复。
             </div>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="console-metric-tile">
-            <div class="console-metric-label">{{ t('pages.skills.metrics.disabled') }}</div>
-            <div class="console-metric-value">
-              <NText type="error">{{ skillStore.disabledCount }}</NText>
-            </div>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="console-metric-tile">
-            <div class="console-metric-label">{{ t('pages.skills.metrics.configVars') }}</div>
-            <div class="console-metric-value">
-              <NText type="info">{{ skillStore.configVarCount }}</NText>
-            </div>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="console-metric-tile">
-            <div class="console-metric-label">{{ t('pages.skills.metrics.userCreated') }}</div>
-            <div class="console-metric-value">
-              <NText type="info">{{ skillStore.userCreatedCount }}</NText>
-            </div>
-          </div>
-        </NGridItem>
-      </NGrid>
 
-      <!-- Filter bar -->
-      <div class="skill-filter-bar">
-        <NInput
-          v-model:value="searchQuery"
-          clearable
-          :placeholder="t('pages.skills.search')"
-          style="flex: 1; min-width: 200px"
-        />
-        <NSelect
-          v-model:value="categoryFilter"
-          :options="categoryOptions"
-          :placeholder="t('pages.skills.categoryFilter')"
-          clearable
-          style="width: 160px"
-        />
-        <NSelect
-          v-model:value="statusFilter"
-          :options="statusOptions"
-          :placeholder="t('pages.skills.statusFilter')"
-          clearable
-          style="width: 140px"
-        />
-        <NSelect
-          v-model:value="sourceFilter"
-          :options="skillSourceOptions"
-          :placeholder="t('pages.skills.sourceFilter')"
-          clearable
-          style="width: 150px"
-        />
-      </div>
-      <NText
-        v-if="skillStore.sourceError"
-        type="warning"
-        style="font-size: 12px; margin-top: 8px; display: block"
-      >
-        {{ t('pages.skills.source.fallback', { error: skillStore.sourceError }) }}
-      </NText>
+            <div class="skill-advanced-panel">
+              <div class="skill-advanced-panel-head">
+                <NSpace align="center" :size="8">
+                  <NIcon :component="ExtensionPuzzleOutline" :size="20" />
+                  <span>{{ t('pages.skills.title') }}</span>
+                </NSpace>
+                <NSpace align="center" :size="8">
+                  <NTag size="small" :type="sourceType" round>
+                    {{ sourceLabel }}
+                  </NTag>
+                  <NButton
+                    secondary
+                    size="small"
+                    :loading="skillStore.loading"
+                    @click="skillStore.fetchSkills()"
+                  >
+                    <template #icon><NIcon :component="RefreshOutline" /></template>
+                    {{ t('pages.skills.refresh') }}
+                  </NButton>
+                </NSpace>
+              </div>
+
+              <NGrid cols="1 s:2 m:5" responsive="screen" :x-gap="8" :y-gap="8">
+                <NGridItem>
+                  <div class="console-metric-tile">
+                    <div class="console-metric-label">{{ t('pages.skills.metrics.total') }}</div>
+                    <div class="console-metric-value">{{ skillStore.skills.length }}</div>
+                  </div>
+                </NGridItem>
+                <NGridItem>
+                  <div class="console-metric-tile">
+                    <div class="console-metric-label">{{ t('pages.skills.metrics.enabled') }}</div>
+                    <div class="console-metric-value">
+                      <NText type="success">{{ skillStore.enabledCount }}</NText>
+                    </div>
+                  </div>
+                </NGridItem>
+                <NGridItem>
+                  <div class="console-metric-tile">
+                    <div class="console-metric-label">{{ t('pages.skills.metrics.disabled') }}</div>
+                    <div class="console-metric-value">
+                      <NText type="error">{{ skillStore.disabledCount }}</NText>
+                    </div>
+                  </div>
+                </NGridItem>
+                <NGridItem>
+                  <div class="console-metric-tile">
+                    <div class="console-metric-label">
+                      {{ t('pages.skills.metrics.configVars') }}
+                    </div>
+                    <div class="console-metric-value">
+                      <NText type="info">{{ skillStore.configVarCount }}</NText>
+                    </div>
+                  </div>
+                </NGridItem>
+                <NGridItem>
+                  <div class="console-metric-tile">
+                    <div class="console-metric-label">
+                      {{ t('pages.skills.metrics.userCreated') }}
+                    </div>
+                    <div class="console-metric-value">
+                      <NText type="info">{{ skillStore.userCreatedCount }}</NText>
+                    </div>
+                  </div>
+                </NGridItem>
+              </NGrid>
+
+              <div class="skill-filter-bar">
+                <NInput
+                  v-model:value="searchQuery"
+                  clearable
+                  :placeholder="t('pages.skills.search')"
+                  style="flex: 1; min-width: 200px"
+                />
+                <NSelect
+                  v-model:value="categoryFilter"
+                  :options="categoryOptions"
+                  :placeholder="t('pages.skills.categoryFilter')"
+                  clearable
+                  style="width: 160px"
+                />
+                <NSelect
+                  v-model:value="statusFilter"
+                  :options="statusOptions"
+                  :placeholder="t('pages.skills.statusFilter')"
+                  clearable
+                  style="width: 140px"
+                />
+                <NSelect
+                  v-model:value="sourceFilter"
+                  :options="skillSourceOptions"
+                  :placeholder="t('pages.skills.sourceFilter')"
+                  clearable
+                  style="width: 150px"
+                />
+              </div>
+              <NText
+                v-if="skillStore.sourceError"
+                type="warning"
+                style="font-size: 12px; margin-top: 8px; display: block"
+              >
+                {{ t('pages.skills.source.fallback', { error: skillStore.sourceError }) }}
+              </NText>
+            </div>
+
+            <div v-if="!skillStore.loading && skillStore.skills.length === 0" class="skill-empty">
+              <NText depth="3">{{ t('pages.skills.empty') }}</NText>
+            </div>
+
+            <div v-else class="skill-browser">
+              <div
+                class="skill-advanced-panel skill-table-card"
+                :style="{ flex: isNarrow ? '1' : '0 0 60%', minWidth: 0 }"
+              >
+                <NDataTable
+                  :columns="columns"
+                  :data="filteredSkills"
+                  :row-key="(row: SkillMeta) => row.name"
+                  :row-class-name="rowClassName"
+                  :row-props="rowProps"
+                  :loading="skillStore.loading"
+                  :scroll-x="600"
+                  size="small"
+                  :pagination="{ pageSize: 20 }"
+                />
+              </div>
+
+              <div v-if="!isNarrow" class="skill-advanced-panel skill-detail-card">
+                <div v-if="!skillStore.selectedSkill" class="skill-empty">
+                  <NText depth="3">{{ t('pages.skills.detail.empty') }}</NText>
+                </div>
+                <SkillDetail v-else />
+              </div>
+            </div>
+
+            <div class="skill-advanced-panel">
+              <div class="skill-advanced-panel-head">
+                <div>
+                  <NText strong>{{ t('pages.skills.externalDirs.title') }}</NText>
+                  <NText depth="3" class="skill-process-detail">
+                    外部目录属于配置维护，保留在高级区里用于排查。
+                  </NText>
+                </div>
+              </div>
+              <div
+                v-if="skillStore.externalDirs.length === 0"
+                class="skill-empty skill-empty--compact"
+              >
+                <NText depth="3">{{ t('pages.skills.externalDirs.empty') }}</NText>
+              </div>
+              <div v-else class="skill-dir-list">
+                <div v-for="dir in skillStore.externalDirs" :key="dir" class="skill-dir-row">
+                  <NText
+                    code
+                    style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis"
+                    >{{ dir }}</NText
+                  >
+                  <NPopconfirm @positive-click="handleRemoveDir(dir)">
+                    <template #trigger>
+                      <NButton size="tiny" type="error" quaternary>
+                        <template #icon><NIcon :component="TrashOutline" /></template>
+                      </NButton>
+                    </template>
+                    {{ t('pages.skills.externalDirs.confirmRemove') }}
+                  </NPopconfirm>
+                </div>
+              </div>
+              <NSpace>
+                <NInput
+                  v-model:value="newDirPath"
+                  :placeholder="t('pages.skills.externalDirs.placeholder')"
+                  style="width: 300px"
+                  @keyup.enter="handleAddDir"
+                />
+                <NButton type="primary" :disabled="!newDirPath.trim()" @click="handleAddDir">
+                  <template #icon><NIcon :component="AddOutline" /></template>
+                  {{ t('pages.skills.externalDirs.add') }}
+                </NButton>
+              </NSpace>
+            </div>
+          </NSpace>
+        </NCollapseItem>
+      </NCollapse>
     </NCard>
 
-    <NCard v-if="userCreatedSkills.length > 0" class="app-card">
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NTag type="info" round>{{ t('pages.skills.sources.userCreated') }}</NTag>
-          <span>{{ t('pages.skills.userCreated.title') }}</span>
-        </NSpace>
-      </template>
-      <div class="skill-chip-grid">
-        <button
-          v-for="skill in userCreatedSkills"
-          :key="skill.name"
-          class="skill-chip"
-          type="button"
-          @click="selectSkill(skill.name)"
-        >
-          <span class="skill-chip-name">{{ skill.name }}</span>
-          <span class="skill-chip-meta">
-            {{ skill.configVars?.length || 0 }} 配置 ·
-            {{ skillStore.isDisabled(skill.name) ? '停用' : '启用' }}
-          </span>
-        </button>
-      </div>
-    </NCard>
-
-    <!-- Empty state -->
-    <NCard v-if="!skillStore.loading && skillStore.skills.length === 0" class="app-card">
-      <div class="skill-empty">
-        <NText depth="3">{{ t('pages.skills.empty') }}</NText>
-      </div>
-    </NCard>
-
-    <!-- Zone 2+3: Table + Detail -->
-    <div v-else class="skill-browser">
-      <!-- Left: Table -->
-      <NCard
-        class="app-card skill-table-card"
-        :style="{ flex: isNarrow ? '1' : '0 0 60%', minWidth: 0 }"
-      >
-        <NDataTable
-          :columns="columns"
-          :data="filteredSkills"
-          :row-key="(row: SkillMeta) => row.name"
-          :row-class-name="rowClassName"
-          :row-props="rowProps"
-          :loading="skillStore.loading"
-          :scroll-x="600"
-          size="small"
-          :pagination="{ pageSize: 20 }"
-        />
-      </NCard>
-
-      <!-- Right: Detail Panel (wide screen) -->
-      <NCard v-if="!isNarrow" class="app-card skill-detail-card">
-        <div v-if="!skillStore.selectedSkill" class="skill-empty">
-          <NText depth="3">{{ t('pages.skills.detail.empty') }}</NText>
-        </div>
-        <SkillDetail v-else />
-      </NCard>
-    </div>
-
-    <!-- Drawer for narrow screens -->
     <NDrawer v-model:show="drawerVisible" :width="360" placement="right">
       <NDrawerContent :title="skillStore.selectedSkill?.name || ''">
         <SkillDetail v-if="skillStore.selectedSkill" />
       </NDrawerContent>
     </NDrawer>
-
-    <!-- External Directories -->
-    <NCard class="app-card">
-      <NCollapse>
-        <NCollapseItem :title="t('pages.skills.externalDirs.title')" name="external-dirs">
-          <div v-if="skillStore.externalDirs.length === 0" class="skill-empty skill-empty--compact">
-            <NText depth="3">{{ t('pages.skills.externalDirs.empty') }}</NText>
-          </div>
-          <div v-else class="skill-dir-list">
-            <div v-for="dir in skillStore.externalDirs" :key="dir" class="skill-dir-row">
-              <NText
-                code
-                style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis"
-                >{{ dir }}</NText
-              >
-              <NPopconfirm @positive-click="handleRemoveDir(dir)">
-                <template #trigger>
-                  <NButton size="tiny" type="error" quaternary>
-                    <template #icon><NIcon :component="TrashOutline" /></template>
-                  </NButton>
-                </template>
-                {{ t('pages.skills.externalDirs.confirmRemove') }}
-              </NPopconfirm>
-            </div>
-          </div>
-          <NSpace>
-            <NInput
-              v-model:value="newDirPath"
-              :placeholder="t('pages.skills.externalDirs.placeholder')"
-              style="width: 300px"
-              @keyup.enter="handleAddDir"
-            />
-            <NButton type="primary" @click="handleAddDir" :disabled="!newDirPath.trim()">
-              <template #icon><NIcon :component="AddOutline" /></template>
-              {{ t('pages.skills.externalDirs.add') }}
-            </NButton>
-          </NSpace>
-        </NCollapseItem>
-      </NCollapse>
-    </NCard>
   </NSpace>
 </template>
 
@@ -1148,6 +1144,51 @@ const SkillDetail = defineComponent({
   gap: var(--ui-gap-sm);
   margin-top: var(--ui-gap);
   flex-wrap: wrap;
+}
+
+.skill-advanced-card :deep(.n-card__content) {
+  padding: 0;
+}
+
+.skill-advanced-card :deep(.n-collapse-item__header-main) {
+  min-width: 0;
+  width: 100%;
+}
+
+.skill-advanced-header {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap);
+  padding-right: var(--ui-gap-sm);
+}
+
+.skill-advanced-body {
+  padding: 0 var(--ui-panel-padding) var(--ui-panel-padding);
+}
+
+.skill-advanced-note {
+  color: var(--text-secondary);
+  font-size: var(--font-body-sm);
+  line-height: var(--line-normal);
+}
+
+.skill-advanced-panel {
+  border: 1px solid var(--n-border-color);
+  border-radius: var(--radius);
+  background: var(--n-color);
+  padding: var(--ui-panel-padding);
+  min-width: 0;
+}
+
+.skill-advanced-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-gap);
+  margin-bottom: var(--ui-gap);
 }
 
 .skill-chip-grid {

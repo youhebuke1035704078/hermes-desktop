@@ -1,0 +1,953 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hermes Desktop Skills Pruned Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #111214;
+        --rail: #15161a;
+        --panel: #1a1b20;
+        --panel-2: #202126;
+        --panel-3: #25262c;
+        --line: #303139;
+        --text: #ededf1;
+        --muted: #a6a9b1;
+        --soft: #7f8490;
+        --green: #60d7ac;
+        --green-bg: #123326;
+        --amber: #e2b85a;
+        --amber-bg: #3a2d16;
+        --red: #ef7d82;
+        --red-bg: #3b2025;
+        --blue: #78b7ff;
+        --blue-bg: #17304c;
+        --shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button {
+        min-height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0 13px;
+        color: var(--text);
+        background: #26272d;
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: #4a4c56;
+        background: #2d2e35;
+      }
+
+      input,
+      select {
+        min-height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0 12px;
+        color: var(--text);
+        background: #17181c;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 236px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--line);
+        background: var(--rail);
+        padding: 20px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 6px;
+      }
+
+      .brand img {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        object-fit: cover;
+      }
+
+      .brand-title {
+        font-size: 17px;
+        font-weight: 780;
+        line-height: 1.1;
+      }
+
+      .brand-sub {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .nav {
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav button {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        color: #c9ccd3;
+        padding: 11px 12px;
+      }
+
+      .nav button.active {
+        color: var(--green);
+        background: rgba(96, 215, 172, 0.12);
+      }
+
+      .nav-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 99px;
+        background: currentColor;
+      }
+
+      .sidebar-note {
+        margin-top: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: #18191e;
+      }
+
+      .sidebar-note strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+
+      .sidebar-note span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .topbar {
+        min-height: 68px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(25, 25, 29, 0.96);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        position: sticky;
+        top: 0;
+        z-index: 4;
+      }
+
+      .crumb {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .page-title {
+        margin-top: 4px;
+        font-size: 20px;
+        font-weight: 800;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 28px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 99px;
+        background: #24252a;
+        color: #d8dbe1;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .pill.green {
+        color: var(--green);
+        background: var(--green-bg);
+        border-color: rgba(96, 215, 172, 0.35);
+      }
+
+      .pill.amber {
+        color: var(--amber);
+        background: var(--amber-bg);
+        border-color: rgba(226, 184, 90, 0.35);
+      }
+
+      .pill.red {
+        color: var(--red);
+        background: var(--red-bg);
+        border-color: rgba(239, 125, 130, 0.35);
+      }
+
+      .pill.blue {
+        color: var(--blue);
+        background: var(--blue-bg);
+        border-color: rgba(120, 183, 255, 0.35);
+      }
+
+      .content {
+        padding: 22px 24px 34px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .hero {
+        border: 1px solid #24262d;
+        border-radius: 8px;
+        background: linear-gradient(120deg, rgba(25, 25, 29, 0.98), rgba(23, 26, 28, 0.98));
+        padding: 22px;
+        box-shadow: var(--shadow);
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.55fr);
+        gap: 18px;
+      }
+
+      .eyebrow {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 680;
+      }
+
+      h1 {
+        margin: 8px 0 10px;
+        font-size: clamp(32px, 4vw, 54px);
+        line-height: 0.98;
+      }
+
+      .hero p {
+        max-width: 760px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.65;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 16px;
+      }
+
+      .panel-title {
+        font-size: 18px;
+        font-weight: 790;
+      }
+
+      .panel-sub {
+        margin-top: 5px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .hero-actions {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+
+      .primary {
+        border-color: rgba(96, 215, 172, 0.55);
+        background: var(--green);
+        color: #062019;
+        font-weight: 750;
+      }
+
+      .secondary {
+        background: #24252b;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .mini {
+        border: 1px solid #2a2c34;
+        border-radius: 8px;
+        background: #202126;
+        padding: 13px;
+        min-height: 90px;
+        display: grid;
+        align-content: space-between;
+      }
+
+      .mini-label {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .mini-value {
+        margin-top: 12px;
+        font-size: 24px;
+        font-weight: 820;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 16px;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .process-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .process-row {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        border: 1px solid #2b2d35;
+        border-radius: 8px;
+        background: #18191d;
+        padding: 12px;
+      }
+
+      .step-index {
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+        background: rgba(96, 215, 172, 0.16);
+        color: #b9f1df;
+        font-weight: 820;
+      }
+
+      .small {
+        font-size: 13px;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .side-actions {
+        display: grid;
+        gap: 12px;
+      }
+
+      .action-list {
+        display: grid;
+        gap: 9px;
+        margin-top: 12px;
+      }
+
+      .action-list button {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .audit-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .audit-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        border: 1px solid #2b2d35;
+        border-radius: 8px;
+        padding: 12px;
+        background: #18191d;
+      }
+
+      .fold {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #15161a;
+        overflow: hidden;
+      }
+
+      .fold summary {
+        cursor: pointer;
+        list-style: none;
+        min-height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 16px;
+        font-weight: 780;
+      }
+
+      .fold summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .fold summary:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .fold-body {
+        border-top: 1px solid var(--line);
+        padding: 16px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .toolbar input {
+        flex: 1;
+        min-width: 220px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 12px;
+        text-align: left;
+        vertical-align: top;
+        font-size: 13px;
+      }
+
+      th {
+        background: #24252b;
+        color: #c7cad1;
+        font-weight: 730;
+      }
+
+      td {
+        color: #dddfe5;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+        gap: 12px;
+      }
+
+      .config-row {
+        display: grid;
+        grid-template-columns: 140px minmax(0, 1fr);
+        border: 1px solid var(--line);
+        border-bottom: 0;
+      }
+
+      .config-row:last-child {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .config-row span,
+      .config-row strong {
+        padding: 11px 12px;
+      }
+
+      .config-row span {
+        color: var(--muted);
+        background: #24252b;
+      }
+
+      .review-note {
+        border: 1px solid rgba(226, 184, 90, 0.35);
+        border-radius: 8px;
+        background: rgba(226, 184, 90, 0.1);
+        padding: 15px;
+      }
+
+      .review-grid {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .review-item {
+        border: 1px solid rgba(226, 184, 90, 0.25);
+        border-radius: 8px;
+        padding: 12px;
+        background: rgba(17, 18, 20, 0.42);
+      }
+
+      .review-item strong,
+      .review-item span {
+        display: block;
+      }
+
+      .review-item span {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      @media (max-width: 1060px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: static;
+        }
+
+        .hero,
+        .layout,
+        .split {
+          grid-template-columns: 1fr;
+        }
+
+        .review-grid,
+        .cols-4,
+        .cols-3,
+        .cols-2 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 640px) {
+        .content {
+          padding: 16px;
+        }
+
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+          height: auto;
+          gap: 10px;
+          padding: 16px;
+        }
+
+        .review-grid,
+        .cols-4,
+        .cols-3,
+        .cols-2 {
+          grid-template-columns: 1fr;
+        }
+
+        .process-row,
+        .audit-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="../src/renderer/src/assets/hermes-girl-avatar.png" alt="Hermes" />
+          <div>
+            <div class="brand-title">Hermes Desktop</div>
+            <div class="brand-sub">控制塔</div>
+          </div>
+        </div>
+        <nav class="nav" aria-label="主导航">
+          <button><span class="nav-dot"></span>控制塔</button>
+          <button><span class="nav-dot"></span>在线对话</button>
+          <button><span class="nav-dot"></span>任务计划</button>
+          <button class="active"><span class="nav-dot"></span>技能管理</button>
+          <button><span class="nav-dot"></span>系统设置</button>
+        </nav>
+        <div class="sidebar-note">
+          <strong>这版删减目标</strong>
+          <span>自建 Skill 作为业务产品页；全量 Skill 表、外部目录和配置变量收进高级区。</span>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <div class="crumb">首页 / 技能管理</div>
+            <div class="page-title">技能管理</div>
+          </div>
+          <div class="top-actions">
+            <span class="pill green">gpt-5.4</span>
+            <span class="pill">Desktop v0.5.51</span>
+          </div>
+        </header>
+
+        <div class="content">
+          <section class="hero">
+            <div>
+              <div class="eyebrow">自建 Skill</div>
+              <h1>价格监控 Skill 产品页</h1>
+              <p>
+                首页只回答一个问题：价格监控流程是否完整，今天是否需要处理。旧的库存表和外部目录仍可排查，但默认不打扰主流程。
+              </p>
+            </div>
+            <div class="panel">
+              <div class="section-head">
+                <div>
+                  <div class="panel-title">jd-tongrentang-price-watch</div>
+                  <div class="panel-sub">标准流程、手动补跑、关联 Cron 和文件位置集中在这里。</div>
+                </div>
+                <span class="pill green">已启用</span>
+              </div>
+              <div class="grid cols-2">
+                <div class="mini">
+                  <div class="mini-label">今日入库</div>
+                  <div class="mini-value">40/40</div>
+                </div>
+                <div class="mini">
+                  <div class="mini-label">最近失败</div>
+                  <div class="mini-value">无</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="layout">
+            <div class="grid">
+              <section class="panel">
+                <div class="section-head">
+                  <div>
+                    <div class="panel-title">运行状态</div>
+                    <div class="panel-sub">保留主状态，不再额外展示“自建 Skill chip 列表”。</div>
+                  </div>
+                  <span class="pill green">闭环正常</span>
+                </div>
+                <div class="grid cols-4">
+                  <div class="mini">
+                    <div class="mini-label">关联任务</div>
+                    <div class="mini-value">7</div>
+                  </div>
+                  <div class="mini">
+                    <div class="mini-label">补录状态</div>
+                    <div class="mini-value">可补跑</div>
+                  </div>
+                  <div class="mini">
+                    <div class="mini-label">路径</div>
+                    <div class="mini-value">可复制</div>
+                  </div>
+                  <div class="mini">
+                    <div class="mini-label">配置</div>
+                    <div class="mini-value">已就绪</div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="section-head">
+                  <div>
+                    <div class="panel-title">Skill 生命周期</div>
+                    <div class="panel-sub">把“会跑什么、坏了看哪里”作为主内容。</div>
+                  </div>
+                  <span class="pill blue">4 阶段</span>
+                </div>
+                <div class="process-list">
+                  <div class="process-row">
+                    <div class="step-index">1</div>
+                    <div>
+                      <strong>验证门控</strong>
+                      <div class="small muted">检测是否需要人工解锁，不自动绕过验证。</div>
+                    </div>
+                    <span class="pill green">OK</span>
+                  </div>
+                  <div class="process-row">
+                    <div class="step-index">2</div>
+                    <div>
+                      <strong>采集与入库</strong>
+                      <div class="small muted">采集 SKU 价格，落 SQLite，生成日报。</div>
+                    </div>
+                    <span class="pill green">40/40</span>
+                  </div>
+                  <div class="process-row">
+                    <div class="step-index">3</div>
+                    <div>
+                      <strong>巡检与补录</strong>
+                      <div class="small muted">缺数据才补录；数据已齐全时成功退出。</div>
+                    </div>
+                    <span class="pill green">OK</span>
+                  </div>
+                  <div class="process-row">
+                    <div class="step-index">4</div>
+                    <div>
+                      <strong>告警与备份</strong>
+                      <div class="small muted">飞书通知、健康检查和 SQLite 备份。</div>
+                    </div>
+                    <span class="pill green">OK</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <aside class="side-actions">
+              <section class="panel">
+                <div class="panel-title">快捷动作</div>
+                <div class="panel-sub">只放和这个 Skill 直接相关的操作。</div>
+                <div class="action-list">
+                  <button class="primary">补跑 17:00</button>
+                  <button>打开任务闭环</button>
+                  <button>复制 Skill 路径</button>
+                  <button>查看今日日志</button>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-title">诊断入口</div>
+                <div class="panel-sub">诊断包主入口放系统设置，这里只做跳转。</div>
+                <div class="action-list">
+                  <button>跳到系统诊断</button>
+                </div>
+              </section>
+            </aside>
+          </section>
+
+          <section class="review-note">
+            <div class="panel-title">这版建议收纳的旧模块</div>
+            <div class="review-grid">
+              <div class="review-item">
+                <strong>用户自建 Skill 卡片</strong>
+                <span>已被顶部产品页替代，不再单独展示 chip 列表。</span>
+              </div>
+              <div class="review-item">
+                <strong>Skill 统计卡</strong>
+                <span>总数、启用、禁用改放高级区，避免和主状态重复。</span>
+              </div>
+              <div class="review-item">
+                <strong>全量 Skill 表格</strong>
+                <span>保留排查能力，但默认折叠为高级管理。</span>
+              </div>
+              <div class="review-item">
+                <strong>外部 Skill 目录</strong>
+                <span>属于配置维护，放高级区或系统设置，不占主页。</span>
+              </div>
+            </div>
+          </section>
+
+          <details class="fold">
+            <summary>
+              <span>高级 Skill 管理</span>
+              <span class="pill amber">旧模块收纳区</span>
+            </summary>
+            <div class="fold-body">
+              <div class="toolbar">
+                <input value="jd-tongrentang" aria-label="搜索 Skill" />
+                <select aria-label="来源筛选">
+                  <option>全部来源</option>
+                  <option>自建</option>
+                  <option>系统内置</option>
+                  <option>外部目录</option>
+                </select>
+                <select aria-label="状态筛选">
+                  <option>全部状态</option>
+                  <option>已启用</option>
+                  <option>已停用</option>
+                </select>
+                <button>刷新列表</button>
+              </div>
+
+              <div class="grid cols-4">
+                <div class="mini">
+                  <div class="mini-label">Skill 总数</div>
+                  <div class="mini-value">12</div>
+                </div>
+                <div class="mini">
+                  <div class="mini-label">已启用</div>
+                  <div class="mini-value">11</div>
+                </div>
+                <div class="mini">
+                  <div class="mini-label">已停用</div>
+                  <div class="mini-value">1</div>
+                </div>
+                <div class="mini">
+                  <div class="mini-label">配置变量</div>
+                  <div class="mini-value">6</div>
+                </div>
+              </div>
+
+              <div class="split">
+                <div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Skill</th>
+                        <th>来源</th>
+                        <th>状态</th>
+                        <th>配置</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>
+                          <strong>jd-tongrentang-price-watch</strong>
+                          <div class="small muted">同仁堂京东价格监控标准流程</div>
+                        </td>
+                        <td><span class="pill blue">自建</span></td>
+                        <td><span class="pill green">启用</span></td>
+                        <td>3 项</td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <strong>browser-automation</strong>
+                          <div class="small muted">网页自动化辅助能力</div>
+                        </td>
+                        <td><span class="pill">内置</span></td>
+                        <td><span class="pill green">启用</span></td>
+                        <td>0 项</td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <strong>report-export</strong>
+                          <div class="small muted">报告导出与格式化</div>
+                        </td>
+                        <td><span class="pill">外部</span></td>
+                        <td><span class="pill amber">停用</span></td>
+                        <td>2 项</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="panel">
+                  <div class="section-head">
+                    <div>
+                      <div class="panel-title">选中 Skill 详情</div>
+                      <div class="panel-sub">旧右侧详情不删除，只改成高级区内的详情面板。</div>
+                    </div>
+                    <span class="pill green">启用</span>
+                  </div>
+                  <div class="config-row">
+                    <span>路径</span>
+                    <strong>~/.hermes/skills/jd-tongrentang-price-watch</strong>
+                  </div>
+                  <div class="config-row">
+                    <span>平台</span>
+                    <strong>macOS / Windows</strong>
+                  </div>
+                  <div class="config-row">
+                    <span>依赖</span>
+                    <strong>sqlite3, playwright</strong>
+                  </div>
+                  <div class="config-row">
+                    <span>配置变量</span>
+                    <strong>JD_COOKIE, FEISHU_WEBHOOK, PRICE_DB_PATH</strong>
+                  </div>
+                </div>
+              </div>
+
+              <section class="panel">
+                <div class="section-head">
+                  <div>
+                    <div class="panel-title">外部 Skill 目录</div>
+                    <div class="panel-sub">保留添加/移除能力，但它不再作为技能管理首页内容。</div>
+                  </div>
+                  <button>添加目录</button>
+                </div>
+                <div class="audit-list">
+                  <div class="audit-row">
+                    <div>
+                      <strong>~/.hermes/skills</strong>
+                      <div class="small muted">默认 Skill 目录</div>
+                    </div>
+                    <span class="pill green">可用</span>
+                  </div>
+                  <div class="audit-row">
+                    <div>
+                      <strong>~/openclaw/skills</strong>
+                      <div class="small muted">OpenClaw 沉淀 Skill 目录</div>
+                    </div>
+                    <span class="pill green">可用</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </details>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
