@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, h, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  NCard,
   NSpace,
   NButton,
   NIcon,
@@ -14,9 +13,8 @@ import {
   NFormItem,
   NSwitch,
   NAlert,
-  NGrid,
-  NGridItem,
   NPopconfirm,
+  NPopover,
   NText,
   NSpin,
   NTooltip,
@@ -32,7 +30,6 @@ import {
   CreateOutline,
   TrashOutline,
   PauseCircleOutline,
-  CalendarOutline,
   CheckmarkCircleOutline
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
@@ -77,6 +74,8 @@ const search = ref('')
 const showModal = ref(false)
 const editingJob = ref<CronJob | null>(null)
 const priceWorkflowSectionRef = ref<HTMLElement | null>(null)
+const technicalDetailsRef = ref<HTMLElement | null>(null)
+const technicalDetailsOpen = ref(false)
 const activeTaskGroup = ref<TaskGroupKey>('price')
 
 const TASK_GROUP_DEFS: TaskGroupDefinition[] = [
@@ -108,14 +107,6 @@ const filteredJobs = computed(() => {
 })
 
 const enabledCount = computed(() => cronStore.jobs.filter((j) => j.enabled).length)
-const disabledCount = computed(() => cronStore.jobs.filter((j) => !j.enabled).length)
-const runningCount = computed(() => cronStore.jobs.filter((j) => j.state?.runningAtMs).length)
-const failedCount = computed(
-  () => cronStore.jobs.filter((j) => j.enabled && j.state?.lastStatus === 'error').length
-)
-const failedJobs = computed(() =>
-  cronStore.jobs.filter((j) => j.enabled && j.state?.lastStatus === 'error')
-)
 
 function jobActivityMs(job: CronJob): number {
   return Number(
@@ -150,13 +141,26 @@ const recentJobs = computed(() =>
 )
 
 function jobIndexText(job: CronJob): string {
-  return `${job.name} ${job.description || ''} ${job.command || ''}`.toLowerCase()
+  return `${job.name} ${job.description || ''} ${job.command || ''} ${job.schedule || ''}`.toLowerCase()
+}
+
+function isPriceWorkflowText(text: string): boolean {
+  if (/jd-tongrentang-price-watch|tongrentang|price-watch|价格监控|同仁堂/.test(text)) {
+    return true
+  }
+  return Boolean(
+    /(07:20|07：20|07:30|07：30|11:00|11：00|17:00|17：00|17:30|17：30|23:00|23：00|03:00|03：00)/.test(
+      text
+    ) &&
+    /验证门控|快速验证|价格获取|价格采集|主采集|上午缺口|失败数据补采|补录|晚间通知|健康检查|数据备份/.test(
+      text
+    )
+  )
 }
 
 function classifyTaskGroup(job: CronJob): TaskGroupKey {
   const text = jobIndexText(job)
-  if (/jd-tongrentang-price-watch|tongrentang|price-watch|价格监控|同仁堂/.test(text))
-    return 'price'
+  if (isPriceWorkflowText(text)) return 'price'
   if (/backup|sqlite|restore|dump|export|备份|恢复|导出/.test(text)) return 'backup'
   if (/alarm|alert|notify|notification|feishu|webhook|飞书|通知|告警/.test(text)) return 'alert'
   if (
@@ -173,6 +177,10 @@ function jobHasIssue(job: CronJob): boolean {
     job.enabled && (job.state?.lastStatus === 'error' || job.state?.lastStatus === 'skipped')
   )
 }
+
+const issueJobs = computed(() => cronStore.jobs.filter(jobHasIssue))
+const attentionJob = computed(() => issueJobs.value[0] || null)
+const issueCount = computed(() => issueJobs.value.length)
 
 const taskGroupSummaries = computed<TaskGroupSummary[]>(() =>
   TASK_GROUP_DEFS.map((def) => {
@@ -203,26 +211,53 @@ const currentGroupJobs = computed(() =>
   cronStore.jobs.filter((job) => classifyTaskGroup(job) === activeTaskGroup.value)
 )
 
-const priceMonitorJobs = computed(() =>
-  cronStore.jobs.filter((job) => classifyTaskGroup(job) === 'price')
-)
+function formatShortDateTime(value: number | string | Date): string {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return '-'
+  const now = new Date()
+  const tomorrow = new Date(now)
+  tomorrow.setDate(now.getDate() + 1)
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  const nextDay =
+    date.getFullYear() === tomorrow.getFullYear() &&
+    date.getMonth() === tomorrow.getMonth() &&
+    date.getDate() === tomorrow.getDate()
+  const hh = String(date.getHours()).padStart(2, '0')
+  const mm = String(date.getMinutes()).padStart(2, '0')
+  if (sameDay) return `今天 ${hh}:${mm}`
+  if (nextDay) return `明天 ${hh}:${mm}`
+  return `${date.getMonth() + 1}/${date.getDate()} ${hh}:${mm}`
+}
 
 function findPriceStageJob(key: string): CronJob | undefined {
-  const jobs = priceMonitorJobs.value
+  const jobs = cronStore.jobs
   if (key === 'gate')
-    return jobs.find((job) => /verification-gate|验证门控|gate|07:20|07：20/i.test(job.name))
+    return jobs.find((job) =>
+      /verification-gate|验证门控|快速验证|gate|07:20|07：20/i.test(jobIndexText(job))
+    )
   if (key === 'daily') {
     return jobs.find(
       (job) =>
-        /jd-tongrentang-price-watch/i.test(job.name) &&
-        !/verification-gate|gate|backfill|watchdog|evening|alarm|backup|health/i.test(job.name)
+        (/jd-tongrentang-price-watch/i.test(jobIndexText(job)) ||
+          /价格获取|价格采集|主采集|07:30|07：30/i.test(jobIndexText(job))) &&
+        !/verification-gate|gate|backfill|watchdog|audit|evening|alarm|backup|health|07:20|07：20|11:00|11：00|17:00|17：00|17:30|17：30|23:00|23：00|03:00|03：00|验证门控|快速验证|巡检|上午缺口|补录|告警|健康|备份/i.test(
+          jobIndexText(job)
+        )
     )
   }
-  if (key === 'watchdog') return jobs.find((job) => /watchdog|11:00|11：00/i.test(job.name))
-  if (key === 'backfill') return jobs.find((job) => /backfill|补录|17:00|17：00/i.test(job.name))
-  if (key === 'alarm') return jobs.find((job) => /evening|alarm|告警|17:30|17：30/i.test(job.name))
-  if (key === 'health') return jobs.find((job) => /cron-health|health|健康/i.test(job.name))
-  if (key === 'backup') return jobs.find((job) => /backup|备份/i.test(job.name))
+  if (key === 'watchdog')
+    return jobs.find((job) => /watchdog|巡检|上午缺口|11:00|11：00/i.test(jobIndexText(job)))
+  if (key === 'backfill')
+    return jobs.find((job) => /backfill|失败数据补采|补录|17:00|17：00/i.test(jobIndexText(job)))
+  if (key === 'alarm')
+    return jobs.find((job) => /evening|alarm|晚间通知|告警|17:30|17：30/i.test(jobIndexText(job)))
+  if (key === 'health')
+    return jobs.find((job) => /cron-health|health|状态巡检|健康检查|健康/i.test(jobIndexText(job)))
+  if (key === 'backup')
+    return jobs.find((job) => /backup|sqlite 备份|数据备份|备份/i.test(jobIndexText(job)))
   return undefined
 }
 
@@ -280,10 +315,14 @@ const priceWorkflowStages = computed<PriceWorkflowStage[]>(() => {
       type: priceStageType(job),
       status: priceStageStatus(job),
       detail: priceStageDetail(job, def.hint),
-      nextRun: job?.nextRun ? formatDate(job.nextRun) : '-'
+      nextRun: job?.nextRun ? formatShortDateTime(job.nextRun) : '-'
     }
   })
 })
+
+const configuredPriceStageCount = computed(
+  () => priceWorkflowStages.value.filter((stage) => stage.job).length
+)
 
 // Soonest next run
 const nextRunText = computed(() => {
@@ -292,7 +331,7 @@ const nextRunText = computed(() => {
     .map((j) => ({ name: j.name, time: new Date(j.nextRun!).getTime() }))
     .sort((a, b) => a.time - b.time)
   if (!upcoming.length) return '-'
-  return formatRelativeTime(upcoming[0]!.time)
+  return formatShortDateTime(upcoming[0]!.time)
 })
 
 // ── Table columns ──
@@ -664,6 +703,40 @@ async function handleRun(job: CronJob) {
   }
 }
 
+async function focusJobInTechnicalDetails(job: CronJob) {
+  search.value = job.name
+  technicalDetailsOpen.value = true
+  await nextTick()
+  technicalDetailsRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function handleStageAction(stage: PriceWorkflowStage) {
+  if (!stage.job) return
+  if (stage.type === 'success') {
+    focusJobInTechnicalDetails(stage.job)
+    return
+  }
+  handleRun(stage.job)
+}
+
+function stageActionLabel(stage: PriceWorkflowStage): string {
+  if (!stage.job) return '未配置'
+  if (stage.type === 'success') return stage.key === 'gate' ? '运行' : '详情'
+  return stage.key === 'gate' ? '运行' : '补跑'
+}
+
+function syncTechnicalDetailsOpen(event: Event) {
+  technicalDetailsOpen.value = (event.target as HTMLDetailsElement).open
+}
+
+function focusAttentionJob() {
+  if (attentionJob.value) focusJobInTechnicalDetails(attentionJob.value)
+}
+
+function runAttentionJob() {
+  if (attentionJob.value) handleRun(attentionJob.value)
+}
+
 async function handleDelete(job: CronJob) {
   const ok = await cronStore.deleteJob(job.id)
   if (ok) {
@@ -706,415 +779,322 @@ watch(
 </script>
 
 <template>
-  <NSpace vertical :size="12" class="cron-page">
-    <!-- Header -->
-    <NCard class="app-card">
-      <template #header>
-        <NSpace align="center" :size="8">
-          <NIcon :component="CalendarOutline" size="18" />
-          <span>{{ t('pages.cron.title') }}</span>
-        </NSpace>
-      </template>
-      <template #header-extra>
-        <NSpace :size="8">
-          <NButton size="small" :loading="cronStore.loading" @click="handleRefresh">
-            <template #icon><NIcon :component="RefreshOutline" /></template>
-          </NButton>
-          <NButton size="small" type="primary" @click="handleCreate">
-            <template #icon><NIcon :component="AddOutline" /></template>
-            {{ t('pages.cron.actions.createJob') }}
-          </NButton>
-        </NSpace>
-      </template>
-
-      <!-- Stats -->
-      <NGrid cols="1 s:2 m:4" responsive="screen" :x-gap="8" :y-gap="8" style="margin-bottom: 12px">
-        <NGridItem>
-          <div class="console-metric-tile">
-            <div class="console-metric-label">{{ t('pages.cron.stats.totalJobs') }}</div>
-            <div class="console-metric-value">{{ cronStore.jobs.length }}</div>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="console-metric-tile">
-            <div class="console-metric-label">{{ t('pages.cron.stats.enabledJobs') }}</div>
-            <div class="console-metric-value">
-              <NText :type="enabledCount > 0 ? 'success' : undefined">{{ enabledCount }}</NText>
-            </div>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="console-metric-tile">
-            <div class="console-metric-label">{{ t('pages.cron.stats.disabledJobs') }}</div>
-            <div class="console-metric-value">
-              <NText :type="disabledCount > 0 ? 'warning' : undefined">{{ disabledCount }}</NText>
-            </div>
-          </div>
-        </NGridItem>
-        <NGridItem>
-          <div class="console-metric-tile">
-            <div class="console-metric-label">{{ t('pages.cron.stats.nextRun') }}</div>
-            <div class="console-metric-value console-metric-value--small">
-              <NText type="info">{{ nextRunText }}</NText>
-            </div>
-          </div>
-        </NGridItem>
-      </NGrid>
-
-      <!-- Quick templates -->
-      <NAlert :closable="false" type="default" style="margin-bottom: 12px">
-        <template #header>{{ t('pages.cron.quickTemplates') }}</template>
-        <NSpace :size="8">
-          <NButton
-            size="small"
-            @click="
-              handleTemplate({
-                name: t('pages.cron.templates.morningReport.label'),
-                schedule: '0 7 * * *',
-                prompt: t('pages.cron.templates.morningReport.payloadText')
-              })
-            "
-          >
-            {{ t('pages.cron.templates.morningReport.label') }}
-          </NButton>
-          <NButton
-            size="small"
-            @click="
-              handleTemplate({
-                name: t('pages.cron.templates.heartbeatCheck.label'),
-                schedule: '*/30 * * * *',
-                prompt: t('pages.cron.templates.heartbeatCheck.payloadText')
-              })
-            "
-          >
-            {{ t('pages.cron.templates.heartbeatCheck.label') }}
-          </NButton>
-          <NButton
-            size="small"
-            @click="
-              handleTemplate({
-                name: t('pages.cron.templates.mainReminder.label'),
-                schedule: '0 9,14,18 * * 1-5',
-                prompt: t('pages.cron.templates.mainReminder.payloadText')
-              })
-            "
-          >
-            {{ t('pages.cron.templates.mainReminder.label') }}
-          </NButton>
-        </NSpace>
-      </NAlert>
-
-      <!-- Failure recovery -->
-      <NCard
-        v-if="failedJobs.length"
-        embedded
-        :bordered="false"
-        size="small"
-        style="border-radius: 8px; margin-bottom: 12px"
-      >
-        <template #header>
-          <NSpace align="center" :size="8">
-            <NText strong>失败恢复流程</NText>
-            <NTag size="small" type="error" round :bordered="false"
-              >{{ failedJobs.length }} 个失败任务</NTag
+  <div class="cron-page">
+    <section class="cron-hero">
+      <div>
+        <div class="cron-eyebrow">任务计划</div>
+        <h1>按业务流处理任务</h1>
+        <p>闭环状态、下一步动作和技术细节集中在一页处理。</p>
+      </div>
+      <div class="cron-hero-actions">
+        <NButton :loading="cronStore.loading" secondary @click="handleRefresh">
+          <template #icon><NIcon :component="RefreshOutline" /></template>
+          刷新
+        </NButton>
+        <NPopover trigger="click" placement="bottom-end" :show-arrow="false">
+          <template #trigger>
+            <NButton type="primary">
+              <template #icon><NIcon :component="AddOutline" /></template>
+              新建任务
+            </NButton>
+          </template>
+          <div class="template-menu">
+            <div class="template-menu-title">选择模板</div>
+            <button
+              type="button"
+              class="template-row"
+              @click="
+                handleTemplate({
+                  name: t('pages.cron.templates.morningReport.label'),
+                  schedule: '0 7 * * *',
+                  prompt: t('pages.cron.templates.morningReport.payloadText')
+                })
+              "
             >
-          </NSpace>
-        </template>
-        <div class="recovery-grid">
-          <div v-for="job in failedJobs" :key="`recovery-${job.id}`" class="recovery-card">
-            <div class="recovery-head">
-              <NText strong>{{ job.name }}</NText>
-              <NTag size="small" type="error" round :bordered="false">失败</NTag>
-            </div>
-            <NText type="error" class="recovery-error">{{
-              job.state?.lastError || '未知错误'
-            }}</NText>
-            <NText depth="3" class="recovery-advice">{{ recoveryAdvice(job) }}</NText>
-            <NSpace :size="8">
-              <NButton size="tiny" type="primary" secondary @click="handleRun(job)">
-                <template #icon><NIcon :component="PlayOutline" /></template>
-                一键补跑
-              </NButton>
-              <NButton size="tiny" secondary @click="search = job.name"> 定位任务 </NButton>
-            </NSpace>
-          </div>
-        </div>
-      </NCard>
-
-      <!-- Task workbench -->
-      <div ref="priceWorkflowSectionRef" class="cron-section-anchor task-workbench">
-        <div class="task-group-nav" role="tablist" aria-label="任务业务分组">
-          <button
-            v-for="group in taskGroupSummaries"
-            :key="group.key"
-            type="button"
-            class="task-group-button"
-            :class="{ 'task-group-button--active': activeTaskGroup === group.key }"
-            role="tab"
-            :aria-selected="activeTaskGroup === group.key"
-            @click="selectTaskGroup(group.key)"
-          >
-            <span class="task-group-main">
-              <span class="task-group-title">{{ group.label }}</span>
-              <NTag size="small" :type="group.statusType" round :bordered="false">
-                {{ group.issueCount ? `${group.issueCount} 异常` : group.count ? 'OK' : '空' }}
-              </NTag>
-            </span>
-            <span class="task-group-desc">{{ group.description }}</span>
-            <span class="task-group-meta"
-              >{{ group.count }} 个任务 · 下次 {{ group.nextRunText }}</span
+              <span>
+                <strong>{{ t('pages.cron.templates.morningReport.label') }}</strong>
+                <small>07:00 触发，适合固定摘要。</small>
+              </span>
+              <span class="template-use">使用</span>
+            </button>
+            <button
+              type="button"
+              class="template-row"
+              @click="
+                handleTemplate({
+                  name: t('pages.cron.templates.heartbeatCheck.label'),
+                  schedule: '*/30 * * * *',
+                  prompt: t('pages.cron.templates.heartbeatCheck.payloadText')
+                })
+              "
             >
-          </button>
+              <span>
+                <strong>{{ t('pages.cron.templates.heartbeatCheck.label') }}</strong>
+                <small>每 30 分钟检查服务可用性。</small>
+              </span>
+              <span class="template-use">使用</span>
+            </button>
+            <button
+              type="button"
+              class="template-row"
+              @click="
+                handleTemplate({
+                  name: t('pages.cron.templates.mainReminder.label'),
+                  schedule: '0 9,14,18 * * 1-5',
+                  prompt: t('pages.cron.templates.mainReminder.payloadText')
+                })
+              "
+            >
+              <span>
+                <strong>{{ t('pages.cron.templates.mainReminder.label') }}</strong>
+                <small>工作日 09:00 / 14:00 / 18:00。</small>
+              </span>
+              <span class="template-use">使用</span>
+            </button>
+            <NButton block secondary size="small" @click="handleCreate">自定义任务</NButton>
+          </div>
+        </NPopover>
+      </div>
+    </section>
+
+    <section class="cron-summary-strip" aria-label="任务状态摘要">
+      <div class="cron-metric">
+        <span>业务分组</span>
+        <strong>{{ TASK_GROUP_DEFS.length }}</strong>
+      </div>
+      <div class="cron-metric">
+        <span>启用任务</span>
+        <strong>{{ enabledCount }}</strong>
+      </div>
+      <div class="cron-metric">
+        <span>需处理</span>
+        <strong :class="{ 'metric-warning': issueCount }">{{ issueCount }}</strong>
+      </div>
+      <div class="cron-metric">
+        <span>下次运行</span>
+        <strong class="metric-time">{{ nextRunText }}</strong>
+      </div>
+    </section>
+
+    <section v-if="attentionJob" class="cron-attention" aria-label="待处理任务">
+      <div class="attention-copy">
+        <div class="attention-title">{{ attentionJob.name }} 需要确认</div>
+        <p>{{ attentionJob.state?.lastError || recoveryAdvice(attentionJob) }}</p>
+      </div>
+      <div class="attention-actions">
+        <NButton secondary @click="focusAttentionJob">定位日志</NButton>
+        <NButton type="primary" @click="runAttentionJob">
+          <template #icon><NIcon :component="PlayOutline" /></template>
+          一键补跑
+        </NButton>
+      </div>
+    </section>
+
+    <section ref="priceWorkflowSectionRef" class="cron-section-anchor task-workbench">
+      <div class="task-group-nav" role="tablist" aria-label="任务业务分组">
+        <button
+          v-for="group in taskGroupSummaries"
+          :key="group.key"
+          type="button"
+          class="task-group-button"
+          :class="{ 'task-group-button--active': activeTaskGroup === group.key }"
+          role="tab"
+          :aria-selected="activeTaskGroup === group.key"
+          @click="selectTaskGroup(group.key)"
+        >
+          <span class="task-group-main">
+            <span class="task-group-title">{{ group.label }}</span>
+            <NTag size="small" :type="group.statusType" round :bordered="false">
+              {{ group.issueCount ? `${group.issueCount} 异常` : group.count ? 'OK' : '空' }}
+            </NTag>
+          </span>
+          <span class="task-group-desc">{{ group.description }}</span>
+          <span class="task-group-meta"
+            >{{ group.count }} 个任务 · 下次 {{ group.nextRunText }}</span
+          >
+        </button>
+      </div>
+
+      <div class="task-group-panel" role="tabpanel">
+        <div class="task-panel-head">
+          <div>
+            <NText strong class="task-panel-title">
+              {{ activeTaskGroup === 'price' ? '价格监控闭环' : currentTaskGroup.label }}
+            </NText>
+            <NText depth="3" class="task-panel-note">
+              {{
+                activeTaskGroup === 'price'
+                  ? '验证、采集、补录、告警和健康检查集中处理。'
+                  : currentTaskGroup.description
+              }}
+            </NText>
+          </div>
+          <NTag
+            size="small"
+            :type="
+              currentTaskGroup.issueCount
+                ? 'warning'
+                : currentTaskGroup.count
+                  ? 'success'
+                  : 'default'
+            "
+            round
+            :bordered="false"
+          >
+            {{
+              currentTaskGroup.issueCount
+                ? `${currentTaskGroup.issueCount} 项需关注`
+                : `${currentTaskGroup.count} 个任务`
+            }}
+          </NTag>
         </div>
 
-        <div class="task-group-panel" role="tabpanel">
-          <div class="task-panel-head">
-            <div>
-              <NText strong class="task-panel-title">{{ currentTaskGroup.label }}</NText>
-              <NText depth="3" class="task-panel-note">{{ currentTaskGroup.description }}</NText>
-            </div>
-            <NSpace :size="8">
-              <NTag
-                size="small"
-                :type="
-                  currentTaskGroup.issueCount
-                    ? 'warning'
-                    : currentTaskGroup.count
-                      ? 'success'
-                      : 'default'
-                "
-                round
-                :bordered="false"
-              >
-                {{
-                  currentTaskGroup.issueCount
-                    ? `${currentTaskGroup.issueCount} 项需关注`
-                    : `${currentTaskGroup.count} 个任务`
-                }}
-              </NTag>
-              <NButton
-                v-if="activeTaskGroup === 'price' && priceMonitorJobs.length"
-                size="small"
-                secondary
-                @click="search = 'jd-tongrentang'"
-              >
-                筛选任务
-              </NButton>
-            </NSpace>
-          </div>
-
-          <template v-if="activeTaskGroup === 'price'">
-            <div class="price-workflow-grid">
-              <div
-                v-for="stage in priceWorkflowStages"
-                :key="stage.key"
-                class="price-workflow-card"
-              >
-                <div class="price-workflow-head">
-                  <NText strong>{{ stage.label }}</NText>
-                  <NTag size="small" :type="stage.type" round :bordered="false">{{
-                    stage.status
-                  }}</NTag>
-                </div>
-                <NText depth="3" class="price-workflow-hint">{{ stage.hint }}</NText>
+        <template v-if="activeTaskGroup === 'price'">
+          <div class="workflow-list">
+            <div v-for="stage in priceWorkflowStages" :key="stage.key" class="workflow-row">
+              <div class="workflow-copy">
+                <NText strong class="workflow-title">{{ stage.label }}</NText>
+                <NText depth="3" class="workflow-hint">{{ stage.hint }}</NText>
                 <NText
-                  class="price-workflow-detail"
+                  v-if="stage.detail"
+                  class="workflow-detail"
                   :type="stage.type === 'error' ? 'error' : undefined"
                 >
                   {{ stage.detail }}
                 </NText>
-                <NText depth="3" class="price-workflow-next">下次 {{ stage.nextRun }}</NText>
-                <div class="price-workflow-actions">
-                  <NButton
-                    size="tiny"
-                    secondary
-                    :disabled="!stage.job"
-                    @click="stage.job ? handleRun(stage.job) : undefined"
-                  >
-                    <template #icon><NIcon :component="PlayOutline" /></template>
-                    补跑
-                  </NButton>
-                  <NButton v-if="stage.job" size="tiny" text @click="search = stage.job.name">
-                    定位
-                  </NButton>
-                </div>
               </div>
+              <NTag class="workflow-status" size="small" :type="stage.type" round :bordered="false">
+                {{ stage.status }}
+              </NTag>
+              <NText depth="3" class="workflow-time">{{ stage.nextRun }}</NText>
+              <NButton
+                size="small"
+                :type="stage.type === 'error' || stage.type === 'warning' ? 'primary' : 'default'"
+                :secondary="stage.type === 'success'"
+                :disabled="!stage.job"
+                @click="handleStageAction(stage)"
+              >
+                <template #icon><NIcon :component="PlayOutline" /></template>
+                {{ stageActionLabel(stage) }}
+              </NButton>
             </div>
+          </div>
 
-            <NAlert
-              v-if="!priceMonitorJobs.length"
-              type="warning"
-              :closable="false"
-              style="margin-top: 12px"
+          <NAlert
+            v-if="!configuredPriceStageCount"
+            type="warning"
+            :closable="false"
+            style="margin-top: 12px"
+          >
+            未发现 jd-tongrentang-price-watch 相关 Cron 任务。请先确认自建 skill 已同步，并检查 Cron
+            jobs 配置。
+          </NAlert>
+        </template>
+
+        <div v-else class="workflow-list">
+          <div v-for="job in currentGroupJobs" :key="`group-${job.id}`" class="workflow-row">
+            <div class="workflow-copy">
+              <NText strong class="workflow-title">{{ job.name }}</NText>
+              <NText depth="3" class="workflow-hint">
+                {{ job.description || job.command || '未填写说明' }}
+              </NText>
+              <NText v-if="job.state?.lastError" type="error" class="workflow-detail">
+                {{ job.state.lastError }}
+              </NText>
+            </div>
+            <NTag
+              class="workflow-status"
+              size="small"
+              :type="cronStatusType(job)"
+              round
+              :bordered="false"
             >
-              未发现 jd-tongrentang-price-watch 相关 Cron 任务。请先确认自建 skill 已同步，并检查
-              Cron jobs 配置。
-            </NAlert>
-          </template>
+              {{ cronStatusLabel(job) }}
+            </NTag>
+            <NText depth="3" class="workflow-time">
+              {{ job.nextRun ? formatShortDateTime(job.nextRun) : '-' }}
+            </NText>
+            <NButton
+              size="small"
+              secondary
+              @click="jobHasIssue(job) ? handleRun(job) : focusJobInTechnicalDetails(job)"
+            >
+              <template #icon
+                ><NIcon :component="jobHasIssue(job) ? PlayOutline : CreateOutline"
+              /></template>
+              {{ jobHasIssue(job) ? '补跑' : '详情' }}
+            </NButton>
+          </div>
+          <NAlert v-if="!currentGroupJobs.length" type="default" :closable="false">
+            当前分组暂无任务。新建任务后会按名称、描述和命令自动归类到这里。
+          </NAlert>
+        </div>
+      </div>
+    </section>
 
-          <div v-else class="task-group-job-list">
-            <div v-if="currentGroupJobs.length" class="task-group-jobs">
-              <div v-for="job in currentGroupJobs" :key="`group-${job.id}`" class="cron-mini-row">
-                <div class="cron-mini-main">
-                  <NText strong class="cron-mini-name">{{ job.name }}</NText>
-                  <NTag size="small" :type="cronStatusType(job)" round :bordered="false">{{
-                    cronStatusLabel(job)
-                  }}</NTag>
-                </div>
-                <NText depth="3" class="cron-mini-detail">
-                  下次 {{ job.nextRun ? formatDate(job.nextRun) : '-' }} · 上次
-                  {{ cronRelativeTime(job.state?.lastRunAtMs) }}
-                </NText>
-                <NText v-if="job.state?.lastError" type="error" class="cron-mini-error">
-                  {{ job.state.lastError }}
-                </NText>
-              </div>
+    <details
+      ref="technicalDetailsRef"
+      class="cron-advanced"
+      :open="technicalDetailsOpen"
+      @toggle="syncTechnicalDetailsOpen"
+    >
+      <summary>
+        <span>Cron 技术表与最近执行</span>
+        <span class="advanced-label">高级明细</span>
+      </summary>
+      <div class="advanced-body">
+        <div v-if="recentJobs.length" class="recent-strip">
+          <div v-for="job in recentJobs" :key="`recent-${job.id}`" class="recent-item">
+            <div class="recent-main">
+              <NText strong>{{ job.name }}</NText>
+              <NTag size="small" :type="cronStatusType(job)" round :bordered="false">
+                {{ cronStatusLabel(job) }}
+              </NTag>
             </div>
-            <NAlert v-else type="default" :closable="false">
-              当前分组暂无任务。新建任务后会按名称、描述和命令自动归类到这里。
-            </NAlert>
+            <NText depth="3" class="recent-meta">
+              上次 {{ cronRelativeTime(job.state?.lastRunAtMs) }}
+              <template v-if="job.state?.lastDurationMs != null">
+                · {{ (job.state.lastDurationMs / 1000).toFixed(1) }}s
+              </template>
+            </NText>
           </div>
         </div>
-      </div>
 
-      <!-- Operational health -->
-      <NGrid cols="1 l:2" responsive="screen" :x-gap="12" :y-gap="12" style="margin-bottom: 12px">
-        <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px">
-            <template #header>
-              <NSpace align="center" :size="8">
-                <NText strong>最近执行</NText>
-                <NTag
-                  size="small"
-                  :type="failedCount ? 'error' : runningCount ? 'info' : 'success'"
-                  round
-                  :bordered="false"
-                >
-                  {{
-                    failedCount
-                      ? `${failedCount} 个失败`
-                      : runningCount
-                        ? `${runningCount} 个运行中`
-                        : '正常'
-                  }}
-                </NTag>
-              </NSpace>
-            </template>
-            <NSpace v-if="recentJobs.length" vertical :size="8">
-              <div v-for="job in recentJobs" :key="`recent-${job.id}`" class="cron-mini-row">
-                <div class="cron-mini-main">
-                  <NText strong class="cron-mini-name">{{ job.name }}</NText>
-                  <NTag size="small" :type="cronStatusType(job)" round :bordered="false">{{
-                    cronStatusLabel(job)
-                  }}</NTag>
-                </div>
-                <NText depth="3" class="cron-mini-detail">
-                  上次 {{ cronRelativeTime(job.state?.lastRunAtMs) }}
-                  <template v-if="job.state?.lastDurationMs != null">
-                    · {{ (job.state.lastDurationMs / 1000).toFixed(1) }}s
-                  </template>
-                  <template v-if="job.state?.consecutiveErrors">
-                    · 连续失败 {{ job.state.consecutiveErrors }} 次
-                  </template>
-                </NText>
-                <NText v-if="job.state?.lastError" type="error" class="cron-mini-error">
-                  {{ job.state.lastError }}
-                </NText>
-              </div>
-            </NSpace>
-            <NText v-else depth="3">暂无执行记录</NText>
-          </NCard>
-        </NGridItem>
-
-        <NGridItem>
-          <NCard embedded :bordered="false" size="small" style="border-radius: 10px">
-            <template #header>
-              <NSpace align="center" :size="8">
-                <NText strong>价格监控任务</NText>
-                <NTag
-                  size="small"
-                  :type="priceMonitorJobs.length ? 'success' : 'warning'"
-                  round
-                  :bordered="false"
-                >
-                  {{ priceMonitorJobs.length }} 个
-                </NTag>
-              </NSpace>
-            </template>
-            <NSpace v-if="priceMonitorJobs.length" vertical :size="8">
-              <div v-for="job in priceMonitorJobs" :key="`price-${job.id}`" class="cron-mini-row">
-                <div class="cron-mini-main">
-                  <NText strong class="cron-mini-name">{{ job.name }}</NText>
-                  <NTag size="small" :type="cronStatusType(job)" round :bordered="false">{{
-                    cronStatusLabel(job)
-                  }}</NTag>
-                </div>
-                <NText depth="3" class="cron-mini-detail">
-                  下次 {{ job.nextRun ? formatDate(job.nextRun) : '-' }} · 上次
-                  {{ cronRelativeTime(job.state?.lastRunAtMs) }}
-                </NText>
-                <NText v-if="job.state?.lastError" type="error" class="cron-mini-error">
-                  {{ job.state.lastError }}
-                </NText>
-              </div>
-            </NSpace>
-            <NAlert v-else type="warning" :closable="false">
-              未发现 jd-tongrentang-price-watch 相关任务，请检查自建 skill 和 Cron 配置是否已同步。
-            </NAlert>
-          </NCard>
-        </NGridItem>
-      </NGrid>
-
-      <div class="table-context">
-        <div>
-          <NText strong>{{ currentTaskGroup.label }}任务明细</NText>
-          <NText depth="3" class="table-context-note">查看、补跑、启停和编辑当前分组任务。</NText>
+        <div class="tech-toolbar">
+          <NInput
+            v-model:value="search"
+            :placeholder="`${currentTaskGroup.label}内搜索 Cron 任务`"
+            clearable
+            size="small"
+          />
+          <NButton size="small" secondary @click="search = ''">清空筛选</NButton>
         </div>
-        <NButton
-          v-if="activeTaskGroup !== 'price'"
-          size="small"
-          secondary
-          @click="selectTaskGroup('price')"
-        >
-          回到价格监控
-        </NButton>
+
+        <NSpin :show="cronStore.loading">
+          <NDataTable
+            :columns="columns"
+            :data="filteredJobs"
+            :row-key="(row: CronJob) => row.id"
+            :render-expand="renderExpand"
+            :bordered="false"
+            :single-line="false"
+            size="small"
+            :scroll-x="980"
+          />
+          <NText
+            v-if="!cronStore.loading && cronStore.jobs.length === 0"
+            depth="3"
+            style="display: block; text-align: center; padding: 24px 0"
+          >
+            {{ t('pages.cron.jobs.emptyHint') }}
+          </NText>
+        </NSpin>
       </div>
+    </details>
 
-      <!-- Search -->
-      <NInput
-        v-model:value="search"
-        :placeholder="`${currentTaskGroup.label}内搜索任务`"
-        clearable
-        size="small"
-        style="margin-bottom: 12px"
-      />
-
-      <!-- Jobs table -->
-      <NSpin :show="cronStore.loading">
-        <NDataTable
-          :columns="columns"
-          :data="filteredJobs"
-          :row-key="(row: CronJob) => row.id"
-          :render-expand="renderExpand"
-          :bordered="false"
-          :single-line="false"
-          size="small"
-          :scroll-x="980"
-        />
-        <NText
-          v-if="!cronStore.loading && cronStore.jobs.length === 0"
-          depth="3"
-          style="display: block; text-align: center; padding: 24px 0"
-        >
-          {{ t('pages.cron.jobs.emptyHint') }}
-        </NText>
-      </NSpin>
-
-      <!-- Error -->
-      <NAlert v-if="cronStore.lastError" type="error" :closable="true" style="margin-top: 12px">
-        {{ t('pages.cron.requestFailed', { error: cronStore.lastError }) }}
-      </NAlert>
-    </NCard>
+    <NAlert v-if="cronStore.lastError" type="error" :closable="true" style="margin-top: 12px">
+      {{ t('pages.cron.requestFailed', { error: cronStore.lastError }) }}
+    </NAlert>
 
     <!-- Create / Edit Modal -->
     <NModal
@@ -1157,16 +1137,165 @@ watch(
         </NSpace>
       </template>
     </NModal>
-  </NSpace>
+  </div>
 </template>
 
 <style scoped>
 .cron-page {
   font-size: var(--font-body);
+  display: grid;
+  gap: var(--ui-gap);
 }
 
-.console-metric-value--small {
+.cron-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ui-gap);
+  align-items: start;
+}
+
+.cron-eyebrow {
+  color: var(--n-text-color-3);
+  font-size: var(--font-body-sm);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.cron-hero h1 {
+  margin: 0;
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.cron-hero p {
+  margin: 12px 0 0;
+  color: var(--n-text-color-3);
+  font-size: var(--font-body);
+  line-height: 1.7;
+}
+
+.cron-hero-actions,
+.attention-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-gap-sm);
+}
+
+.template-menu {
+  width: 320px;
+  max-width: calc(100vw - 48px);
+}
+
+.template-menu-title {
+  font-weight: 800;
+  margin-bottom: var(--ui-gap-sm);
+}
+
+.template-row {
+  appearance: none;
+  width: 100%;
+  border: 1px solid var(--n-border-color);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--n-text-color);
+  padding: 10px;
+  margin-bottom: var(--ui-gap-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-row:hover {
+  border-color: rgba(99, 226, 183, 0.44);
+  background: rgba(99, 226, 183, 0.08);
+}
+
+.template-row strong,
+.template-row small {
+  display: block;
+}
+
+.template-row small {
+  color: var(--n-text-color-3);
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.template-use {
+  color: var(--n-primary-color);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cron-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ui-gap-sm);
+}
+
+.cron-metric {
+  border: 1px solid var(--n-border-color);
+  border-radius: var(--radius);
+  background: var(--n-card-color);
+  padding: var(--ui-panel-padding-sm) 14px;
+  min-width: 0;
+}
+
+.cron-metric span {
+  display: block;
+  color: var(--n-text-color-3);
+  font-size: var(--font-body-sm);
+  font-weight: 700;
+}
+
+.cron-metric strong {
+  display: block;
+  margin-top: 8px;
   font-size: var(--font-section-title);
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-warning {
+  color: #f2c66d;
+}
+
+.metric-time {
+  font-size: var(--font-card-title) !important;
+}
+
+.cron-attention {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-gap);
+  border: 1px solid rgba(242, 198, 109, 0.55);
+  border-radius: var(--radius);
+  background: rgba(242, 198, 109, 0.13);
+  padding: var(--ui-panel-padding-sm) 14px;
+}
+
+.attention-copy {
+  min-width: 0;
+}
+
+.attention-title {
+  font-size: var(--font-card-title);
+  font-weight: 800;
+}
+
+.attention-copy p {
+  margin: 6px 0 0;
+  color: var(--n-text-color-3);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .cron-section-anchor {
@@ -1175,7 +1304,7 @@ watch(
 
 .task-workbench {
   display: grid;
-  grid-template-columns: 204px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: var(--ui-gap);
   margin-bottom: var(--ui-gap);
   align-items: start;
@@ -1192,15 +1321,14 @@ watch(
   border-radius: var(--radius);
   background: var(--n-card-color);
   color: var(--n-text-color);
-  padding: 10px;
+  padding: 12px;
   text-align: left;
   display: grid;
-  gap: 5px;
+  gap: 6px;
   cursor: pointer;
   transition:
     border-color 0.16s ease,
-    background-color 0.16s ease,
-    transform 0.16s ease;
+    background-color 0.16s ease;
 }
 
 .task-group-button:hover {
@@ -1210,7 +1338,7 @@ watch(
 
 .task-group-button--active {
   border-color: rgba(99, 226, 183, 0.64);
-  background: rgba(99, 226, 183, 0.12);
+  background: rgba(99, 226, 183, 0.14);
 }
 
 .task-group-main {
@@ -1243,7 +1371,7 @@ watch(
 }
 
 .task-panel-head,
-.table-context {
+.recent-main {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1252,97 +1380,139 @@ watch(
 }
 
 .task-panel-title,
-.task-panel-note,
-.table-context-note {
+.task-panel-note {
   display: block;
 }
 
-.task-panel-note,
-.table-context-note {
+.task-panel-title {
+  font-size: var(--font-section-title);
+}
+
+.task-panel-note {
   margin-top: 4px;
   font-size: var(--font-body-sm);
   line-height: 1.4;
 }
 
-.task-group-job-list {
-  min-width: 0;
-}
-
-.task-group-jobs {
+.workflow-list {
   display: grid;
-  gap: 2px;
-}
-
-.price-workflow-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
   gap: var(--ui-gap-sm);
 }
 
-.recovery-grid {
+.workflow-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ui-gap-sm);
-}
-
-.recovery-card {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--ui-gap);
   border: 1px solid var(--n-border-color);
   border-radius: var(--radius);
-  padding: var(--ui-panel-padding-sm) 12px;
+  background: rgba(0, 0, 0, 0.12);
+  padding: 12px;
   min-width: 0;
 }
 
-.recovery-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.workflow-copy {
+  min-width: 0;
 }
 
-.recovery-error,
-.recovery-advice {
+.workflow-title,
+.workflow-hint,
+.workflow-detail {
   display: block;
-  margin-top: 8px;
+}
+
+.workflow-title {
+  font-size: var(--font-card-title);
+}
+
+.workflow-hint,
+.workflow-detail {
+  margin-top: 4px;
   font-size: var(--font-body-sm);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
-.recovery-advice {
-  margin-bottom: 10px;
+.workflow-status {
+  min-width: 58px;
+  justify-content: center;
 }
 
-.price-workflow-card {
+.workflow-time {
+  white-space: nowrap;
+  min-width: 74px;
+}
+
+.cron-advanced {
   border: 1px solid var(--n-border-color);
   border-radius: var(--radius);
-  padding: var(--ui-panel-padding-sm) 12px;
-  min-width: 0;
   background: var(--n-card-color);
+  overflow: hidden;
+  scroll-margin-top: 16px;
 }
 
-.price-workflow-head {
+.cron-advanced summary {
+  list-style: none;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--ui-gap);
+  padding: 14px var(--ui-panel-padding);
+  font-weight: 800;
+}
+
+.cron-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-label {
+  color: var(--n-text-color-3);
+  font-size: var(--font-body-sm);
+  font-weight: 600;
+}
+
+.advanced-body {
+  border-top: 1px solid var(--n-border-color);
+  padding: var(--ui-panel-padding);
+}
+
+.recent-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ui-gap-sm);
+  margin-bottom: var(--ui-gap);
+}
+
+.recent-item {
+  border: 1px solid var(--n-border-color);
+  border-radius: var(--radius);
+  padding: 10px;
   min-width: 0;
 }
 
-.price-workflow-hint,
-.price-workflow-detail,
-.price-workflow-next {
-  display: block;
-  margin-top: 8px;
-  font-size: var(--font-body-sm);
-  line-height: 1.45;
-  overflow-wrap: anywhere;
+.recent-main {
+  align-items: center;
+  margin-bottom: 5px;
 }
 
-.price-workflow-actions {
+.recent-main :deep(.n-text) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-meta {
+  display: block;
+  font-size: var(--font-body-sm);
+  line-height: 1.45;
+}
+
+.tech-toolbar {
   display: flex;
   align-items: center;
   gap: var(--ui-gap-sm);
-  margin-top: 10px;
+  margin-bottom: var(--ui-gap-sm);
 }
 
 .cron-mini-row {
@@ -1381,27 +1551,49 @@ watch(
 }
 
 @media (max-width: 900px) {
+  .cron-hero,
   .task-workbench {
     grid-template-columns: 1fr;
   }
 
-  .price-workflow-grid {
+  .cron-hero-actions,
+  .attention-actions {
+    justify-content: flex-start;
+  }
+
+  .cron-summary-strip,
+  .recent-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .recovery-grid {
+  .cron-attention,
+  .workflow-row {
     grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .workflow-time {
+    white-space: normal;
   }
 }
 
 @media (max-width: 560px) {
-  .price-workflow-grid {
+  .cron-summary-strip,
+  .recent-strip {
     grid-template-columns: 1fr;
   }
 
   .task-panel-head,
-  .table-context {
+  .tech-toolbar,
+  .cron-hero-actions,
+  .attention-actions {
     display: grid;
+  }
+
+  .cron-hero-actions :deep(.n-button),
+  .attention-actions :deep(.n-button),
+  .tech-toolbar :deep(.n-button) {
+    width: 100%;
   }
 }
 </style>

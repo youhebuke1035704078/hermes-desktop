@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hermes Desktop - 任务计划删减版 Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0d0f12;
+        --panel: #17191d;
+        --panel-2: #1e2026;
+        --panel-3: #111317;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-strong: rgba(255, 255, 255, 0.18);
+        --text: #f1f3f5;
+        --muted: #a7adb7;
+        --muted-2: #767d88;
+        --green: #61e2b7;
+        --green-soft: rgba(97, 226, 183, 0.14);
+        --blue: #78b7ff;
+        --blue-soft: rgba(120, 183, 255, 0.13);
+        --amber: #f2c66d;
+        --amber-soft: rgba(242, 198, 109, 0.14);
+        --red: #ff7c86;
+        --red-soft: rgba(255, 124, 134, 0.14);
+        --shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'PingFang SC',
+          'Microsoft YaHei',
+          sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        border: 1px solid transparent;
+        border-radius: 6px;
+        padding: 9px 13px;
+        background: #2a2d34;
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: var(--line-strong);
+      }
+
+      button.primary {
+        background: var(--green);
+        color: #07110e;
+        font-weight: 760;
+      }
+
+      button.secondary {
+        background: transparent;
+        border-color: var(--line-strong);
+      }
+
+      button.ghost {
+        background: transparent;
+        color: var(--muted);
+        padding-inline: 8px;
+      }
+
+      .app {
+        display: grid;
+        min-height: 100vh;
+        grid-template-columns: 244px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--line);
+        background: #111318;
+        padding: 18px 14px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 30px;
+      }
+
+      .brand img {
+        width: 38px;
+        height: 38px;
+        border-radius: 9px;
+        object-fit: cover;
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.16),
+          0 10px 22px rgba(0, 0, 0, 0.32);
+      }
+
+      .brand-title {
+        font-size: 17px;
+        font-weight: 820;
+      }
+
+      .brand-sub {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 2px;
+      }
+
+      .nav {
+        display: grid;
+        gap: 8px;
+      }
+
+      .nav a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 42px;
+        padding: 10px 12px;
+        border-radius: 7px;
+        color: #d7dbe1;
+        text-decoration: none;
+        font-weight: 720;
+      }
+
+      .nav a.active {
+        background: #17332c;
+        color: var(--green);
+      }
+
+      .nav-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: 0.9;
+      }
+
+      .sidebar-focus {
+        margin-top: 28px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .sidebar-focus strong {
+        display: block;
+        color: var(--text);
+        margin-bottom: 4px;
+      }
+
+      .main {
+        min-width: 0;
+      }
+
+      .topbar {
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        padding: 0 28px;
+        background: rgba(18, 20, 24, 0.78);
+      }
+
+      .breadcrumb {
+        color: var(--muted);
+        font-weight: 660;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .model-pill,
+      .version-pill,
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: #2a2d34;
+        color: #d6d9de;
+        font-weight: 720;
+        white-space: nowrap;
+      }
+
+      .model-pill {
+        background: #123126;
+        color: var(--green);
+      }
+
+      .content {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: start;
+        margin-bottom: 18px;
+      }
+
+      .eyebrow {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 760;
+        margin-bottom: 8px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(32px, 4vw, 48px);
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      .hero p {
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.7;
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      .status-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 14px;
+      }
+
+      .metric-label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .metric-value {
+        margin-top: 8px;
+        font-size: 22px;
+        font-weight: 820;
+      }
+
+      .attention {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 1px solid rgba(242, 198, 109, 0.5);
+        background: var(--amber-soft);
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+      }
+
+      .attention-title {
+        font-size: 16px;
+        font-weight: 820;
+      }
+
+      .attention-copy {
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+      }
+
+      .groups,
+      .panel,
+      .folded,
+      .review-note {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .groups {
+        padding: 10px;
+        position: sticky;
+        top: 82px;
+      }
+
+      .group-btn {
+        width: 100%;
+        text-align: left;
+        display: grid;
+        gap: 6px;
+        padding: 12px;
+        border-radius: 7px;
+        background: transparent;
+        border-color: transparent;
+      }
+
+      .group-btn.active {
+        background: #142d27;
+      }
+
+      .group-main {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .group-title {
+        font-weight: 820;
+      }
+
+      .group-desc,
+      .group-meta,
+      .muted {
+        color: var(--muted);
+      }
+
+      .group-desc,
+      .group-meta {
+        font-size: 12px;
+      }
+
+      .panel {
+        padding: 18px;
+      }
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: start;
+        margin-bottom: 16px;
+      }
+
+      .panel-title {
+        font-size: 22px;
+        font-weight: 840;
+      }
+
+      .panel-sub {
+        color: var(--muted);
+        margin-top: 5px;
+      }
+
+      .job-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .job-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto auto;
+        gap: 14px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-3);
+        padding: 13px;
+      }
+
+      .job-title {
+        font-weight: 820;
+      }
+
+      .job-copy {
+        color: var(--muted);
+        margin-top: 4px;
+        line-height: 1.45;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 58px;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 820;
+      }
+
+      .pill.green {
+        color: var(--green);
+        background: var(--green-soft);
+      }
+
+      .pill.amber {
+        color: var(--amber);
+        background: var(--amber-soft);
+      }
+
+      .pill.red {
+        color: var(--red);
+        background: var(--red-soft);
+      }
+
+      .pill.gray {
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .time {
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      details.folded {
+        margin-top: 14px;
+        overflow: hidden;
+      }
+
+      details.folded summary {
+        list-style: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 15px 16px;
+        font-weight: 820;
+      }
+
+      details.folded summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .folded-body {
+        border-top: 1px solid var(--line);
+        padding: 16px;
+      }
+
+      .tech-toolbar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .tech-toolbar input {
+        flex: 1;
+        min-width: 0;
+        border: 1px solid var(--line);
+        background: #101216;
+        color: var(--text);
+        border-radius: 6px;
+        padding: 10px 12px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        padding: 11px 12px;
+      }
+
+      th {
+        color: var(--muted);
+        background: #1b1d22;
+        font-size: 12px;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .review-note {
+        margin-top: 14px;
+        padding: 16px;
+      }
+
+      .review-title {
+        font-weight: 840;
+        margin-bottom: 10px;
+      }
+
+      .review-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .review-item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-3);
+        padding: 12px;
+      }
+
+      .review-item strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .review-item span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .template-popover {
+        display: none;
+        position: absolute;
+        right: 28px;
+        top: 108px;
+        width: 320px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: #202329;
+        box-shadow: var(--shadow);
+        padding: 12px;
+        z-index: 5;
+      }
+
+      .new-task-wrap:hover .template-popover,
+      .new-task-wrap:focus-within .template-popover {
+        display: block;
+      }
+
+      .template-title {
+        font-weight: 820;
+        margin-bottom: 8px;
+      }
+
+      .template-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 10px;
+        margin-top: 8px;
+      }
+
+      .template-row span {
+        color: var(--muted);
+        display: block;
+        font-size: 12px;
+        margin-top: 2px;
+      }
+
+      @media (max-width: 980px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .hero,
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .groups {
+          position: static;
+        }
+
+        .status-strip,
+        .review-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .job-row {
+          grid-template-columns: 1fr;
+        }
+
+        .attention {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .attention .hero-actions {
+          justify-content: stretch;
+        }
+
+        .attention .hero-actions button {
+          flex: 1;
+        }
+
+        .time {
+          white-space: normal;
+        }
+
+        .template-popover {
+          left: 28px;
+          right: 28px;
+          width: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="../src/renderer/src/assets/hermes-girl-avatar.png" alt="Hermes" />
+          <div>
+            <div class="brand-title">Hermes Desktop</div>
+            <div class="brand-sub">控制塔</div>
+          </div>
+        </div>
+        <nav class="nav" aria-label="主导航">
+          <a href="#"><span class="nav-dot"></span>控制塔</a>
+          <a href="#"><span class="nav-dot"></span>在线对话</a>
+          <a class="active" href="#"><span class="nav-dot"></span>任务计划</a>
+          <a href="#"><span class="nav-dot"></span>技能管理</a>
+          <a href="#"><span class="nav-dot"></span>系统设置</a>
+        </nav>
+        <div class="sidebar-focus">
+          <strong>今日重点</strong>
+          价格监控只显示阶段闭环；Cron 表和历史记录收进高级明细。
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="breadcrumb">首页 / 任务计划</div>
+          <div class="top-actions">
+            <span class="model-pill">gpt-5.4</span>
+            <span class="version-pill">Desktop v0.5.45</span>
+          </div>
+        </header>
+
+        <div class="content">
+          <section class="hero">
+            <div>
+              <div class="eyebrow">任务计划</div>
+              <h1>按业务流处理任务</h1>
+              <p>默认只看闭环状态和下一步动作；Cron 技术表、最近执行和模板入口全部收纳。</p>
+            </div>
+            <div class="hero-actions">
+              <button class="secondary">刷新</button>
+              <div class="new-task-wrap">
+                <button class="primary">新建任务</button>
+                <div class="template-popover">
+                  <div class="template-title">选择模板</div>
+                  <div class="template-row">
+                    <div>
+                      <strong>每日晨报</strong>
+                      <span>07:00 触发，适合固定摘要。</span>
+                    </div>
+                    <button class="ghost">使用</button>
+                  </div>
+                  <div class="template-row">
+                    <div>
+                      <strong>心跳检查</strong>
+                      <span>每 30 分钟检查服务可用性。</span>
+                    </div>
+                    <button class="ghost">使用</button>
+                  </div>
+                  <div class="template-row">
+                    <div>
+                      <strong>工作提醒</strong>
+                      <span>工作日 09:00 / 14:00 / 18:00。</span>
+                    </div>
+                    <button class="ghost">使用</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="status-strip" aria-label="任务状态摘要">
+            <div class="metric">
+              <div class="metric-label">业务分组</div>
+              <div class="metric-value">5</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">启用任务</div>
+              <div class="metric-value">7</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">需处理</div>
+              <div class="metric-value" style="color: var(--amber)">1</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">下次运行</div>
+              <div class="metric-value">17:00</div>
+            </div>
+          </section>
+
+          <section class="attention" aria-label="待处理任务">
+            <div>
+              <div class="attention-title">17:00 补录需要确认</div>
+              <div class="attention-copy">上次脚本退出码为 1；如果数据库已齐，可标记为已处理。</div>
+            </div>
+            <div class="hero-actions">
+              <button class="secondary">定位日志</button>
+              <button class="primary">一键补跑</button>
+            </div>
+          </section>
+
+          <section class="layout">
+            <div class="groups" role="tablist" aria-label="业务分组">
+              <button class="group-btn active">
+                <span class="group-main">
+                  <span class="group-title">价格监控</span>
+                  <span class="pill amber">1 异常</span>
+                </span>
+                <span class="group-desc">验证 / 采集 / 补录 / 告警</span>
+                <span class="group-meta">7 个任务 · 下次 17:00</span>
+              </button>
+              <button class="group-btn">
+                <span class="group-main">
+                  <span class="group-title">系统巡检</span>
+                  <span class="pill green">OK</span>
+                </span>
+                <span class="group-desc">Gateway / Cron / 版本健康</span>
+                <span class="group-meta">2 个任务 · 下次 23:00</span>
+              </button>
+              <button class="group-btn">
+                <span class="group-main">
+                  <span class="group-title">通知告警</span>
+                  <span class="pill green">OK</span>
+                </span>
+                <span class="group-desc">飞书推送与异常升级</span>
+                <span class="group-meta">1 个任务 · 下次 17:30</span>
+              </button>
+              <button class="group-btn">
+                <span class="group-main">
+                  <span class="group-title">数据备份</span>
+                  <span class="pill green">OK</span>
+                </span>
+                <span class="group-desc">SQLite 备份与导出恢复</span>
+                <span class="group-meta">1 个任务 · 下次 03:00</span>
+              </button>
+              <button class="group-btn">
+                <span class="group-main">
+                  <span class="group-title">其他任务</span>
+                  <span class="pill gray">空</span>
+                </span>
+                <span class="group-desc">低频维护与未归类任务</span>
+                <span class="group-meta">0 个任务</span>
+              </button>
+            </div>
+
+            <div>
+              <div class="panel">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title">价格监控闭环</div>
+                    <div class="panel-sub">
+                      关键阶段在这里处理；不再额外显示“价格监控任务”列表卡。
+                    </div>
+                  </div>
+                  <span class="status-pill">1 项需关注</span>
+                </div>
+
+                <div class="job-list">
+                  <div class="job-row">
+                    <div>
+                      <div class="job-title">07:20 验证门控</div>
+                      <div class="job-copy">检测京东快速验证，必要时提醒人工解锁。</div>
+                    </div>
+                    <span class="pill green">OK</span>
+                    <span class="time">明天 07:20</span>
+                    <button class="secondary">运行</button>
+                  </div>
+                  <div class="job-row">
+                    <div>
+                      <div class="job-title">07:30 价格获取</div>
+                      <div class="job-copy">主采集任务，入库后更新当天价格快照。</div>
+                    </div>
+                    <span class="pill green">OK</span>
+                    <span class="time">明天 07:30</span>
+                    <button class="secondary">补跑</button>
+                  </div>
+                  <div class="job-row">
+                    <div>
+                      <div class="job-title">11:00 巡检</div>
+                      <div class="job-copy">检查上午缺口，只报告已到运行时间的关键任务。</div>
+                    </div>
+                    <span class="pill green">OK</span>
+                    <span class="time">明天 11:00</span>
+                    <button class="secondary">详情</button>
+                  </div>
+                  <div class="job-row">
+                    <div>
+                      <div class="job-title">17:00 补录</div>
+                      <div class="job-copy">失败数据补采；如数据已齐，应成功退出并发确认。</div>
+                    </div>
+                    <span class="pill amber">观察</span>
+                    <span class="time">今天 17:00</span>
+                    <button class="primary">补跑</button>
+                  </div>
+                  <div class="job-row">
+                    <div>
+                      <div class="job-title">17:30 告警</div>
+                      <div class="job-copy">晚间通知，汇总今日价格监控闭环状态。</div>
+                    </div>
+                    <span class="pill green">OK</span>
+                    <span class="time">今天 17:30</span>
+                    <button class="secondary">详情</button>
+                  </div>
+                  <div class="job-row">
+                    <div>
+                      <div class="job-title">23:00 健康检查</div>
+                      <div class="job-copy">检查 Cron 状态、失败项和关键任务是否漏跑。</div>
+                    </div>
+                    <span class="pill green">OK</span>
+                    <span class="time">今天 23:00</span>
+                    <button class="secondary">详情</button>
+                  </div>
+                  <div class="job-row">
+                    <div>
+                      <div class="job-title">03:00 数据备份</div>
+                      <div class="job-copy">SQLite 备份，保留价格获取任务可回滚数据。</div>
+                    </div>
+                    <span class="pill green">OK</span>
+                    <span class="time">明天 03:00</span>
+                    <button class="secondary">详情</button>
+                  </div>
+                </div>
+              </div>
+
+              <details class="folded">
+                <summary>
+                  <span>Cron 技术表与最近执行</span>
+                  <span class="muted">高级明细</span>
+                </summary>
+                <div class="folded-body">
+                  <div class="tech-toolbar">
+                    <input value="jd-tongrentang" aria-label="搜索 Cron 任务" />
+                    <button class="secondary">导出运行记录</button>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>任务</th>
+                        <th>表达式</th>
+                        <th>状态</th>
+                        <th>上次运行</th>
+                        <th>耗时</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>jd-tongrentang-price-watch</td>
+                        <td>30 7 * * *</td>
+                        <td><span class="pill green">OK</span></td>
+                        <td>9 小时前</td>
+                        <td>42.4s</td>
+                      </tr>
+                      <tr>
+                        <td>jd-tongrentang-price-watch-backfill-1700</td>
+                        <td>0 17 * * *</td>
+                        <td><span class="pill amber">观察</span></td>
+                        <td>昨天 17:00</td>
+                        <td>3.1s</td>
+                      </tr>
+                      <tr>
+                        <td>jd-tongrentang-cron-health</td>
+                        <td>0 23 * * *</td>
+                        <td><span class="pill green">OK</span></td>
+                        <td>昨天 23:00</td>
+                        <td>1.7s</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </div>
+          </section>
+
+          <section class="review-note">
+            <div class="review-title">本 demo 中被收纳的旧模块</div>
+            <div class="review-grid">
+              <div class="review-item">
+                <strong>顶部统计卡</strong>
+                <span>压缩到摘要状态条和分组按钮，不再占一整排。</span>
+              </div>
+              <div class="review-item">
+                <strong>快捷模板</strong>
+                <span>移入“新建任务”入口，避免长期占据主页面。</span>
+              </div>
+              <div class="review-item">
+                <strong>最近执行</strong>
+                <span>放进 Cron 技术表折叠区，需要排查时再打开。</span>
+              </div>
+              <div class="review-item">
+                <strong>价格监控任务卡</strong>
+                <span>由价格监控闭环阶段替代，避免列表重复。</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
