@@ -14,18 +14,23 @@ asarUnpack:
   - 'resources/**'
 win:
   executableName: hermes-desktop
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:
         - x64
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
   shortcutName: Hermes Desktop
   uninstallDisplayName: Hermes Desktop
   createDesktopShortcut: always
   oneClick: true
   language: 2052
 mac:
+  icon: build/icon.icns
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
@@ -38,6 +43,7 @@ mac:
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
+  icon: build/icon.png
   target:
     - AppImage
   maintainer: hermes-desktop
