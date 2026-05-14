@@ -74,6 +74,7 @@ const roleFilter = ref<'all' | 'user' | 'assistant' | 'system'>('all')
 const autoFollowBottom = ref(true)
 const transcriptRef = ref<HTMLElement | null>(null)
 const showAgentDetails = ref(false)
+const showChatToolsDrawer = ref(false)
 const aborting = ref(false)
 const nowMs = ref(Date.now())
 let nowTimer: ReturnType<typeof setInterval> | null = null
@@ -2630,6 +2631,11 @@ const hermesConvStats = computed(() => {
   }
 })
 
+const chatToolActivityCount = computed(() => {
+  const steps = chatStore.agentSteps.get(currentAgentId.value)?.length || 0
+  return steps + (currentToolProgress.value ? 1 : 0)
+})
+
 async function handleSend() {
   const content = draft.value.trim()
   if (!content) return
@@ -2674,8 +2680,10 @@ async function handleSend() {
       <aside class="chat-list">
         <NSpace vertical :size="12">
           <div class="chat-side-heading">
-            <NText strong class="chat-side-heading-title">会话管理</NText>
-            <NText depth="3" class="chat-side-heading-note">会话不再是独立主入口。</NText>
+            <NText strong class="chat-side-heading-title">会话</NText>
+            <NText depth="3" class="chat-side-heading-note">
+              只保留选择、新建和最近状态；不再占用主视觉。
+            </NText>
           </div>
 
           <!-- Hermes REST: New conversation button -->
@@ -2812,6 +2820,26 @@ async function handleSend() {
                 }}
               </NText>
             </NSpace>
+
+            <div class="chat-thread-head">
+              <div class="chat-thread-title">
+                <span>当前会话</span>
+                <strong>
+                  {{
+                    isHermesRest
+                      ? hermesChatStore.activeConversation?.title || t('pages.chat.hermes.untitled')
+                      : normalizedSessionKey
+                  }}
+                </strong>
+                <span
+                  >{{ isHermesRest ? hermesConvStats.total : renderedMessages.length }} 条消息</span
+                >
+                <span>{{ autoFollowBottom ? '自动跟随' : '手动浏览' }}</span>
+              </div>
+              <NButton size="tiny" secondary @click="showChatToolsDrawer = true">
+                查看工具调用
+              </NButton>
+            </div>
 
             <div class="chat-transcript-shell">
               <NSpin :show="transcriptLoading" class="chat-transcript-spin">
@@ -3429,15 +3457,39 @@ async function handleSend() {
         </div>
       </section>
 
-      <aside class="chat-tools">
-        <NSpace vertical :size="12">
+      <aside class="chat-tools-rail">
+        <button
+          class="chat-rail-button is-active"
+          type="button"
+          @click="showChatToolsDrawer = true"
+        >
+          <strong>模型</strong>
+          <span>{{ connectionStore.hermesRealModel || hermesModel }}</span>
+        </button>
+        <button class="chat-rail-button" type="button" @click="showChatToolsDrawer = true">
+          <strong>Token</strong>
+          <span>{{
+            currentSessionTokenUsage ? formatTokenCount(currentSessionTokenUsage.total) : '-'
+          }}</span>
+        </button>
+        <button class="chat-rail-button" type="button" @click="showChatToolsDrawer = true">
+          <strong>工具</strong>
+          <span>{{ chatToolActivityCount }}</span>
+        </button>
+      </aside>
+
+      <aside v-if="showChatToolsDrawer" class="chat-tools-drawer">
+        <div class="chat-tools-drawer-head">
           <div>
-            <NText strong class="chat-tools-title">右侧调试抽屉</NText>
+            <NText strong class="chat-tools-title">运行详情</NText>
             <NText depth="3" class="chat-tools-note">
-              模型、Skill、token、工具调用详情集中到这里，不挤占聊天主区域。
+              模型、Skill、token、工具调用详情集中到这里，需要排障时再展开。
             </NText>
           </div>
+          <NButton size="tiny" secondary @click="showChatToolsDrawer = false">收起</NButton>
+        </div>
 
+        <NSpace vertical :size="12" class="chat-tools-drawer-body">
           <div class="chat-tools-grid">
             <div class="chat-tools-mini">
               <span>当前模型</span>
@@ -3546,20 +3598,23 @@ async function handleSend() {
   display: flex;
   flex-direction: column;
   gap: var(--ui-gap);
+  position: relative;
 }
 
 .chat-layout {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(360px, 1fr) minmax(220px, 280px);
+  grid-template-columns: 300px minmax(820px, 1fr) 96px;
   gap: var(--ui-gap);
   align-items: stretch;
+  position: relative;
 }
 
 .chat-list,
 .chat-main,
-.chat-tools {
+.chat-tools-rail,
+.chat-tools-drawer {
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--border-color);
@@ -3568,16 +3623,92 @@ async function handleSend() {
   box-shadow: var(--shadow-sm);
 }
 
-.chat-list,
-.chat-tools {
-  padding: var(--ui-panel-padding);
+.chat-list {
+  padding: 18px;
   overflow: auto;
 }
 
 .chat-main {
   display: flex;
-  padding: var(--ui-panel-padding);
+  padding: 0;
   overflow: hidden;
+  position: relative;
+}
+
+.chat-tools-rail {
+  padding: 10px 8px;
+  display: grid;
+  grid-auto-rows: min-content;
+  gap: 8px;
+  overflow: auto;
+}
+
+.chat-rail-button {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 64px;
+  padding: 8px 6px;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.chat-rail-button:hover,
+.chat-rail-button.is-active {
+  border-color: rgba(94, 224, 179, 0.48);
+  background: rgba(94, 224, 179, 0.12);
+}
+
+.chat-rail-button strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--primary-color);
+  font-size: 14px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-rail-button span {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-tools-drawer {
+  position: absolute;
+  top: 0;
+  right: calc(96px + var(--ui-gap));
+  bottom: 0;
+  z-index: 9;
+  width: min(340px, calc(100% - 430px));
+  padding: 16px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  background: rgba(19, 20, 25, 0.98);
+  box-shadow: var(--shadow-md);
+}
+
+.chat-tools-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.chat-tools-drawer-body {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .chat-token-metrics {
@@ -3733,31 +3864,34 @@ async function handleSend() {
 
 .chat-side-heading-title {
   display: block;
-  font-size: var(--font-section-title);
+  font-size: 20px;
+  line-height: 1.2;
 }
 
 .chat-side-heading-note {
   display: block;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .chat-tools-title {
   display: block;
-  font-size: var(--font-section-title);
+  font-size: 18px;
+  line-height: 1.2;
 }
 
 .chat-tools-note {
   display: block;
-  margin-top: 6px;
-  font-size: var(--font-body-sm);
+  margin-top: 5px;
+  font-size: 13px;
   line-height: 1.45;
 }
 
 .chat-tools-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--ui-gap-sm);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .chat-tools-mini,
@@ -3768,7 +3902,7 @@ async function handleSend() {
 }
 
 .chat-tools-mini {
-  padding: var(--ui-panel-padding-sm);
+  padding: 12px;
   min-width: 0;
 }
 
@@ -3782,7 +3916,7 @@ async function handleSend() {
 .chat-tools-mini strong {
   display: block;
   margin-top: 5px;
-  font-size: var(--font-card-title);
+  font-size: 18px;
   line-height: var(--line-tight);
   overflow-wrap: anywhere;
 }
@@ -3797,7 +3931,7 @@ async function handleSend() {
   gap: 10px;
   padding: 7px 0;
   border-bottom: 1px solid var(--border-color);
-  font-size: var(--font-body-sm);
+  font-size: 13px;
 }
 
 .chat-tools-row:last-child {
@@ -3832,7 +3966,7 @@ async function handleSend() {
 .hermes-conv-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   max-height: calc(100vh - var(--header-height) - 180px);
   overflow-y: auto;
 }
@@ -3848,9 +3982,10 @@ async function handleSend() {
 
 .hermes-conv-item {
   position: relative;
-  padding: 8px 9px;
-  border-radius: 6px;
+  padding: 12px 13px;
+  border-radius: var(--radius);
   border: 1px solid transparent;
+  background: var(--bg-primary);
   cursor: pointer;
   transition:
     background 0.15s,
@@ -3878,7 +4013,7 @@ async function handleSend() {
 }
 
 .hermes-conv-title {
-  font-size: var(--font-body);
+  font-size: 15px;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3934,7 +4069,7 @@ async function handleSend() {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--ui-gap);
+  gap: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -4016,7 +4151,7 @@ async function handleSend() {
 
 .chat-transcript-card,
 .chat-compose-card {
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .chat-transcript-card {
@@ -4039,6 +4174,44 @@ async function handleSend() {
   padding: 0 !important;
 }
 
+.chat-thread-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 18px 8px;
+  pointer-events: none;
+}
+
+.chat-thread-head > * {
+  pointer-events: auto;
+}
+
+.chat-thread-title {
+  min-width: 0;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: rgba(16, 17, 21, 0.72);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.chat-thread-title strong {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-transcript-shell {
   flex: 1;
   min-height: 0;
@@ -4058,8 +4231,7 @@ async function handleSend() {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 2px;
-  padding-bottom: 16px;
+  padding: 8px 32px 18px;
   overflow-anchor: none;
   overscroll-behavior: contain;
   background: transparent;
@@ -4067,6 +4239,7 @@ async function handleSend() {
 
 .chat-compose-card {
   flex-shrink: 0;
+  margin: 0 24px 20px;
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
   box-shadow: var(--shadow-sm);
@@ -4078,12 +4251,13 @@ async function handleSend() {
 
 .chat-draft-input {
   min-height: 92px;
-  max-height: min(36vh, 320px);
+  max-height: min(28vh, 260px);
 }
 
 :deep(.chat-draft-input.n-input--textarea .n-input-wrapper) {
   min-height: 92px;
-  max-height: min(36vh, 320px);
+  max-height: min(28vh, 260px);
+  resize: vertical;
 }
 
 .chat-slash-panel {
@@ -4166,9 +4340,9 @@ async function handleSend() {
 .chat-bubble {
   position: relative;
   width: fit-content;
-  max-width: min(820px, 86%);
+  max-width: min(760px, 76%);
   margin-bottom: 10px;
-  padding: 9px 11px;
+  padding: 10px 12px;
   border-radius: var(--radius);
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
@@ -4231,8 +4405,8 @@ async function handleSend() {
 
 .chat-markdown {
   white-space: normal;
-  font-size: var(--font-body);
-  line-height: var(--line-readable);
+  font-size: 14px;
+  line-height: 1.62;
   word-break: break-word;
   overflow-wrap: break-word;
 }
@@ -4632,12 +4806,62 @@ async function handleSend() {
 
 body.wide-mode .chat-layout {
   display: grid !important;
-  grid-template-columns: 280px minmax(0, 1fr) 280px !important;
+  grid-template-columns: 300px minmax(820px, 1fr) 96px !important;
   grid-template-rows: 1fr !important;
 }
 
 body.wide-mode .chat-bubble {
-  max-width: min(1600px, 92%);
+  max-width: min(760px, 76%);
+}
+
+@media (max-width: 1760px) {
+  .chat-layout,
+  body.wide-mode .chat-layout {
+    grid-template-columns: 270px minmax(620px, 1fr) 84px !important;
+  }
+
+  .chat-list {
+    padding: 16px;
+  }
+
+  .chat-tools-rail {
+    padding: 9px 7px;
+  }
+
+  .chat-tools-drawer {
+    right: calc(84px + var(--ui-gap));
+    width: min(320px, calc(100% - 380px));
+  }
+
+  .chat-transcript {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+}
+
+@media (max-width: 1460px) {
+  .chat-layout,
+  body.wide-mode .chat-layout {
+    grid-template-columns: 240px minmax(520px, 1fr) 76px !important;
+  }
+
+  .chat-tools-drawer {
+    display: none;
+  }
+
+  .chat-rail-button {
+    min-height: 58px;
+  }
+
+  .chat-rail-button strong {
+    font-size: 13px;
+  }
+
+  .chat-rail-button span,
+  .chat-side-heading-note,
+  .hermes-conv-meta {
+    font-size: 12px;
+  }
 }
 
 @media (max-width: 900px) {
@@ -4645,13 +4869,23 @@ body.wide-mode .chat-bubble {
     height: auto;
   }
 
-  .chat-layout {
-    grid-template-columns: 1fr;
+  .chat-layout,
+  body.wide-mode .chat-layout {
+    grid-template-columns: 1fr !important;
   }
 
   .chat-list,
-  .chat-tools {
+  .chat-tools-rail {
     max-height: none;
+  }
+
+  .chat-tools-rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .chat-tools-drawer {
+    position: static;
+    width: auto;
   }
 
   .chat-main {
