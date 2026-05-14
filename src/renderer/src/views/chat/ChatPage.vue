@@ -3550,7 +3550,7 @@ async function handleSend() {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 280px minmax(520px, 1fr) 280px;
+  grid-template-columns: minmax(220px, 280px) minmax(360px, 1fr) minmax(220px, 280px);
   gap: var(--ui-gap);
   align-items: stretch;
 }
@@ -4628,7 +4628,7 @@ body.wide-mode .chat-bubble {
   max-width: min(1600px, 92%);
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 900px) {
   .chat-page {
     height: auto;
   }
