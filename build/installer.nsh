@@ -5,18 +5,26 @@
 
 ; Keep Windows app managers, Start Menu shortcuts, and uninstall registry icons
 ; pinned to the Hermes girl avatar. Some app managers do not resolve standalone
-; .ico DisplayIcon values reliably, so expose the embedded executable icon too.
+; .ico files or DisplayIcon values with ",0" reliably, so expose the executable
+; path directly and make the uninstall InstallLocation explicit.
 !macro customInstall
   SetOutPath "$INSTDIR"
   File /oname=HermesDesktop.ico "${PROJECT_DIR}\build\icon.ico"
 
-  WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "DisplayIcon" "$appExe,0"
-  WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "Icon" "$appExe,0"
+  WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "DisplayName" "${UNINSTALL_DISPLAY_NAME}"
+  WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "InstallLocation" "$INSTDIR"
+  WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "DisplayIcon" "$appExe"
+  WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "Icon" "$appExe"
+  WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "ApplicationIcon" "$appExe"
   !ifdef UNINSTALL_REGISTRY_KEY_2
-    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY_2}" "DisplayIcon" "$appExe,0"
-    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY_2}" "Icon" "$appExe,0"
+    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY_2}" "DisplayName" "${UNINSTALL_DISPLAY_NAME}"
+    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY_2}" "InstallLocation" "$INSTDIR"
+    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY_2}" "DisplayIcon" "$appExe"
+    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY_2}" "Icon" "$appExe"
+    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY_2}" "ApplicationIcon" "$appExe"
   !endif
-  WriteRegStr SHELL_CONTEXT "Software\Classes\Applications\${APP_EXECUTABLE_FILENAME}" "ApplicationIcon" "$appExe,0"
+  WriteRegStr SHELL_CONTEXT "Software\Classes\Applications\${APP_EXECUTABLE_FILENAME}" "ApplicationName" "${PRODUCT_NAME}"
+  WriteRegStr SHELL_CONTEXT "Software\Classes\Applications\${APP_EXECUTABLE_FILENAME}" "ApplicationIcon" "$appExe"
   WriteRegStr SHELL_CONTEXT "Software\Microsoft\Windows\CurrentVersion\App Paths\${APP_EXECUTABLE_FILENAME}" "" "$appExe"
   WriteRegStr SHELL_CONTEXT "Software\Microsoft\Windows\CurrentVersion\App Paths\${APP_EXECUTABLE_FILENAME}" "Path" "$INSTDIR"
 
