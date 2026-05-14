@@ -3132,7 +3132,9 @@ async function handleSend() {
               <NInput
                 v-model:value="draft"
                 type="textarea"
-                :autosize="{ minRows: 2, maxRows: 6 }"
+                class="chat-draft-input"
+                :rows="4"
+                resizable
                 :placeholder="t('pages.chat.input.placeholder')"
                 @keydown="handleDraftKeydown"
               />
@@ -4072,6 +4074,16 @@ async function handleSend() {
 
 :deep(.chat-compose-card .n-card__content) {
   padding: var(--ui-panel-padding-sm) !important;
+}
+
+.chat-draft-input {
+  min-height: 92px;
+  max-height: min(36vh, 320px);
+}
+
+:deep(.chat-draft-input.n-input--textarea .n-input-wrapper) {
+  min-height: 92px;
+  max-height: min(36vh, 320px);
 }
 
 .chat-slash-panel {
