@@ -36,7 +36,7 @@ const LOCAL_SERVER: ServerConfig = {
   id: '__local__',
   name: '本地 Hermes',
   url: 'http://localhost:8642',
-  username: '_noauth_',
+  username: '_noauth_'
 }
 
 export const useConnectionStore = defineStore('connection', () => {
@@ -54,13 +54,31 @@ export const useConnectionStore = defineStore('connection', () => {
   const hermesAuthToken = ref<string | null>(null)
   /** Stops the watcher that syncs status with wsStore.state after initial connect */
   let stopStateSync: (() => void) | null = null
+  let connectionAttemptId = 0
+
+  function nextConnectionAttempt(): number {
+    connectionAttemptId += 1
+    return connectionAttemptId
+  }
+
+  function isCurrentAttempt(attemptId: number): boolean {
+    return attemptId === connectionAttemptId
+  }
+
+  function assertCurrentAttempt(attemptId: number): void {
+    if (!isCurrentAttempt(attemptId)) {
+      throw new Error('Connection superseded')
+    }
+  }
 
   /** Check whether a URL points to the local machine */
   function isLocalUrl(url: string): boolean {
     try {
       const host = new URL(url).hostname
       return host === 'localhost' || host === '127.0.0.1' || host === '::1'
-    } catch { return false }
+    } catch {
+      return false
+    }
   }
 
   async function fetchHermesModels(serverUrl: string, token: string | null) {
@@ -68,8 +86,9 @@ export const useConnectionStore = defineStore('connection', () => {
     if (token) headers['Authorization'] = `Bearer ${token}`
     return window.api
       ? await window.api.httpFetch(`${serverUrl}/v1/models`, { headers })
-      : await fetch(`${serverUrl}/v1/models`, { headers, signal: AbortSignal.timeout(3000) })
-          .then(async r => ({ ok: r.ok, status: r.status, body: await r.text() }))
+      : await fetch(`${serverUrl}/v1/models`, { headers, signal: AbortSignal.timeout(3000) }).then(
+          async (r) => ({ ok: r.ok, status: r.status, body: await r.text() })
+        )
   }
 
   function modelIdFromModelsResponse(body: string): string | null {
@@ -92,14 +111,17 @@ export const useConnectionStore = defineStore('connection', () => {
    * that into an immediate connection/auth error and gives the user a clear
    * chance to update the saved token.
    */
-  async function validateHermesRestAuth(serverUrl: string, token: string | null): Promise<string | null> {
+  async function validateHermesRestAuth(
+    serverUrl: string,
+    token: string | null
+  ): Promise<string | null> {
     const resp = await fetchHermesModels(serverUrl, token)
     if (resp.status === 401 || resp.status === 403) {
       throw new ConnectionError(
         'auth',
         token
           ? 'API_SERVER_KEY 无效或已过期，请在连接服务器里更新该服务器的访问令牌'
-          : '该 Hermes REST API 需要 API_SERVER_KEY，请在连接服务器里填写访问令牌',
+          : '该 Hermes REST API 需要 API_SERVER_KEY，请在连接服务器里填写访问令牌'
       )
     }
     if (!resp.ok) {
@@ -140,7 +162,9 @@ export const useConnectionStore = defineStore('connection', () => {
           return
         }
       }
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
 
     // Strategy 2: Read local config file (only for localhost)
     if (isLocalUrl(serverUrl) && window.api?.hermesConfig) {
@@ -152,7 +176,9 @@ export const useConnectionStore = defineStore('connection', () => {
           }
           return
         }
-      } catch { /* config read failed */ }
+      } catch {
+        /* config read failed */
+      }
     }
 
     // Strategy 3: Fallback — hermesRealModel remains null
@@ -198,14 +224,20 @@ export const useConnectionStore = defineStore('connection', () => {
   async function connect(serverId: string) {
     // If already connected to another server, clean up first
     if (currentServer.value && currentServer.value.id !== serverId) {
-      try { await disconnect() } catch { /* best-effort */ }
+      try {
+        await disconnect()
+      } catch {
+        /* best-effort */
+      }
     }
 
+    const attemptId = nextConnectionAttempt()
     status.value = 'connecting'
     // Clear stale token from previous server before doing anything
     clearAuthToken()
 
     const password = window.api ? await window.api.decryptPassword(serverId) : null
+    if (!isCurrentAttempt(attemptId)) return
     const server = servers.value.find((s) => s.id === serverId)
     if (!server || !password) {
       status.value = 'error'
@@ -234,18 +266,24 @@ export const useConnectionStore = defineStore('connection', () => {
       try {
         const healthResp = window.api
           ? await window.api.httpFetch(`${server.url}/health`)
-          : await fetch(`${server.url}/health`, { signal: AbortSignal.timeout(5000) })
-              .then(r => ({ ok: r.ok, status: r.status, body: '' }))
+          : await fetch(`${server.url}/health`, { signal: AbortSignal.timeout(5000) }).then(
+              (r) => ({ ok: r.ok, status: r.status, body: '' })
+            )
         if (healthResp.ok) {
-          const data = typeof healthResp.body === 'string' && healthResp.body
-            ? JSON.parse(healthResp.body) : {}
+          const data =
+            typeof healthResp.body === 'string' && healthResp.body
+              ? JSON.parse(healthResp.body)
+              : {}
           if (data?.status === 'ok') isHermesRest = true
         }
-      } catch { /* health probe failed — fall through to WebSocket */ }
+      } catch {
+        /* health probe failed — fall through to WebSocket */
+      }
 
       if (isHermesRest) {
         // Hermes Agent REST API — no WebSocket needed
         const modelId = await validateHermesRestAuth(server.url, isNoAuth ? null : password)
+        assertCurrentAttempt(attemptId)
         serverType.value = 'hermes-rest'
         hermesAuthToken.value = isNoAuth ? null : password
         if (modelId) hermesRealModel.value = modelId
@@ -262,6 +300,10 @@ export const useConnectionStore = defineStore('connection', () => {
       // Start native WebSocket connection and wait for protocol v3 handshake
       const wsStore = useWebSocketStore()
       await wsStore.connect(server.url)
+      if (!isCurrentAttempt(attemptId)) {
+        wsStore.disconnect()
+        throw new Error('Connection superseded')
+      }
 
       currentServer.value = server
       status.value = 'connected'
@@ -272,20 +314,34 @@ export const useConnectionStore = defineStore('connection', () => {
       // Keep connectionStore.status in sync with wsStore.state for post-connect
       // state changes (e.g. WS drop → reconnecting → reconnected / failed)
       stopStateSync?.()
-      stopStateSync = watch(() => wsStore.state, (wsState) => {
-        switch (wsState) {
-          case ConnectionState.CONNECTED: status.value = 'connected'; break
-          case ConnectionState.FAILED: status.value = 'error'; break
-          case ConnectionState.RECONNECTING:
-          case ConnectionState.CONNECTING: status.value = 'connecting'; break
-          case ConnectionState.DISCONNECTED: status.value = 'disconnected'; break
+      stopStateSync = watch(
+        () => wsStore.state,
+        (wsState) => {
+          switch (wsState) {
+            case ConnectionState.CONNECTED:
+              status.value = 'connected'
+              break
+            case ConnectionState.FAILED:
+              status.value = 'error'
+              break
+            case ConnectionState.RECONNECTING:
+            case ConnectionState.CONNECTING:
+              status.value = 'connecting'
+              break
+            case ConnectionState.DISCONNECTED:
+              status.value = 'disconnected'
+              break
+          }
         }
-      })
+      )
     }
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined
     const timeout = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new ConnectionError('timeout', '连接超时，请检查服务器是否可达')), CONNECT_TIMEOUT)
+      timeoutId = setTimeout(
+        () => reject(new ConnectionError('timeout', '连接超时，请检查服务器是否可达')),
+        CONNECT_TIMEOUT
+      )
     })
 
     try {
@@ -294,6 +350,8 @@ export const useConnectionStore = defineStore('connection', () => {
       // If a newer connect() call superseded this one, don't touch shared state
       const msg = e instanceof Error ? e.message : ''
       if (msg === 'Connection superseded') return
+      if (!isCurrentAttempt(attemptId)) return
+      nextConnectionAttempt()
 
       status.value = 'error'
       // Clean up any watcher that may have been installed by a previous
@@ -311,6 +369,7 @@ export const useConnectionStore = defineStore('connection', () => {
   }
 
   async function disconnect() {
+    nextConnectionAttempt()
     stopStateSync?.()
     stopStateSync = null
     const wsStore = useWebSocketStore()
@@ -320,7 +379,7 @@ export const useConnectionStore = defineStore('connection', () => {
       await authStore.logout()
     }
     clearAuthToken()
-    authStore.authEnabled = true  // Reset to default
+    authStore.authEnabled = true // Reset to default
     serverType.value = null
     hermesRealModel.value = null
     hermesAuthToken.value = null
@@ -356,9 +415,14 @@ export const useConnectionStore = defineStore('connection', () => {
   async function connectLocal(): Promise<void> {
     // If already connected to another server, clean up first
     if (currentServer.value) {
-      try { await disconnect() } catch { /* best-effort */ }
+      try {
+        await disconnect()
+      } catch {
+        /* best-effort */
+      }
     }
 
+    const attemptId = nextConnectionAttempt()
     status.value = 'connecting'
     clearAuthToken()
 
@@ -372,9 +436,12 @@ export const useConnectionStore = defineStore('connection', () => {
     if (window.api?.hermesConfig) {
       try {
         const cfg = await window.api.hermesConfig()
+        if (!isCurrentAttempt(attemptId)) return
         if (cfg.apiServerKey) configApiKey = cfg.apiServerKey
         if (cfg.model) hermesRealModel.value = cfg.model
-      } catch { /* fall through — treat as unauthenticated local */ }
+      } catch {
+        /* fall through — treat as unauthenticated local */
+      }
     }
 
     if (configApiKey) {
@@ -397,15 +464,17 @@ export const useConnectionStore = defineStore('connection', () => {
         ? await window.api.httpFetch(`${LOCAL_SERVER.url}/health`, { headers })
         : await fetch(`${LOCAL_SERVER.url}/health`, {
             headers,
-            signal: AbortSignal.timeout(LOCAL_CONNECT_TIMEOUT),
-          }).then(r => ({ ok: r.ok, status: r.status, body: '' }))
+            signal: AbortSignal.timeout(LOCAL_CONNECT_TIMEOUT)
+          }).then((r) => ({ ok: r.ok, status: r.status, body: '' }))
 
+      assertCurrentAttempt(attemptId)
       if (!resp.ok) throw new Error(`health check returned ${resp.status}`)
 
       const data = typeof resp.body === 'string' && resp.body ? JSON.parse(resp.body) : {}
       if (data?.status !== 'ok') throw new Error('unexpected health response')
 
       const modelId = await validateHermesRestAuth(LOCAL_SERVER.url, configApiKey)
+      assertCurrentAttempt(attemptId)
       serverType.value = 'hermes-rest'
       if (modelId) hermesRealModel.value = modelId
       currentServer.value = { ...LOCAL_SERVER }
@@ -413,11 +482,14 @@ export const useConnectionStore = defineStore('connection', () => {
       safeSet('lastConnectedServerId', LOCAL_SERVER.id)
       if (!modelId) fetchHermesModel() // non-blocking: resolve the final display name
     } catch (e) {
+      if (e instanceof Error && e.message === 'Connection superseded') return
+      if (!isCurrentAttempt(attemptId)) return
+      nextConnectionAttempt()
       status.value = 'error'
       // Roll back auth state so a retry doesn't reuse a bad token.
       hermesAuthToken.value = null
       authStore.setToken(null)
-      authStore.authEnabled = true  // Reset to default; don't leave it false if no key was found
+      authStore.authEnabled = true // Reset to default; don't leave it false if no key was found
       if (e instanceof ConnectionError) throw e
       throw new ConnectionError('network', '无法连接到本地 Hermes 服务器')
     }
@@ -453,5 +525,19 @@ export const useConnectionStore = defineStore('connection', () => {
     }
   }
 
-  return { currentServer, status, servers, serverType, hermesRealModel, hermesAuthToken, loadServers, addServer, deleteServer, connect, connectLocal, disconnect, autoConnect }
+  return {
+    currentServer,
+    status,
+    servers,
+    serverType,
+    hermesRealModel,
+    hermesAuthToken,
+    loadServers,
+    addServer,
+    deleteServer,
+    connect,
+    connectLocal,
+    disconnect,
+    autoConnect
+  }
 })

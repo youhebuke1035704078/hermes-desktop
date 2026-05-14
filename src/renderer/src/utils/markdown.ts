@@ -16,7 +16,7 @@ const markdownRenderer = new MarkdownIt({
   html: false,
   linkify: true,
   typographer: true,
-  breaks: true,
+  breaks: true
 })
 
 function escapeHtml(str: string): string {
@@ -70,14 +70,14 @@ markdownRenderer.renderer.rules.fence = (tokens, idx) => {
   const info = token?.info || ''
   const content = token?.content || ''
   const lang = info.trim().split(/\s+/)[0] || ''
-  
+
   return generateCodeBlockWithLineNumbers(content, lang)
 }
 
 markdownRenderer.renderer.rules.code_block = (tokens, idx) => {
   const token = tokens[idx]
   const content = token?.content || ''
-  
+
   return generateCodeBlockWithLineNumbers(content, '')
 }
 
@@ -86,7 +86,7 @@ function renderLatex(content: string, displayMode: boolean = false): string {
     return katex.renderToString(content, {
       displayMode: displayMode,
       throwOnError: false,
-      output: 'html',
+      output: 'html'
     })
   } catch (e) {
     console.error('KaTeX render error:', e)
@@ -118,7 +118,7 @@ function extractLatex(content: string): LatexExtract {
   })
 
   // Inline $...$ (single-line)
-  text = text.replace(/\$([^\$\n]+?)\$/g, (_, math) => {
+  text = text.replace(/\$([^$\n]+?)\$/g, (_, math) => {
     const trimmed = math.trim()
     if (!trimmed) return ''
     const i = segments.length
@@ -172,18 +172,24 @@ markdownRenderer.renderer.rules.heading_open = (tokens, idx, options, env, self)
     const id = text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
     token.attrSet('id', id)
 
-    const level = token.tag === 'h1' ? 1 :
-                  token.tag === 'h2' ? 2 :
-                  token.tag === 'h3' ? 3 :
-                  token.tag === 'h4' ? 4 :
-                  token.tag === 'h5' ? 5 :
-                  token.tag === 'h6' ? 6 : 1
+    const level =
+      token.tag === 'h1'
+        ? 1
+        : token.tag === 'h2'
+          ? 2
+          : token.tag === 'h3'
+            ? 3
+            : token.tag === 'h4'
+              ? 4
+              : token.tag === 'h5'
+                ? 5
+                : token.tag === 'h6'
+                  ? 6
+                  : 1
 
     const envRow = (env || {}) as Record<string, unknown>
     const existing = envRow[HEADING_COUNTERS_KEY]
-    const counters: number[] = Array.isArray(existing)
-      ? (existing as number[])
-      : [0, 0, 0, 0, 0, 0]
+    const counters: number[] = Array.isArray(existing) ? (existing as number[]) : [0, 0, 0, 0, 0, 0]
     envRow[HEADING_COUNTERS_KEY] = counters
 
     const number = getHeadingNumber(counters, level)
@@ -217,12 +223,12 @@ const defaultImageRule = markdownRenderer.renderer.rules.image
 markdownRenderer.renderer.rules.image = (tokens, idx, options, env, self) => {
   const token = tokens[idx]
   const src = token?.attrGet('src') || ''
-  
+
   if (src && !/^https?:\/\//i.test(src) && !/^data:/i.test(src)) {
     const imageBasePath = (env as any)?.imageBasePath as string | undefined
     const workspace = (env as any)?.workspace as string | undefined
     const authToken = (env as any)?.authToken as string | undefined
-    
+
     if (imageBasePath && workspace) {
       const resolvedPath = resolveImagePath(src, imageBasePath)
       let apiSrc = `/api/files/get?path=${encodeURIComponent(resolvedPath)}&workspace=${encodeURIComponent(workspace)}&binary=true`
@@ -232,7 +238,7 @@ markdownRenderer.renderer.rules.image = (tokens, idx, options, env, self) => {
       token?.attrSet('src', apiSrc)
     }
   }
-  
+
   if (defaultImageRule) {
     return defaultImageRule(tokens, idx, options, env, self)
   }
@@ -243,11 +249,11 @@ function resolveImagePath(src: string, basePath: string): string {
   if (src.startsWith('/')) {
     return src.slice(1)
   }
-  
+
   if (src.startsWith('./')) {
     src = src.slice(2)
   }
-  
+
   const normalizedBase = basePath.replace(/\\/g, '/')
   const initialSlash = normalizedBase.lastIndexOf('/')
   let baseDir = initialSlash >= 0 ? normalizedBase.substring(0, initialSlash) : ''
@@ -374,9 +380,7 @@ function normalizeGfmTableBlocks(lines: string[]): string[] {
 }
 
 function normalizeGroupingText(content: string): string {
-  return content
-    .trim()
-    .replace(/[*_`~]/g, '')
+  return content.trim().replace(/[*_`~]/g, '')
 }
 
 function looksLikeGroupTitle(content: string): boolean {
@@ -386,11 +390,16 @@ function looksLikeGroupTitle(content: string): boolean {
   if (/[：:]/.test(text)) return false
   if (/[。！？!?]\s*$/.test(text)) return false
   if (!hasMarkdownLink && /https?:\/\//i.test(text)) return false
-  if (/^(支持|新增|增加|修复|修正|优化|调整|移除|删除|合并|拆分|更新|改进|减少|提供|暴露|规范化)/u.test(text)) return false
+  if (
+    /^(支持|新增|增加|修复|修正|优化|调整|移除|删除|合并|拆分|更新|改进|减少|提供|暴露|规范化)/u.test(
+      text
+    )
+  )
+    return false
   if (text.length > 60) return false
 
   if (hasMarkdownLink) return true
-  if (/[\/]/.test(text)) return true
+  if (text.includes('/')) return true
   if (/[()（）]/.test(text)) return true
   if (/(Changes|Fixes)\b/.test(text)) return true
   if (/(支持|增强|能力|改进|修复)\s*$/u.test(text)) return true
@@ -416,10 +425,15 @@ function looksLikeStrongGroupTitle(content: string): boolean {
   if (/[：:]/.test(text)) return false
   if (/[。！？!?]\s*$/.test(text)) return false
   if (!hasMarkdownLink && /https?:\/\//i.test(text)) return false
-  if (/^(支持|新增|增加|修复|修正|优化|调整|移除|删除|合并|拆分|更新|改进|减少|提供|暴露|规范化)/u.test(text)) return false
+  if (
+    /^(支持|新增|增加|修复|修正|优化|调整|移除|删除|合并|拆分|更新|改进|减少|提供|暴露|规范化)/u.test(
+      text
+    )
+  )
+    return false
   if (text.length > 60) return false
   if (hasMarkdownLink) return true
-  if (/[\/]/.test(text)) return true
+  if (text.includes('/')) return true
   if (/[()（）]/.test(text)) return true
   if (/(Changes|Fixes)\b/.test(text)) return true
   if (/(支持|增强|能力|改进|修复)\s*$/u.test(text)) return true
@@ -442,7 +456,8 @@ function autoNestListLines(lines: string[]): { lines: string[]; changed: boolean
   const readIndentWidth = (prefix: string) => prefix.replace(/\t/g, '    ').length
   const parseListItem = (line: string): { indent: number; content: string } | null => {
     const unordered = line.match(/^([ \t]*)([-*+])\s+(.+)$/)
-    if (unordered) return { indent: readIndentWidth(unordered[1] || ''), content: unordered[3] || '' }
+    if (unordered)
+      return { indent: readIndentWidth(unordered[1] || ''), content: unordered[3] || '' }
     const ordered = line.match(/^([ \t]*)(\d{1,9}\.)\s+(.+)$/)
     if (ordered) return { indent: readIndentWidth(ordered[1] || ''), content: ordered[3] || '' }
     return null
@@ -457,9 +472,7 @@ function autoNestListLines(lines: string[]): { lines: string[]; changed: boolean
     const baseItems = segment.filter((item) => item.indent === baseIndent)
     const titleCount = baseItems.reduce((acc, item) => acc + (item.isTitle ? 1 : 0), 0)
     const firstTitle = baseItems.find((item) => item.isTitle)
-    const canGroupAll =
-      titleCount >= 2 ||
-      (titleCount === 1 && firstTitle?.isStrongTitle)
+    const canGroupAll = titleCount >= 2 || (titleCount === 1 && firstTitle?.isStrongTitle)
 
     let inGroup = false
     for (const item of baseItems) {
@@ -500,7 +513,7 @@ function autoNestListLines(lines: string[]): { lines: string[]; changed: boolean
       indent: parsed.indent,
       content: parsed.content,
       isTitle: looksLikeGroupTitle(parsed.content),
-      isStrongTitle: looksLikeStrongGroupTitle(parsed.content),
+      isStrongTitle: looksLikeStrongGroupTitle(parsed.content)
     })
   }
 
@@ -525,7 +538,7 @@ function normalizeMarkdownInput(markdown: string, options: { autoNestList: boole
       normalizedLines.push(line)
       continue
     }
-    
+
     // 检测 LaTeX 块级公式 $$...$$
     const dollarCount = (line.match(/\$\$/g) || []).length
     if (dollarCount === 1) {
@@ -537,7 +550,7 @@ function normalizeMarkdownInput(markdown: string, options: { autoNestList: boole
       normalizedLines.push(line)
       continue
     }
-    
+
     normalizedLines.push(normalizeLeadingIndent(line))
   }
 
@@ -550,8 +563,13 @@ function normalizeMarkdownInput(markdown: string, options: { autoNestList: boole
   return normalizeGfmTableBlocks(lines).join('\n')
 }
 
-export function renderSimpleMarkdown(markdown: string, options: SimpleMarkdownRenderOptions = {}): string {
-  const normalized = normalizeMarkdownInput(markdown || '', { autoNestList: options.autoNestList ?? false })
+export function renderSimpleMarkdown(
+  markdown: string,
+  options: SimpleMarkdownRenderOptions = {}
+): string {
+  const normalized = normalizeMarkdownInput(markdown || '', {
+    autoNestList: options.autoNestList ?? false
+  })
   if (!normalized.trim()) {
     return options.emptyHtml || ''
   }
@@ -567,18 +585,20 @@ export function renderSimpleMarkdown(markdown: string, options: SimpleMarkdownRe
   if (options.authToken) {
     env.authToken = options.authToken
   }
-  
+
   const extract = extractLatex(normalized)
   const rendered = markdownRenderer.render(extract.text, env)
   return restoreLatex(rendered, extract)
 }
 
-export function extractTocHeadings(markdown: string): { level: number; text: string; id: string }[] {
+export function extractTocHeadings(
+  markdown: string
+): { level: number; text: string; id: string }[] {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n')
   const headings: { level: number; text: string; id: string }[] = []
   let inCodeBlock = false
   let codeBlockFence = ''
-  
+
   for (const line of lines) {
     // Check for fenced code block start/end
     const fenceMatch = line.match(/^(\s*)(`{3,}|~{3,})/)
@@ -593,13 +613,13 @@ export function extractTocHeadings(markdown: string): { level: number; text: str
       }
       continue
     }
-    
+
     // Skip lines inside code blocks
     if (inCodeBlock) continue
-    
+
     // Skip indented code blocks (4 spaces or 1 tab)
-    if (/^(    |\t)/.test(line)) continue
-    
+    if (/^( {4}|\t)/.test(line)) continue
+
     const match = line.match(/^(#{1,6})\s+(.+)$/)
     if (match) {
       const level = match[1]?.length || 1
@@ -608,6 +628,6 @@ export function extractTocHeadings(markdown: string): { level: number; text: str
       headings.push({ level, text, id })
     }
   }
-  
+
   return headings
 }

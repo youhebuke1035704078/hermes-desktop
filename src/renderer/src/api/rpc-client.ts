@@ -44,7 +44,7 @@ import type {
   ExecApprovalsFile,
   ExecApprovalsSnapshot,
   UpdateRunResponse,
-  UpdateRunResult,
+  UpdateRunResult
 } from './types'
 
 let requestId = 0
@@ -113,7 +113,7 @@ export class RPCClient {
       row.turn_count,
       row.totalMessages,
       row.total_messages,
-      row.count,
+      row.count
     ]
     for (const candidate of directCandidates) {
       const count = this.resolveCountNumber(candidate)
@@ -122,12 +122,7 @@ export class RPCClient {
       }
     }
 
-    const listCandidates = [
-      row.messages,
-      row.transcript,
-      row.history,
-      row.items,
-    ]
+    const listCandidates = [row.messages, row.transcript, row.history, row.items]
     for (const candidate of listCandidates) {
       if (Array.isArray(candidate)) {
         return candidate.length
@@ -139,7 +134,7 @@ export class RPCClient {
       this.asRecord(row.messageCounts),
       this.asRecord(row.message_counts),
       this.asRecord(row.stats),
-      this.asRecord(row.metrics),
+      this.asRecord(row.metrics)
     ]
     for (const nested of nestedRows) {
       const count = this.resolveCountNumber(
@@ -222,7 +217,7 @@ export class RPCClient {
       'inputTokens',
       'promptTokens',
       'prompt_tokens',
-      'input_tokens',
+      'input_tokens'
     ])
     const output = this.pickTokenNumber(row, [
       'totalOutput',
@@ -230,13 +225,13 @@ export class RPCClient {
       'outputTokens',
       'completionTokens',
       'completion_tokens',
-      'output_tokens',
+      'output_tokens'
     ])
     const total = this.pickTokenNumber(row, [
       'totalTokens',
       'tokenTotal',
       'tokensTotal',
-      'total_tokens',
+      'total_tokens'
     ])
 
     if (input !== undefined || output !== undefined || total !== undefined) {
@@ -245,7 +240,7 @@ export class RPCClient {
       }
       return {
         totalInput: input ?? 0,
-        totalOutput: output ?? 0,
+        totalOutput: output ?? 0
       }
     }
 
@@ -257,7 +252,7 @@ export class RPCClient {
       row.llmUsage,
       row.modelUsage,
       row.metrics,
-      row.stats,
+      row.stats
     ]
 
     for (const nested of nestedCandidates) {
@@ -288,7 +283,7 @@ export class RPCClient {
       return {
         agentId: 'main',
         channel: 'main',
-        peer: '',
+        peer: ''
       }
     }
 
@@ -297,21 +292,21 @@ export class RPCClient {
       return {
         agentId: 'main',
         channel: 'main',
-        peer: '',
+        peer: ''
       }
     }
     if (lowered === 'global') {
       return {
         agentId: 'main',
         channel: 'global',
-        peer: '',
+        peer: ''
       }
     }
     if (lowered === 'unknown') {
       return {
         agentId: 'main',
         channel: 'unknown',
-        peer: '',
+        peer: ''
       }
     }
 
@@ -327,7 +322,7 @@ export class RPCClient {
         return {
           agentId,
           channel: 'main',
-          peer: rest.slice(1).join(':'),
+          peer: rest.slice(1).join(':')
         }
       }
 
@@ -335,7 +330,7 @@ export class RPCClient {
         return {
           agentId,
           channel: 'main',
-          peer: rest.slice(1).join(':'),
+          peer: rest.slice(1).join(':')
         }
       }
 
@@ -343,7 +338,7 @@ export class RPCClient {
         return {
           agentId,
           channel: head,
-          peer: rest.slice(1).join(':'),
+          peer: rest.slice(1).join(':')
         }
       }
 
@@ -351,7 +346,7 @@ export class RPCClient {
         return {
           agentId,
           channel: this.normalizeSessionChannel(head),
-          peer: rest.slice(2).join(':'),
+          peer: rest.slice(2).join(':')
         }
       }
 
@@ -359,14 +354,14 @@ export class RPCClient {
         return {
           agentId,
           channel: this.normalizeSessionChannel(head),
-          peer: rest.slice(3).join(':'),
+          peer: rest.slice(3).join(':')
         }
       }
 
       return {
         agentId,
         channel: this.normalizeSessionChannel(head),
-        peer: rest.slice(1).join(':'),
+        peer: rest.slice(1).join(':')
       }
     }
 
@@ -374,7 +369,7 @@ export class RPCClient {
       return {
         agentId: 'main',
         channel: 'cron',
-        peer: parts.slice(1).join(':'),
+        peer: parts.slice(1).join(':')
       }
     }
 
@@ -382,7 +377,7 @@ export class RPCClient {
       return {
         agentId: 'main',
         channel: 'main',
-        peer: parts.slice(1).join(':'),
+        peer: parts.slice(1).join(':')
       }
     }
 
@@ -390,14 +385,14 @@ export class RPCClient {
       return {
         agentId: parts[0] || 'main',
         channel: this.normalizeSessionChannel(parts[1] || 'main'),
-        peer: parts.slice(2).join(':'),
+        peer: parts.slice(2).join(':')
       }
     }
 
     return {
       agentId: 'main',
       channel: 'main',
-      peer: '',
+      peer: ''
     }
   }
 
@@ -430,7 +425,7 @@ export class RPCClient {
     )
     const channel = this.resolveSessionChannel({
       primary: primaryChannel,
-      fallback: parsed.channel,
+      fallback: parsed.channel
     })
     const tokenUsage =
       this.normalizeTokenUsage(row.tokenUsage) ||
@@ -445,13 +440,16 @@ export class RPCClient {
       lastActivity: this.asString(row.lastActivity || row.updatedAt || row.lastSeen),
       model: this.asString(row.model || row.modelName) || undefined,
       label: this.asString(row.label || row.displayName) || undefined,
-      tokenUsage,
+      tokenUsage
     }
   }
 
   private normalizeChannelItem(value: unknown): Channel {
     const row = this.asRecord(value)
-    const statusRaw = this.asString(row.status || row.state, this.asBoolean(row.connected) ? 'connected' : 'disconnected')
+    const statusRaw = this.asString(
+      row.status || row.state,
+      this.asBoolean(row.connected) ? 'connected' : 'disconnected'
+    )
     const status: ChannelStatus =
       statusRaw === 'connected' ||
       statusRaw === 'disconnected' ||
@@ -472,22 +470,16 @@ export class RPCClient {
     const groups = Array.isArray(groupsRaw) ? groupsRaw : undefined
     const groupAllowFromRaw = row.groupAllowFrom || row.allowFrom
     const groupAllowFrom = Array.isArray(groupAllowFromRaw)
-      ? groupAllowFromRaw
-          .map((item) => this.asString(item))
-          .filter((item) => !!item.trim())
+      ? groupAllowFromRaw.map((item) => this.asString(item)).filter((item) => !!item.trim())
       : undefined
-    const requireMention = 'requireMention' in row
-      ? this.asBoolean(row.requireMention, false)
-      : undefined
+    const requireMention =
+      'requireMention' in row ? this.asBoolean(row.requireMention, false) : undefined
     const groupPolicy = this.asString(row.groupPolicy)
-    const channelKey = this.asString(row.channelKey || row.channel || row.platform || row.type || row.kind || row.id)
+    const channelKey = this.asString(
+      row.channelKey || row.channel || row.platform || row.type || row.kind || row.id
+    )
     const accountId = this.asString(
-      row.accountId ||
-        row.account ||
-        row.accountName ||
-        row.botId ||
-        row.selfId ||
-        row.userId
+      row.accountId || row.account || row.accountName || row.botId || row.selfId || row.userId
     )
     const id = this.asString(
       row.id ||
@@ -510,7 +502,7 @@ export class RPCClient {
       groupPolicy: groupPolicy || undefined,
       requireMention,
       groupAllowFrom,
-      groups: groups as Channel['groups'],
+      groups: groups as Channel['groups']
     }
   }
 
@@ -539,7 +531,7 @@ export class RPCClient {
       'unconfigured',
       'not linked',
       'disconnected',
-      'offline',
+      'offline'
     ])
 
     if (connected) return 'connected'
@@ -575,7 +567,7 @@ export class RPCClient {
       const accountId = this.asString(account.accountId || account.id, key || defaultAccountId)
       entries.push({
         ...account,
-        accountId,
+        accountId
       })
     }
     return entries
@@ -608,30 +600,34 @@ export class RPCClient {
           const hasRunning = 'running' in account || 'running' in summary
           const hasLinked = 'linked' in account || 'linked' in summary
           const status = this.normalizeChannelStatusFromSnapshot({
-            connected: 'connected' in account
-              ? this.asBoolean(account.connected, false)
-              : 'connected' in summary
-                ? this.asBoolean(summary.connected, false)
-                : undefined,
-            running: 'running' in account
-              ? this.asBoolean(account.running, false)
-              : 'running' in summary
-                ? this.asBoolean(summary.running, false)
-                : undefined,
-            linked: 'linked' in account
-              ? this.asBoolean(account.linked, false)
-              : 'linked' in summary
-                ? this.asBoolean(summary.linked, false)
-                : undefined,
-            configured: 'configured' in account
-              ? this.asBoolean(account.configured, false)
-              : 'configured' in summary
-                ? this.asBoolean(summary.configured, false)
-                : undefined,
+            connected:
+              'connected' in account
+                ? this.asBoolean(account.connected, false)
+                : 'connected' in summary
+                  ? this.asBoolean(summary.connected, false)
+                  : undefined,
+            running:
+              'running' in account
+                ? this.asBoolean(account.running, false)
+                : 'running' in summary
+                  ? this.asBoolean(summary.running, false)
+                  : undefined,
+            linked:
+              'linked' in account
+                ? this.asBoolean(account.linked, false)
+                : 'linked' in summary
+                  ? this.asBoolean(summary.linked, false)
+                  : undefined,
+            configured:
+              'configured' in account
+                ? this.asBoolean(account.configured, false)
+                : 'configured' in summary
+                  ? this.asBoolean(summary.configured, false)
+                  : undefined,
             hasConnected,
             hasRunning,
             hasLinked,
-            lastError: this.asString(account.lastError || summary.lastError),
+            lastError: this.asString(account.lastError || summary.lastError)
           })
           pushChannel({
             ...summary,
@@ -641,7 +637,7 @@ export class RPCClient {
             platform: channelKey,
             channelKey,
             accountId,
-            status,
+            status
           })
         }
         continue
@@ -660,7 +656,7 @@ export class RPCClient {
           hasConnected,
           hasRunning,
           hasLinked,
-          lastError: this.asString(summary.lastError),
+          lastError: this.asString(summary.lastError)
         })
         pushChannel({
           ...summary,
@@ -669,7 +665,7 @@ export class RPCClient {
           platform: channelKey,
           channelKey,
           accountId: defaultAccountId,
-          status,
+          status
         })
       }
     }
@@ -691,7 +687,7 @@ export class RPCClient {
         hasConnected,
         hasRunning,
         hasLinked,
-        lastError: this.asString(summary.lastError),
+        lastError: this.asString(summary.lastError)
       })
       pushChannel({
         ...summary,
@@ -700,7 +696,7 @@ export class RPCClient {
         platform: channelKey,
         channelKey,
         accountId: defaultAccountId,
-        status,
+        status
       })
     }
 
@@ -723,7 +719,7 @@ export class RPCClient {
       disabled: this.asBoolean(row.disabled, false),
       bundled: this.asBoolean(row.bundled, source === 'bundled'),
       skillKey: this.asString(row.skillKey) || undefined,
-      hasUpdate: this.asBoolean(row.hasUpdate, false) || undefined,
+      hasUpdate: this.asBoolean(row.hasUpdate, false) || undefined
     } as Skill
   }
 
@@ -748,7 +744,7 @@ export class RPCClient {
       installed,
       version: this.asString(row.version || row.ver) || undefined,
       enabled: 'enabled' in row ? this.asBoolean(row.enabled, true) : undefined,
-      status: status || undefined,
+      status: status || undefined
     }
   }
 
@@ -758,7 +754,7 @@ export class RPCClient {
       'items',
       'list',
       'data',
-      'entries',
+      'entries'
     ])
       .map((item) => this.normalizePluginItem(item))
       .filter((item) => !!item.name)
@@ -769,10 +765,7 @@ export class RPCClient {
 
     const row = this.asRecord(payload)
     const pluginsRaw = this.asRecord(row.plugins || row.items || row.data)
-    const entriesSource =
-      Object.keys(pluginsRaw).length > 0
-        ? pluginsRaw
-        : row
+    const entriesSource = Object.keys(pluginsRaw).length > 0 ? pluginsRaw : row
 
     const fallback: PluginPackage[] = []
     for (const [key, value] of Object.entries(entriesSource)) {
@@ -829,7 +822,7 @@ export class RPCClient {
       name: this.asString(row.name || row.id),
       description: this.asString(row.description),
       category: this.asString(row.category || row.group, 'general'),
-      enabled: this.asBoolean(row.enabled, true),
+      enabled: this.asBoolean(row.enabled, true)
     }
   }
 
@@ -845,7 +838,7 @@ export class RPCClient {
       platform: this.asString(row.platform || row.os, 'unknown'),
       connected: this.asBoolean(row.connected, false),
       capabilities,
-      lastSeen: this.asString(row.lastSeen || row.updatedAt) || undefined,
+      lastSeen: this.asString(row.lastSeen || row.updatedAt) || undefined
     }
   }
 
@@ -853,7 +846,7 @@ export class RPCClient {
     const row = this.asRecord(value)
     const identityRow = this.asRecord(row.identity)
     const id = this.asString(row.id || row.agentId || row.name)
-    
+
     let model: string | undefined
     if (row.model) {
       if (typeof row.model === 'string') {
@@ -863,7 +856,7 @@ export class RPCClient {
         model = this.asString(modelObj.primary)
       }
     }
-    
+
     return {
       id,
       name: this.asString(row.name) || undefined,
@@ -873,10 +866,10 @@ export class RPCClient {
             theme: this.asString(identityRow.theme) || undefined,
             emoji: this.asString(identityRow.emoji) || undefined,
             avatar: this.asString(identityRow.avatar) || undefined,
-            avatarUrl: this.asString(identityRow.avatarUrl) || undefined,
+            avatarUrl: this.asString(identityRow.avatarUrl) || undefined
           }
         : undefined,
-      model,
+      model
     }
   }
 
@@ -891,10 +884,11 @@ export class RPCClient {
       path: this.asString(row.path || row.filePath || row.file),
       missing: this.asBoolean(row.missing, false),
       size: Number.isFinite(size) && size >= 0 ? Math.floor(size) : undefined,
-      updatedAtMs: Number.isFinite(updatedAtMs) && updatedAtMs >= 0 ? Math.floor(updatedAtMs) : undefined,
+      updatedAtMs:
+        Number.isFinite(updatedAtMs) && updatedAtMs >= 0 ? Math.floor(updatedAtMs) : undefined,
       content: 'content' in row ? this.asString(row.content) : undefined,
       type: type as 'file' | 'directory' | undefined,
-      isDirectory,
+      isDirectory
     }
   }
 
@@ -907,7 +901,7 @@ export class RPCClient {
       defaultId: this.asString(row.defaultId || row.defaultAgentId) || undefined,
       mainKey: this.asString(row.mainKey) || undefined,
       scope: this.asString(row.scope) || undefined,
-      agents,
+      agents
     }
   }
 
@@ -920,7 +914,9 @@ export class RPCClient {
       roleRaw === 'tool' ||
       roleRaw === 'system' ||
       roleRaw === 'toolResult'
-        ? (roleRaw === 'toolResult' ? 'tool' : roleRaw)
+        ? roleRaw === 'toolResult'
+          ? 'tool'
+          : roleRaw
         : 'assistant'
 
     const rawContent = row.content
@@ -930,7 +926,7 @@ export class RPCClient {
     if (Array.isArray(rawContent)) {
       rawContentArray = rawContent.map((item) => {
         const itemRow = this.asRecord(item) || {}
-        const itemType = this.asString(itemRow.type) as ChatMessageContent['type'] || 'text'
+        const itemType = (this.asString(itemRow.type) as ChatMessageContent['type']) || 'text'
         const baseContent = {
           type: itemType,
           text: this.asString(itemRow.text),
@@ -939,7 +935,7 @@ export class RPCClient {
           name: this.asString(itemRow.name),
           arguments: this.asRecord(itemRow.arguments),
           content: itemRow.content,
-          isError: itemRow.isError === true,
+          isError: itemRow.isError === true
         }
         if (itemType === 'image') {
           return {
@@ -947,7 +943,7 @@ export class RPCClient {
             mimeType: this.asString(itemRow.mimeType || itemRow.mime_type),
             bytes: typeof itemRow.bytes === 'number' ? itemRow.bytes : undefined,
             data: this.asString(itemRow.data),
-            mediaPath: this.asString(itemRow.mediaPath || itemRow.media_path),
+            mediaPath: this.asString(itemRow.mediaPath || itemRow.media_path)
           }
         }
         return baseContent
@@ -1004,7 +1000,7 @@ export class RPCClient {
       toolCallId: this.asString(row.toolCallId || row.tool_call_id) || undefined,
       toolName: this.asString(row.toolName || row.tool_name) || undefined,
       isError: row.isError === true,
-      rawContent: rawContentArray,
+      rawContent: rawContentArray
     }
   }
 
@@ -1012,40 +1008,58 @@ export class RPCClient {
     const row = this.asRecord(value)
     const scheduleObjRaw = this.normalizeCronSchedule(row.schedule)
     const scheduleTextRaw = this.asString(row.schedule || row.cron || row.expression || row.expr)
-    const inferredSchedule = scheduleObjRaw || this.inferCronScheduleFromText(scheduleTextRaw, this.asString(row.timezone || row.tz) || undefined)
-    const scheduleText = inferredSchedule ? this.formatCronSchedule(inferredSchedule) : (scheduleTextRaw || '* * * * *')
+    const inferredSchedule =
+      scheduleObjRaw ||
+      this.inferCronScheduleFromText(
+        scheduleTextRaw,
+        this.asString(row.timezone || row.tz) || undefined
+      )
+    const scheduleText = inferredSchedule
+      ? this.formatCronSchedule(inferredSchedule)
+      : scheduleTextRaw || '* * * * *'
     const sessionTargetRaw = this.asString(row.sessionTarget)
     const sessionTarget: CronJob['sessionTarget'] =
-      sessionTargetRaw === 'main' || sessionTargetRaw === 'isolated'
-        ? sessionTargetRaw
-        : undefined
+      sessionTargetRaw === 'main' || sessionTargetRaw === 'isolated' ? sessionTargetRaw : undefined
     const wakeModeRaw = this.asString(row.wakeMode || row.wake)
     const wakeMode: CronJob['wakeMode'] =
-      wakeModeRaw === 'now' || wakeModeRaw === 'next-heartbeat'
-        ? wakeModeRaw
-        : undefined
+      wakeModeRaw === 'now' || wakeModeRaw === 'next-heartbeat' ? wakeModeRaw : undefined
     const payload = this.normalizeCronPayload(row.payload)
-    const delivery = this.normalizeCronDelivery(row.delivery) || this.normalizeCronDelivery(
-      payload && payload.kind === 'agentTurn'
-        ? {
-            mode: payload.deliver === false ? 'none' : (payload.channel || payload.to || payload.deliver === true ? 'announce' : undefined),
-            channel: payload.channel,
-            to: payload.to,
-            bestEffort: payload.bestEffortDeliver,
-          }
-        : undefined
-    )
+    const delivery =
+      this.normalizeCronDelivery(row.delivery) ||
+      this.normalizeCronDelivery(
+        payload && payload.kind === 'agentTurn'
+          ? {
+              mode:
+                payload.deliver === false
+                  ? 'none'
+                  : payload.channel || payload.to || payload.deliver === true
+                    ? 'announce'
+                    : undefined,
+              channel: payload.channel,
+              to: payload.to,
+              bestEffort: payload.bestEffortDeliver
+            }
+          : undefined
+      )
     const state = this.normalizeCronState(row.state)
-    const nextRunAtMs = state?.nextRunAtMs || this.asNumber(row.nextRunAtMs || row.nextAtMs || row.nextTimeMs, 0)
-    const lastRunAtMs = state?.lastRunAtMs || this.asNumber(row.lastRunAtMs || row.lastAtMs || row.lastTimeMs, 0)
-    const nextRun = this.asString(row.nextRun || row.nextAt || row.nextTime) || (nextRunAtMs > 0 ? new Date(nextRunAtMs).toISOString() : undefined)
-    const lastRun = this.asString(row.lastRun || row.lastAt || row.lastTime) || (lastRunAtMs > 0 ? new Date(lastRunAtMs).toISOString() : undefined)
-    const deleteAfterRun = 'deleteAfterRun' in row ? this.asBoolean(row.deleteAfterRun, false) : undefined
+    const nextRunAtMs =
+      state?.nextRunAtMs || this.asNumber(row.nextRunAtMs || row.nextAtMs || row.nextTimeMs, 0)
+    const lastRunAtMs =
+      state?.lastRunAtMs || this.asNumber(row.lastRunAtMs || row.lastAtMs || row.lastTimeMs, 0)
+    const nextRun =
+      this.asString(row.nextRun || row.nextAt || row.nextTime) ||
+      (nextRunAtMs > 0 ? new Date(nextRunAtMs).toISOString() : undefined)
+    const lastRun =
+      this.asString(row.lastRun || row.lastAt || row.lastTime) ||
+      (lastRunAtMs > 0 ? new Date(lastRunAtMs).toISOString() : undefined)
+    const deleteAfterRun =
+      'deleteAfterRun' in row ? this.asBoolean(row.deleteAfterRun, false) : undefined
     const createdAtMs = this.asNumber(row.createdAtMs, 0)
     const updatedAtMs = this.asNumber(row.updatedAtMs, 0)
-    const timezone = inferredSchedule?.kind === 'cron'
-      ? inferredSchedule.tz
-      : (this.asString(row.timezone || row.tz) || undefined)
+    const timezone =
+      inferredSchedule?.kind === 'cron'
+        ? inferredSchedule.tz
+        : this.asString(row.timezone || row.tz) || undefined
 
     return {
       id: this.asString(row.id || row.jobId || row.taskId || row.name, ''),
@@ -1066,7 +1080,7 @@ export class RPCClient {
       command: this.asString(row.command || row.cmd || row.script) || undefined,
       timezone,
       nextRun,
-      lastRun,
+      lastRun
     }
   }
 
@@ -1086,7 +1100,7 @@ export class RPCClient {
       return {
         kind: 'every',
         everyMs,
-        anchorMs: anchorMs > 0 ? anchorMs : undefined,
+        anchorMs: anchorMs > 0 ? anchorMs : undefined
       }
     }
 
@@ -1097,7 +1111,7 @@ export class RPCClient {
       return {
         kind: 'cron',
         expr,
-        tz: tz || undefined,
+        tz: tz || undefined
       }
     }
 
@@ -1112,7 +1126,7 @@ export class RPCClient {
     return {
       kind: 'cron',
       expr,
-      tz,
+      tz
     }
   }
 
@@ -1158,15 +1172,15 @@ export class RPCClient {
         model: this.asString(row.model).trim() || undefined,
         thinking: this.asString(row.thinking).trim() || undefined,
         timeoutSeconds: timeoutSeconds > 0 ? timeoutSeconds : undefined,
-        allowUnsafeExternalContent: 'allowUnsafeExternalContent' in row
-          ? this.asBoolean(row.allowUnsafeExternalContent, false)
-          : undefined,
+        allowUnsafeExternalContent:
+          'allowUnsafeExternalContent' in row
+            ? this.asBoolean(row.allowUnsafeExternalContent, false)
+            : undefined,
         deliver: 'deliver' in row ? this.asBoolean(row.deliver, true) : undefined,
         channel: this.asString(row.channel).trim() || undefined,
         to: this.asString(row.to).trim() || undefined,
-        bestEffortDeliver: 'bestEffortDeliver' in row
-          ? this.asBoolean(row.bestEffortDeliver, false)
-          : undefined,
+        bestEffortDeliver:
+          'bestEffortDeliver' in row ? this.asBoolean(row.bestEffortDeliver, false) : undefined
       }
     }
 
@@ -1177,9 +1191,7 @@ export class RPCClient {
     const row = this.asRecord(value)
     const modeRaw = this.asString(row.mode).trim()
     const mode: 'none' | 'announce' | undefined =
-      modeRaw === 'none' || modeRaw === 'announce'
-        ? modeRaw
-        : undefined
+      modeRaw === 'none' || modeRaw === 'announce' ? modeRaw : undefined
     const channel = this.asString(row.channel).trim() || undefined
     const to = this.asString(row.to).trim() || undefined
     const bestEffort = 'bestEffort' in row ? this.asBoolean(row.bestEffort, false) : undefined
@@ -1192,7 +1204,7 @@ export class RPCClient {
       mode: mode || 'announce',
       channel,
       to,
-      bestEffort,
+      bestEffort
     }
   }
 
@@ -1229,7 +1241,7 @@ export class RPCClient {
       lastStatus,
       lastError,
       lastDurationMs: lastDurationMs > 0 ? lastDurationMs : undefined,
-      consecutiveErrors: consecutiveErrors > 0 ? consecutiveErrors : undefined,
+      consecutiveErrors: consecutiveErrors > 0 ? consecutiveErrors : undefined
     }
   }
 
@@ -1243,7 +1255,7 @@ export class RPCClient {
       enabled,
       jobs,
       running: running > 0 ? running : undefined,
-      nextWakeAtMs: nextWakeAtMs > 0 ? nextWakeAtMs : undefined,
+      nextWakeAtMs: nextWakeAtMs > 0 ? nextWakeAtMs : undefined
     }
   }
 
@@ -1251,9 +1263,7 @@ export class RPCClient {
     const row = this.asRecord(value)
     const statusRaw = this.asString(row.status).trim()
     const status: CronRunLogEntry['status'] =
-      statusRaw === 'ok' || statusRaw === 'error' || statusRaw === 'skipped'
-        ? statusRaw
-        : undefined
+      statusRaw === 'ok' || statusRaw === 'error' || statusRaw === 'skipped' ? statusRaw : undefined
     const action = this.asString(row.action).trim() === 'finished' ? 'finished' : undefined
 
     return {
@@ -1267,7 +1277,7 @@ export class RPCClient {
       sessionKey: this.asString(row.sessionKey || row.key) || undefined,
       runAtMs: this.asNumber(row.runAtMs, 0) || undefined,
       durationMs: this.asNumber(row.durationMs || row.duration, 0) || undefined,
-      nextRunAtMs: this.asNumber(row.nextRunAtMs, 0) || undefined,
+      nextRunAtMs: this.asNumber(row.nextRunAtMs, 0) || undefined
     }
   }
 
@@ -1290,7 +1300,7 @@ export class RPCClient {
       available: this.asBoolean(row.available, this.asBoolean(row.enabled, true)),
       description: this.asString(row.description) || undefined,
       contextWindow: contextWindow > 0 ? contextWindow : undefined,
-      capabilities,
+      capabilities
     }
   }
 
@@ -1307,7 +1317,7 @@ export class RPCClient {
       outputCost: this.asNumber(row.outputCost, 0),
       cacheReadCost: this.asNumber(row.cacheReadCost, 0),
       cacheWriteCost: this.asNumber(row.cacheWriteCost, 0),
-      missingCostEntries: this.asNumber(row.missingCostEntries, 0),
+      missingCostEntries: this.asNumber(row.missingCostEntries, 0)
     }
   }
 
@@ -1321,7 +1331,7 @@ export class RPCClient {
           const toolRow = this.asRecord(tool)
           return {
             name: this.asString(toolRow.name || toolRow.tool || toolRow.id, 'unknown'),
-            count: this.asNumber(toolRow.count || toolRow.calls, 0),
+            count: this.asNumber(toolRow.count || toolRow.calls, 0)
           }
         })
       : []
@@ -1334,7 +1344,7 @@ export class RPCClient {
         return {
           date: this.asString(day.date, ''),
           tokens: this.asNumber(day.tokens, 0),
-          cost: this.asNumber(day.cost, 0),
+          cost: this.asNumber(day.cost, 0)
         }
       })
       .filter((item) => !!item.date)
@@ -1347,36 +1357,46 @@ export class RPCClient {
       agentId: this.asString(row.agentId || row.agent) || undefined,
       channel: this.asString(row.channel) || undefined,
       chatType: this.asString(row.chatType) || undefined,
-      modelProvider: this.asString(row.modelProvider || row.providerOverride || row.provider) || undefined,
+      modelProvider:
+        this.asString(row.modelProvider || row.providerOverride || row.provider) || undefined,
       model: this.asString(row.model || row.modelOverride) || undefined,
-      usage: usageRow && Object.keys(usageRow).length > 0
-        ? {
-            input: this.asNumber(usageRow.input, 0),
-            output: this.asNumber(usageRow.output, 0),
-            cacheRead: this.asNumber(usageRow.cacheRead, 0),
-            cacheWrite: this.asNumber(usageRow.cacheWrite, 0),
-            totalTokens: this.asNumber(usageRow.totalTokens || usageRow.tokens || usageRow.total, 0),
-            totalCost: this.asNumber(usageRow.totalCost || usageRow.cost, 0),
-            messageCounts: messageCountsRow && Object.keys(messageCountsRow).length > 0
-              ? {
-                  total: this.asNumber(messageCountsRow.total, 0),
-                  user: this.asNumber(messageCountsRow.user, 0),
-                  assistant: this.asNumber(messageCountsRow.assistant, 0),
-                  toolCalls: this.asNumber(messageCountsRow.toolCalls, 0),
-                  toolResults: this.asNumber(messageCountsRow.toolResults, 0),
-                  errors: this.asNumber(messageCountsRow.errors, 0),
-                }
-              : undefined,
-            toolUsage: toolUsageRow && Object.keys(toolUsageRow).length > 0
-              ? {
-                  totalCalls: this.asNumber(toolUsageRow.totalCalls || toolUsageRow.calls, 0),
-                  uniqueTools: this.asNumber(toolUsageRow.uniqueTools || toolUsageRow.unique, 0),
-                  tools: toolList,
-                }
-              : undefined,
-            dailyBreakdown,
-          }
-        : null,
+      usage:
+        usageRow && Object.keys(usageRow).length > 0
+          ? {
+              input: this.asNumber(usageRow.input, 0),
+              output: this.asNumber(usageRow.output, 0),
+              cacheRead: this.asNumber(usageRow.cacheRead, 0),
+              cacheWrite: this.asNumber(usageRow.cacheWrite, 0),
+              totalTokens: this.asNumber(
+                usageRow.totalTokens || usageRow.tokens || usageRow.total,
+                0
+              ),
+              totalCost: this.asNumber(usageRow.totalCost || usageRow.cost, 0),
+              messageCounts:
+                messageCountsRow && Object.keys(messageCountsRow).length > 0
+                  ? {
+                      total: this.asNumber(messageCountsRow.total, 0),
+                      user: this.asNumber(messageCountsRow.user, 0),
+                      assistant: this.asNumber(messageCountsRow.assistant, 0),
+                      toolCalls: this.asNumber(messageCountsRow.toolCalls, 0),
+                      toolResults: this.asNumber(messageCountsRow.toolResults, 0),
+                      errors: this.asNumber(messageCountsRow.errors, 0)
+                    }
+                  : undefined,
+              toolUsage:
+                toolUsageRow && Object.keys(toolUsageRow).length > 0
+                  ? {
+                      totalCalls: this.asNumber(toolUsageRow.totalCalls || toolUsageRow.calls, 0),
+                      uniqueTools: this.asNumber(
+                        toolUsageRow.uniqueTools || toolUsageRow.unique,
+                        0
+                      ),
+                      tools: toolList
+                    }
+                  : undefined,
+              dailyBreakdown
+            }
+          : null
     }
   }
 
@@ -1386,7 +1406,10 @@ export class RPCClient {
       .map((item) => this.normalizeSessionsUsageSession(item))
       .filter((item) => !!item.key)
 
-    const daily = this.normalizeList<unknown>(row.aggregates ? this.asRecord(row.aggregates).daily : row.daily, ['daily', 'items', 'list', 'data'])
+    const daily = this.normalizeList<unknown>(
+      row.aggregates ? this.asRecord(row.aggregates).daily : row.daily,
+      ['daily', 'items', 'list', 'data']
+    )
       .map((item) => {
         const day = this.asRecord(item)
         return {
@@ -1395,52 +1418,72 @@ export class RPCClient {
           cost: this.asNumber(day.cost, 0),
           messages: this.asNumber(day.messages, 0),
           toolCalls: this.asNumber(day.toolCalls, 0),
-          errors: this.asNumber(day.errors, 0),
+          errors: this.asNumber(day.errors, 0)
         }
       })
       .filter((item) => !!item.date)
 
     const aggregatesRow = this.asRecord(row.aggregates)
-    const byModel = this.normalizeList<unknown>(aggregatesRow.byModel, ['byModel', 'items', 'list', 'data'])
+    const byModel = this.normalizeList<unknown>(aggregatesRow.byModel, [
+      'byModel',
+      'items',
+      'list',
+      'data'
+    ])
       .map((item) => {
         const entry = this.asRecord(item)
         return {
           provider: this.asString(entry.provider) || undefined,
           model: this.asString(entry.model) || undefined,
           count: this.asNumber(entry.count, 0),
-          totals: this.normalizeUsageTotals(entry.totals),
+          totals: this.normalizeUsageTotals(entry.totals)
         }
       })
       .filter((item) => item.count > 0 || item.totals.totalTokens > 0 || item.totals.totalCost > 0)
 
-    const byProvider = this.normalizeList<unknown>(aggregatesRow.byProvider, ['byProvider', 'items', 'list', 'data'])
+    const byProvider = this.normalizeList<unknown>(aggregatesRow.byProvider, [
+      'byProvider',
+      'items',
+      'list',
+      'data'
+    ])
       .map((item) => {
         const entry = this.asRecord(item)
         return {
           provider: this.asString(entry.provider) || undefined,
           model: this.asString(entry.model) || undefined,
           count: this.asNumber(entry.count, 0),
-          totals: this.normalizeUsageTotals(entry.totals),
+          totals: this.normalizeUsageTotals(entry.totals)
         }
       })
       .filter((item) => item.count > 0 || item.totals.totalTokens > 0 || item.totals.totalCost > 0)
 
-    const byAgent = this.normalizeList<unknown>(aggregatesRow.byAgent, ['byAgent', 'items', 'list', 'data'])
+    const byAgent = this.normalizeList<unknown>(aggregatesRow.byAgent, [
+      'byAgent',
+      'items',
+      'list',
+      'data'
+    ])
       .map((item) => {
         const entry = this.asRecord(item)
         return {
           agentId: this.asString(entry.agentId || entry.agent, ''),
-          totals: this.normalizeUsageTotals(entry.totals),
+          totals: this.normalizeUsageTotals(entry.totals)
         }
       })
       .filter((item) => !!item.agentId)
 
-    const byChannel = this.normalizeList<unknown>(aggregatesRow.byChannel, ['byChannel', 'items', 'list', 'data'])
+    const byChannel = this.normalizeList<unknown>(aggregatesRow.byChannel, [
+      'byChannel',
+      'items',
+      'list',
+      'data'
+    ])
       .map((item) => {
         const entry = this.asRecord(item)
         return {
           channel: this.asString(entry.channel, ''),
-          totals: this.normalizeUsageTotals(entry.totals),
+          totals: this.normalizeUsageTotals(entry.totals)
         }
       })
       .filter((item) => !!item.channel)
@@ -1452,7 +1495,7 @@ export class RPCClient {
           const toolRow = this.asRecord(tool)
           return {
             name: this.asString(toolRow.name || toolRow.tool || toolRow.id, 'unknown'),
-            count: this.asNumber(toolRow.count || toolRow.calls, 0),
+            count: this.asNumber(toolRow.count || toolRow.calls, 0)
           }
         })
       : []
@@ -1470,19 +1513,19 @@ export class RPCClient {
           assistant: this.asNumber(messagesRow.assistant, 0),
           toolCalls: this.asNumber(messagesRow.toolCalls, 0),
           toolResults: this.asNumber(messagesRow.toolResults, 0),
-          errors: this.asNumber(messagesRow.errors, 0),
+          errors: this.asNumber(messagesRow.errors, 0)
         },
         tools: {
           totalCalls: this.asNumber(toolsRow.totalCalls || toolsRow.calls, 0),
           uniqueTools: this.asNumber(toolsRow.uniqueTools || toolsRow.unique, 0),
-          tools: toolItems,
+          tools: toolItems
         },
         byModel,
         byProvider,
         byAgent,
         byChannel,
-        daily,
-      },
+        daily
+      }
     }
   }
 
@@ -1493,7 +1536,7 @@ export class RPCClient {
         const entry = this.asRecord(item)
         return {
           date: this.asString(entry.date, ''),
-          ...this.normalizeUsageTotals(entry),
+          ...this.normalizeUsageTotals(entry)
         }
       })
       .filter((item) => !!item.date)
@@ -1502,15 +1545,13 @@ export class RPCClient {
       updatedAt: this.asNumber(row.updatedAt, Date.now()),
       days: this.asNumber(row.days, daily.length),
       totals: this.normalizeUsageTotals(row.totals),
-      daily,
+      daily
     }
   }
 
   private normalizeStringArray(value: unknown): string[] | undefined {
     if (!Array.isArray(value)) return undefined
-    const list = value
-      .map((item) => this.asString(item).trim())
-      .filter(Boolean)
+    const list = value.map((item) => this.asString(item).trim()).filter(Boolean)
     return list.length > 0 ? list : undefined
   }
 
@@ -1534,9 +1575,10 @@ export class RPCClient {
       scopes: this.normalizeStringArray(row.scopes) || undefined,
       tags: this.normalizeStringArray(row.tags) || undefined,
       ts: Number.isFinite(tsNumber) && tsNumber >= 0 ? Math.floor(tsNumber) : undefined,
-      lastInputSeconds: Number.isFinite(lastInputSeconds) && lastInputSeconds >= 0
-        ? Math.floor(lastInputSeconds)
-        : undefined,
+      lastInputSeconds:
+        Number.isFinite(lastInputSeconds) && lastInputSeconds >= 0
+          ? Math.floor(lastInputSeconds)
+          : undefined
     }
   }
 
@@ -1546,9 +1588,7 @@ export class RPCClient {
     const size = this.asNumber(row.size, 0)
     const file = this.asString(row.file, '')
     const lines = Array.isArray(row.lines)
-      ? row.lines
-          .map((line) => this.asString(line))
-          .filter((line) => typeof line === 'string')
+      ? row.lines.map((line) => this.asString(line)).filter((line) => typeof line === 'string')
       : []
     return {
       file,
@@ -1556,7 +1596,7 @@ export class RPCClient {
       size: Number.isFinite(size) && size >= 0 ? Math.floor(size) : 0,
       lines,
       truncated: 'truncated' in row ? this.asBoolean(row.truncated, false) : undefined,
-      reset: 'reset' in row ? this.asBoolean(row.reset, false) : undefined,
+      reset: 'reset' in row ? this.asBoolean(row.reset, false) : undefined
     }
   }
 
@@ -1595,9 +1635,10 @@ export class RPCClient {
           return {
             id: this.asString(entry.id) || undefined,
             pattern,
-            lastUsedAt: Number.isFinite(lastUsedAt) && lastUsedAt >= 0 ? Math.floor(lastUsedAt) : undefined,
+            lastUsedAt:
+              Number.isFinite(lastUsedAt) && lastUsedAt >= 0 ? Math.floor(lastUsedAt) : undefined,
             lastUsedCommand: this.asString(entry.lastUsedCommand) || undefined,
-            lastResolvedPath: this.asString(entry.lastResolvedPath) || undefined,
+            lastResolvedPath: this.asString(entry.lastResolvedPath) || undefined
           }
         })
         .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
@@ -1606,10 +1647,11 @@ export class RPCClient {
         security: normalizeSecurity(agentRow.security),
         ask: normalizeAsk(agentRow.ask),
         askFallback: normalizeSecurity(agentRow.askFallback),
-        autoAllowSkills: 'autoAllowSkills' in agentRow
-          ? this.asBoolean(agentRow.autoAllowSkills, false)
-          : undefined,
-        allowlist: allowlist.length > 0 ? allowlist : undefined,
+        autoAllowSkills:
+          'autoAllowSkills' in agentRow
+            ? this.asBoolean(agentRow.autoAllowSkills, false)
+            : undefined,
+        allowlist: allowlist.length > 0 ? allowlist : undefined
       }
     }
 
@@ -1617,17 +1659,18 @@ export class RPCClient {
       version: 1,
       socket: {
         path: this.asString(socketRaw.path) || undefined,
-        token: this.asString(socketRaw.token) || undefined,
+        token: this.asString(socketRaw.token) || undefined
       },
       defaults: {
         security: normalizeSecurity(defaultsRaw.security),
         ask: normalizeAsk(defaultsRaw.ask),
         askFallback: normalizeSecurity(defaultsRaw.askFallback),
-        autoAllowSkills: 'autoAllowSkills' in defaultsRaw
-          ? this.asBoolean(defaultsRaw.autoAllowSkills, false)
-          : undefined,
+        autoAllowSkills:
+          'autoAllowSkills' in defaultsRaw
+            ? this.asBoolean(defaultsRaw.autoAllowSkills, false)
+            : undefined
       },
-      agents: Object.keys(agents).length > 0 ? agents : undefined,
+      agents: Object.keys(agents).length > 0 ? agents : undefined
     }
   }
 
@@ -1637,7 +1680,7 @@ export class RPCClient {
       path: this.asString(row.path),
       exists: this.asBoolean(row.exists, false),
       hash: this.asString(row.hash),
-      file: this.normalizeExecApprovalsFile(row.file),
+      file: this.normalizeExecApprovalsFile(row.file)
     }
   }
 
@@ -1658,28 +1701,35 @@ export class RPCClient {
             durationMs: Number.isFinite(stepDurationMs) ? Math.floor(stepDurationMs) : undefined,
             exitCode: Number.isFinite(exitCode) ? Math.floor(exitCode) : null,
             stdoutTail: this.asString(step.stdoutTail) || null,
-            stderrTail: this.asString(step.stderrTail) || null,
+            stderrTail: this.asString(step.stderrTail) || null
           }
         })
       : []
 
     return {
       status: statusRaw === 'ok' || statusRaw === 'skipped' ? statusRaw : 'error',
-      mode: modeRaw === 'git' || modeRaw === 'pnpm' || modeRaw === 'bun' || modeRaw === 'npm'
-        ? modeRaw
-        : 'unknown',
+      mode:
+        modeRaw === 'git' || modeRaw === 'pnpm' || modeRaw === 'bun' || modeRaw === 'npm'
+          ? modeRaw
+          : 'unknown',
       root: this.asString(row.root) || undefined,
       reason: this.asString(row.reason) || undefined,
-      before: Object.keys(this.asRecord(row.before)).length > 0 ? {
-        sha: this.asString(this.asRecord(row.before).sha) || null,
-        version: this.asString(this.asRecord(row.before).version) || null,
-      } : null,
-      after: Object.keys(this.asRecord(row.after)).length > 0 ? {
-        sha: this.asString(this.asRecord(row.after).sha) || null,
-        version: this.asString(this.asRecord(row.after).version) || null,
-      } : null,
+      before:
+        Object.keys(this.asRecord(row.before)).length > 0
+          ? {
+              sha: this.asString(this.asRecord(row.before).sha) || null,
+              version: this.asString(this.asRecord(row.before).version) || null
+            }
+          : null,
+      after:
+        Object.keys(this.asRecord(row.after)).length > 0
+          ? {
+              sha: this.asString(this.asRecord(row.after).sha) || null,
+              version: this.asString(this.asRecord(row.after).version) || null
+            }
+          : null,
       steps,
-      durationMs: Number.isFinite(durationMs) ? Math.max(0, Math.floor(durationMs)) : 0,
+      durationMs: Number.isFinite(durationMs) ? Math.max(0, Math.floor(durationMs)) : 0
     }
   }
 
@@ -1690,38 +1740,33 @@ export class RPCClient {
     return {
       ok: this.asBoolean(row.ok, true),
       result: row.result ? this.normalizeUpdateRunResult(row.result) : undefined,
-      restart: Object.keys(restartRow).length > 0
-        ? {
-            ok: 'ok' in restartRow ? this.asBoolean(restartRow.ok, false) : undefined,
-            delayMs: 'delayMs' in restartRow ? this.asNumber(restartRow.delayMs, 0) : undefined,
-            pid: 'pid' in restartRow ? this.asNumber(restartRow.pid, 0) : undefined,
-            reason: this.asString(restartRow.reason) || undefined,
-            error: this.asString(restartRow.error) || undefined,
-          }
-        : null,
-      sentinel: Object.keys(sentinelRow).length > 0
-        ? {
-            path: this.asString(sentinelRow.path) || null,
-            payload: (sentinelRow.payload && typeof sentinelRow.payload === 'object')
-              ? (sentinelRow.payload as Record<string, unknown>)
-              : null,
-          }
-        : null,
+      restart:
+        Object.keys(restartRow).length > 0
+          ? {
+              ok: 'ok' in restartRow ? this.asBoolean(restartRow.ok, false) : undefined,
+              delayMs: 'delayMs' in restartRow ? this.asNumber(restartRow.delayMs, 0) : undefined,
+              pid: 'pid' in restartRow ? this.asNumber(restartRow.pid, 0) : undefined,
+              reason: this.asString(restartRow.reason) || undefined,
+              error: this.asString(restartRow.error) || undefined
+            }
+          : null,
+      sentinel:
+        Object.keys(sentinelRow).length > 0
+          ? {
+              path: this.asString(sentinelRow.path) || null,
+              payload:
+                sentinelRow.payload && typeof sentinelRow.payload === 'object'
+                  ? (sentinelRow.payload as Record<string, unknown>)
+                  : null
+            }
+          : null
     }
   }
 
   private looksLikeConfigRoot(value: unknown): value is HermesConfig {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false
     const row = value as Record<string, unknown>
-    const keys = [
-      'agents',
-      'channels',
-      'bindings',
-      'tools',
-      'session',
-      'gateway',
-      'models',
-    ]
+    const keys = ['agents', 'channels', 'bindings', 'tools', 'session', 'gateway', 'models']
     return keys.some((key) => key in row)
   }
 
@@ -1793,7 +1838,12 @@ export class RPCClient {
     raw: string | null
   } {
     const row = this.asRecord(payload)
-    const candidates = [row, this.asRecord(row.payload), this.asRecord(row.data), this.asRecord(row.result)]
+    const candidates = [
+      row,
+      this.asRecord(row.payload),
+      this.asRecord(row.data),
+      this.asRecord(row.result)
+    ]
 
     let exists = true
     let hash: string | null = null
@@ -1822,7 +1872,7 @@ export class RPCClient {
     return {
       exists,
       hash,
-      raw,
+      raw
     }
   }
 
@@ -1870,7 +1920,7 @@ export class RPCClient {
       'list',
       'data',
       'events',
-      'turns',
+      'turns'
     ]
     const queue: unknown[] = [payload]
     const visited = new Set<unknown>()
@@ -1975,8 +2025,8 @@ export class RPCClient {
           entries.length > 0 &&
           entries.every(([, item]) => item && typeof item === 'object' && !Array.isArray(item))
         ) {
-          return entries.map(([id, item]) =>
-            ({ id, ...(item as Record<string, unknown>) } as unknown as T)
+          return entries.map(
+            ([id, item]) => ({ id, ...(item as Record<string, unknown>) }) as unknown as T
           )
         }
       }
@@ -1987,7 +2037,9 @@ export class RPCClient {
       entries.length > 0 &&
       entries.every(([, item]) => item && typeof item === 'object' && !Array.isArray(item))
     ) {
-      return entries.map(([id, item]) => ({ id, ...(item as Record<string, unknown>) } as unknown as T))
+      return entries.map(
+        ([id, item]) => ({ id, ...(item as Record<string, unknown>) }) as unknown as T
+      )
     }
 
     return []
@@ -1996,10 +2048,17 @@ export class RPCClient {
   private call<T>(method: string, params?: Record<string, unknown>, timeout = 15000): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const id = nextId()
-      let timer: ReturnType<typeof setTimeout>
       let settled = false
+      let cleanup = (): void => {}
 
-      const cleanup = this.ws.on(`rpc:${id}`, (response: unknown) => {
+      const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
+        if (settled) return
+        settled = true
+        cleanup()
+        reject(new Error(`RPC call "${method}" timed out after ${timeout}ms`))
+      }, timeout)
+
+      cleanup = this.ws.on(`rpc:${id}`, (response: unknown) => {
         if (settled) return
         settled = true
         clearTimeout(timer)
@@ -2011,13 +2070,6 @@ export class RPCClient {
           reject(new Error(res.error?.message ?? 'RPC call failed'))
         }
       })
-
-      timer = setTimeout(() => {
-        if (settled) return
-        settled = true
-        cleanup()
-        reject(new Error(`RPC call "${method}" timed out after ${timeout}ms`))
-      }, timeout)
 
       this.ws.send({ type: 'req', id, method, params }).catch((err) => {
         if (settled) return
@@ -2038,7 +2090,7 @@ export class RPCClient {
     const normalized = patches
       .map((item) => ({
         path: this.asString(item.path).trim(),
-        value: item.value,
+        value: item.value
       }))
       .filter((item) => !!item.path)
 
@@ -2054,7 +2106,7 @@ export class RPCClient {
     }
 
     const params: Record<string, unknown> = {
-      raw: this.buildConfigPatchRaw(normalized),
+      raw: this.buildConfigPatchRaw(normalized)
     }
 
     if (snapshotMeta.exists && baseHash) {
@@ -2086,7 +2138,7 @@ export class RPCClient {
     }
 
     const params: Record<string, unknown> = {
-      raw: JSON.stringify(config, null, 2),
+      raw: JSON.stringify(config, null, 2)
     }
 
     if (snapshotMeta.exists && baseHash) {
@@ -2163,10 +2215,7 @@ export class RPCClient {
   }
 
   sendToSession(sessionKey: string, message: string): Promise<void> {
-    return this.callWithFallback(
-      ['sessions.send', 'session.send'],
-      { sessionKey, message }
-    )
+    return this.callWithFallback(['sessions.send', 'session.send'], { sessionKey, message })
   }
 
   getSessionHistory(sessionKey: string, limit?: number): Promise<unknown[]> {
@@ -2175,26 +2224,25 @@ export class RPCClient {
       params.limit = limit
     }
 
-    return this.callWithFallback<unknown>(
-      ['sessions.history', 'session.history'],
-      params
-    ).then((result) => {
-      if (Array.isArray(result)) {
-        return result
-      }
+    return this.callWithFallback<unknown>(['sessions.history', 'session.history'], params).then(
+      (result) => {
+        if (Array.isArray(result)) {
+          return result
+        }
 
-      if (result && typeof result === 'object') {
-        const record = result as Record<string, unknown>
-        const candidates = ['messages', 'history', 'items', 'list', 'data']
-        for (const key of candidates) {
-          if (Array.isArray(record[key])) {
-            return record[key] as unknown[]
+        if (result && typeof result === 'object') {
+          const record = result as Record<string, unknown>
+          const candidates = ['messages', 'history', 'items', 'list', 'data']
+          for (const key of candidates) {
+            if (Array.isArray(record[key])) {
+              return record[key] as unknown[]
+            }
           }
         }
-      }
 
-      return []
-    })
+        return []
+      }
+    )
   }
 
   patchSession(params: {
@@ -2206,7 +2254,7 @@ export class RPCClient {
     elevated?: boolean
   }): Promise<void> {
     const normalized: Record<string, unknown> = {
-      key: params.sessionKey,
+      key: params.sessionKey
     }
 
     if (params.label !== undefined) normalized.label = params.label
@@ -2241,7 +2289,11 @@ export class RPCClient {
     ).then((payload) => this.normalizeSessionsUsageResult(payload))
   }
 
-  getUsageCost(params?: { startDate?: string; endDate?: string; days?: number }): Promise<CostUsageSummary> {
+  getUsageCost(params?: {
+    startDate?: string
+    endDate?: string
+    days?: number
+  }): Promise<CostUsageSummary> {
     const normalized: Record<string, unknown> = {}
     if (params?.startDate?.trim()) normalized.startDate = params.startDate.trim()
     if (params?.endDate?.trim()) normalized.endDate = params.endDate.trim()
@@ -2258,7 +2310,11 @@ export class RPCClient {
 
   // --- Channels ---
   listChannels(): Promise<Channel[]> {
-    return this.callWithFallback<unknown>(['channels.status', 'channels.list', 'channel.list']).then((payload) => {
+    return this.callWithFallback<unknown>([
+      'channels.status',
+      'channels.list',
+      'channel.list'
+    ]).then((payload) => {
       const statusSnapshot = this.normalizeChannelsStatusPayload(payload)
       if (statusSnapshot.length > 0) {
         return statusSnapshot.filter((item) => !!item.id)
@@ -2297,12 +2353,7 @@ export class RPCClient {
   installPlugin(name: string): Promise<void> {
     return this.callWithMethodAndParamsFallback(
       ['plugins.install', 'plugin.install'],
-      [
-        { name },
-        { package: name },
-        { plugin: name },
-        { id: name },
-      ],
+      [{ name }, { package: name }, { plugin: name }, { id: name }],
       180000
     )
   }
@@ -2369,54 +2420,58 @@ export class RPCClient {
   }
 
   getStatus(): Promise<StatusSummary> {
-    return this.callWithMethodAndParamsFallback<StatusSummary>(
-      ['status'],
-      [{}, undefined],
-      30000
-    )
+    return this.callWithMethodAndParamsFallback<StatusSummary>(['status'], [{}, undefined], 30000)
   }
 
   getSystemPresence(): Promise<SystemPresenceEntry[]> {
-    return this.callWithMethodAndParamsFallback<unknown>(
-      ['system-presence'],
-      [{}, undefined]
-    ).then((payload) => {
-      const entries = Array.isArray(payload)
-        ? payload
-        : this.normalizeList<unknown>(payload, ['presence', 'items', 'list', 'data'])
-      return entries
-        .map((item) => this.normalizePresenceEntry(item))
-        .filter((item) => !!item.host || !!item.instanceId || !!item.deviceId)
-        .sort((a, b) => (b.ts || 0) - (a.ts || 0))
-    })
+    return this.callWithMethodAndParamsFallback<unknown>(['system-presence'], [{}, undefined]).then(
+      (payload) => {
+        const entries = Array.isArray(payload)
+          ? payload
+          : this.normalizeList<unknown>(payload, ['presence', 'items', 'list', 'data'])
+        return entries
+          .map((item) => this.normalizePresenceEntry(item))
+          .filter((item) => !!item.host || !!item.instanceId || !!item.deviceId)
+          .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+      }
+    )
   }
 
   tailLogs(params?: LogsTailParams): Promise<LogsTailResult> {
     const normalized: Record<string, unknown> = {}
-    if (typeof params?.cursor === 'number' && Number.isFinite(params.cursor) && params.cursor >= 0) {
+    if (
+      typeof params?.cursor === 'number' &&
+      Number.isFinite(params.cursor) &&
+      params.cursor >= 0
+    ) {
       normalized.cursor = Math.floor(params.cursor)
     }
     if (typeof params?.limit === 'number' && Number.isFinite(params.limit) && params.limit > 0) {
       normalized.limit = Math.floor(params.limit)
     }
-    if (typeof params?.maxBytes === 'number' && Number.isFinite(params.maxBytes) && params.maxBytes > 0) {
+    if (
+      typeof params?.maxBytes === 'number' &&
+      Number.isFinite(params.maxBytes) &&
+      params.maxBytes > 0
+    ) {
       normalized.maxBytes = Math.floor(params.maxBytes)
     }
 
-    return this.callWithMethodAndParamsFallback<unknown>(
-      ['logs.tail'],
-      [normalized, {}]
-    ).then((payload) => this.normalizeLogsTailResult(payload))
+    return this.callWithMethodAndParamsFallback<unknown>(['logs.tail'], [normalized, {}]).then(
+      (payload) => this.normalizeLogsTailResult(payload)
+    )
   }
 
   getExecApprovals(target?: { nodeId?: string }): Promise<ExecApprovalsSnapshot> {
     const nodeId = target?.nodeId?.trim()
     if (nodeId) {
-      return this.callWithFallback<unknown>(['exec.approvals.node.get'], { nodeId })
-        .then((payload) => this.normalizeExecApprovalsSnapshot(payload))
+      return this.callWithFallback<unknown>(['exec.approvals.node.get'], { nodeId }).then(
+        (payload) => this.normalizeExecApprovalsSnapshot(payload)
+      )
     }
-    return this.callWithFallback<unknown>(['exec.approvals.get'], {})
-      .then((payload) => this.normalizeExecApprovalsSnapshot(payload))
+    return this.callWithFallback<unknown>(['exec.approvals.get'], {}).then((payload) =>
+      this.normalizeExecApprovalsSnapshot(payload)
+    )
   }
 
   setExecApprovals(params: {
@@ -2427,20 +2482,19 @@ export class RPCClient {
     const nodeId = params.nodeId?.trim()
     const payload = {
       file: this.normalizeExecApprovalsFile(params.file),
-      baseHash: params.baseHash,
+      baseHash: params.baseHash
     }
 
     if (nodeId) {
-      return this.callWithFallback<unknown>(
-        ['exec.approvals.node.set'],
-        { nodeId, ...payload }
-      ).then((res) => this.normalizeExecApprovalsSnapshot(res))
+      return this.callWithFallback<unknown>(['exec.approvals.node.set'], {
+        nodeId,
+        ...payload
+      }).then((res) => this.normalizeExecApprovalsSnapshot(res))
     }
 
-    return this.callWithFallback<unknown>(
-      ['exec.approvals.set'],
-      payload
-    ).then((res) => this.normalizeExecApprovalsSnapshot(res))
+    return this.callWithFallback<unknown>(['exec.approvals.set'], payload).then((res) =>
+      this.normalizeExecApprovalsSnapshot(res)
+    )
   }
 
   runUpdate(params?: {
@@ -2472,7 +2526,7 @@ export class RPCClient {
     return this.callWithMethodAndParamsFallback<unknown>(
       ['update.run'],
       [payload, {}],
-      (params?.timeoutMs && Number.isFinite(params.timeoutMs))
+      params?.timeoutMs && Number.isFinite(params.timeoutMs)
         ? Math.max(5000, Math.floor(params.timeoutMs) + 15000)
         : 240000
     ).then((res) => this.normalizeUpdateRunResponse(res))
@@ -2482,11 +2536,11 @@ export class RPCClient {
   async listAgents(): Promise<AgentsListResult> {
     const config = await this.getConfig()
     const configured = Array.isArray(config.agents?.list) ? config.agents.list : []
-    
+
     try {
       const payload = await this.callWithFallback<unknown>(['agents.list', 'agent.list'], {})
       const result = this.normalizeAgentsListResult(payload)
-      
+
       if (result.agents.length > 0) {
         const mergedAgents = result.agents.map((agent) => {
           const configuredAgent = configured.find((a) => a.id === agent.id)
@@ -2495,20 +2549,26 @@ export class RPCClient {
           if (modelValue) {
             if (typeof modelValue === 'string') {
               model = this.asString(modelValue)
-            } else if (typeof modelValue === 'object' && modelValue !== null && 'primary' in modelValue) {
+            } else if (
+              typeof modelValue === 'object' &&
+              modelValue !== null &&
+              'primary' in modelValue
+            ) {
               model = this.asString(modelValue.primary)
             }
           }
           return {
             ...agent,
-            name: this.asString((configuredAgent as Record<string, unknown> | undefined)?.name) || agent.name,
+            name:
+              this.asString((configuredAgent as Record<string, unknown> | undefined)?.name) ||
+              agent.name,
             model: model || agent.model,
-            tools: configuredAgent?.tools,
+            tools: configuredAgent?.tools
           }
         })
         return {
           ...result,
-          agents: mergedAgents,
+          agents: mergedAgents
         }
       }
       // Server returned empty agents list — fall back to config-based construction
@@ -2518,9 +2578,12 @@ export class RPCClient {
         throw error
       }
       const ids = Array.from(
-        new Set(
-          ['main', ...configured.map((item) => this.asString((item as unknown as Record<string, unknown>)?.id)).filter(Boolean)]
-        )
+        new Set([
+          'main',
+          ...configured
+            .map((item) => this.asString((item as unknown as Record<string, unknown>)?.id))
+            .filter(Boolean)
+        ])
       )
       const agents = ids.map((id) => {
         const configuredAgent = configured.find((a) => a.id === id)
@@ -2529,7 +2592,11 @@ export class RPCClient {
         if (modelValue) {
           if (typeof modelValue === 'string') {
             model = this.asString(modelValue)
-          } else if (typeof modelValue === 'object' && modelValue !== null && 'primary' in modelValue) {
+          } else if (
+            typeof modelValue === 'object' &&
+            modelValue !== null &&
+            'primary' in modelValue
+          ) {
             model = this.asString(modelValue.primary)
           }
         }
@@ -2538,21 +2605,24 @@ export class RPCClient {
           name: this.asString((configuredAgent as Record<string, unknown> | undefined)?.name),
           identity: configuredAgent?.identity,
           model,
-          tools: configuredAgent?.tools,
+          tools: configuredAgent?.tools
         }
       })
       return {
         defaultId: 'main',
         mainKey: 'main',
-        agents,
+        agents
       }
     }
   }
 
-  createAgent(params: { name: string; workspace: string }): Promise<{ agentId: string; name: string; workspace: string }> {
+  createAgent(params: {
+    name: string
+    workspace: string
+  }): Promise<{ agentId: string; name: string; workspace: string }> {
     return this.call('agents.create', {
       name: params.name,
-      workspace: params.workspace,
+      workspace: params.workspace
     })
   }
 
@@ -2575,7 +2645,7 @@ export class RPCClient {
     }
   }): Promise<{ agentId: string }> {
     const payload: Record<string, unknown> = {
-      agentId: params.agentId,
+      agentId: params.agentId
     }
     if (params.workspace !== undefined) payload.workspace = params.workspace
     if (params.model !== undefined) payload.model = params.model
@@ -2595,29 +2665,47 @@ export class RPCClient {
    * Attempts multiple RPC method names; returns null if gateway doesn't support it.
    */
   async remoteReaddir(dirPath: string): Promise<Array<{
-    name: string; path: string; type: 'file' | 'directory'; size?: number; mtimeMs?: number; extension?: string
+    name: string
+    path: string
+    type: 'file' | 'directory'
+    size?: number
+    mtimeMs?: number
+    extension?: string
   }> | null> {
     const methods = ['fs.readdir', 'workspace.readdir', 'files.readdir']
     const paramsList = [{ path: dirPath }, { dir: dirPath }, { dirPath }]
     try {
       const payload = await this.callWithMethodAndParamsFallback<unknown>(methods, paramsList)
       const row = this.asRecord(payload)
-      const items = this.normalizeList<unknown>(payload, ['entries', 'files', 'items', 'list', 'data'])
+      const items = this.normalizeList<unknown>(payload, [
+        'entries',
+        'files',
+        'items',
+        'list',
+        'data'
+      ])
       if (items.length === 0 && !row.entries && !row.files && !row.items) return null
-      return items.map((item) => {
-        const r = this.asRecord(item)
-        const name = this.asString(r.name)
-        const isDir = r.isDirectory === true || r.type === 'directory' || r.kind === 'directory'
-        const ext = name.includes('.') ? name.split('.').pop() || '' : ''
-        return {
-          name,
-          path: this.asString(r.path || r.fullPath, `${dirPath}/${name}`),
-          type: (isDir ? 'directory' : 'file') as 'file' | 'directory',
-          size: typeof r.size === 'number' ? r.size : undefined,
-          mtimeMs: typeof r.mtimeMs === 'number' ? r.mtimeMs : (typeof r.modifiedAt === 'number' ? r.modifiedAt : undefined),
-          extension: isDir ? undefined : ext,
-        }
-      }).filter((e) => !!e.name)
+      return items
+        .map((item) => {
+          const r = this.asRecord(item)
+          const name = this.asString(r.name)
+          const isDir = r.isDirectory === true || r.type === 'directory' || r.kind === 'directory'
+          const ext = name.includes('.') ? name.split('.').pop() || '' : ''
+          return {
+            name,
+            path: this.asString(r.path || r.fullPath, `${dirPath}/${name}`),
+            type: (isDir ? 'directory' : 'file') as 'file' | 'directory',
+            size: typeof r.size === 'number' ? r.size : undefined,
+            mtimeMs:
+              typeof r.mtimeMs === 'number'
+                ? r.mtimeMs
+                : typeof r.modifiedAt === 'number'
+                  ? r.modifiedAt
+                  : undefined,
+            extension: isDir ? undefined : ext
+          }
+        })
+        .filter((e) => !!e.name)
     } catch {
       return null
     }
@@ -2635,7 +2723,7 @@ export class RPCClient {
       return {
         agentId: this.asString(row.agentId || row.id, agentId),
         workspace: this.asString(row.workspace || row.dir || row.path),
-        files,
+        files
       }
     })
   }
@@ -2643,7 +2731,11 @@ export class RPCClient {
   getAgentFile(agentId: string, name: string): Promise<AgentFilesGetResult> {
     return this.callWithMethodAndParamsFallback<unknown>(
       ['agents.files.get', 'agent.files.get'],
-      [{ agentId, name }, { id: agentId, name }, { agent: agentId, name }]
+      [
+        { agentId, name },
+        { id: agentId, name },
+        { agent: agentId, name }
+      ]
     ).then((payload) => {
       const row = this.asRecord(payload)
       const filePayload = row.file && typeof row.file === 'object' ? row.file : payload
@@ -2651,12 +2743,12 @@ export class RPCClient {
       const file: AgentFileEntry = {
         ...parsed,
         name: parsed.name || name,
-        path: parsed.path || `${this.asString(row.workspace)}/${name}`,
+        path: parsed.path || `${this.asString(row.workspace)}/${name}`
       }
       return {
         agentId: this.asString(row.agentId || row.id, agentId),
         workspace: this.asString(row.workspace || row.dir || row.path),
-        file,
+        file
       }
     })
   }
@@ -2667,7 +2759,7 @@ export class RPCClient {
       [
         { agentId, name, content },
         { id: agentId, name, content },
-        { agent: agentId, name, content },
+        { agent: agentId, name, content }
       ]
     ).then((payload) => {
       const row = this.asRecord(payload)
@@ -2678,13 +2770,13 @@ export class RPCClient {
         name: parsed.name || name,
         path: parsed.path || `${this.asString(row.workspace)}/${name}`,
         missing: false,
-        content,
+        content
       }
       return {
         ok: this.asBoolean(row.ok, true),
         agentId: this.asString(row.agentId || row.id, agentId),
         workspace: this.asString(row.workspace || row.dir || row.path),
-        file,
+        file
       }
     })
   }
@@ -2715,39 +2807,40 @@ export class RPCClient {
   }
 
   sendChatMessage(params: ChatSendParams): Promise<unknown> {
-    const idempotencyKey = params.idempotencyKey || `web-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const idempotencyKey =
+      params.idempotencyKey || `web-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     const model = params.model?.trim()
     const chatSendCandidates: Array<Record<string, unknown>> = [
       {
         sessionKey: params.sessionKey,
         message: params.message,
-        idempotencyKey,
+        idempotencyKey
       },
       {
         sessionKey: params.sessionKey,
         input: params.message,
-        idempotencyKey,
+        idempotencyKey
       },
       {
         key: params.sessionKey,
         message: params.message,
-        idempotencyKey,
+        idempotencyKey
       },
       {
         session: params.sessionKey,
         message: params.message,
-        idempotencyKey,
+        idempotencyKey
       },
       {
         sessionKey: params.sessionKey,
         text: params.message,
-        idempotencyKey,
+        idempotencyKey
       },
       {
         sessionKey: params.sessionKey,
         content: params.message,
-        idempotencyKey,
-      },
+        idempotencyKey
+      }
     ]
 
     if (model) {
@@ -2756,78 +2849,76 @@ export class RPCClient {
           sessionKey: params.sessionKey,
           message: params.message,
           modelRef: model,
-          idempotencyKey,
+          idempotencyKey
         },
         {
           sessionKey: params.sessionKey,
           message: params.message,
           modelOverride: model,
-          idempotencyKey,
+          idempotencyKey
         },
         {
           sessionKey: params.sessionKey,
           message: params.message,
           model,
-          idempotencyKey,
+          idempotencyKey
         },
         {
           sessionKey: params.sessionKey,
           input: params.message,
           modelOverride: model,
-          idempotencyKey,
+          idempotencyKey
         }
       )
     }
 
-    return this.callWithMethodAndParamsFallback(
-      ['chat.send'],
-      chatSendCandidates,
-      120000
-    ).catch((error) => {
-      if (!this.shouldFallbackOnError(error)) {
-        throw error
+    return this.callWithMethodAndParamsFallback(['chat.send'], chatSendCandidates, 120000).catch(
+      (error) => {
+        if (!this.shouldFallbackOnError(error)) {
+          throw error
+        }
+        return this.callWithMethodAndParamsFallback(
+          ['agent'],
+          [
+            {
+              sessionKey: params.sessionKey,
+              input: params.message,
+              ...(model ? { modelOverride: model } : {}),
+              idempotencyKey
+            },
+            {
+              sessionKey: params.sessionKey,
+              message: params.message,
+              ...(model ? { modelOverride: model } : {}),
+              idempotencyKey
+            },
+            {
+              key: params.sessionKey,
+              input: params.message,
+              ...(model ? { modelOverride: model } : {}),
+              idempotencyKey
+            },
+            {
+              key: params.sessionKey,
+              message: params.message,
+              ...(model ? { modelOverride: model } : {}),
+              idempotencyKey
+            },
+            {
+              input: params.message,
+              ...(model ? { modelOverride: model } : {}),
+              idempotencyKey
+            },
+            {
+              message: params.message,
+              ...(model ? { modelOverride: model } : {}),
+              idempotencyKey
+            }
+          ],
+          120000
+        )
       }
-      return this.callWithMethodAndParamsFallback(
-        ['agent'],
-        [
-          {
-            sessionKey: params.sessionKey,
-            input: params.message,
-            ...(model ? { modelOverride: model } : {}),
-            idempotencyKey,
-          },
-          {
-            sessionKey: params.sessionKey,
-            message: params.message,
-            ...(model ? { modelOverride: model } : {}),
-            idempotencyKey,
-          },
-          {
-            key: params.sessionKey,
-            input: params.message,
-            ...(model ? { modelOverride: model } : {}),
-            idempotencyKey,
-          },
-          {
-            key: params.sessionKey,
-            message: params.message,
-            ...(model ? { modelOverride: model } : {}),
-            idempotencyKey,
-          },
-          {
-            input: params.message,
-            ...(model ? { modelOverride: model } : {}),
-            idempotencyKey,
-          },
-          {
-            message: params.message,
-            ...(model ? { modelOverride: model } : {}),
-            idempotencyKey,
-          },
-        ],
-        120000
-      )
-    })
+    )
   }
 
   abortChat(runId?: string, sessionKey?: string): Promise<void> {
@@ -2848,11 +2939,18 @@ export class RPCClient {
     return this.callWithMethodAndParamsFallback<unknown>(
       ['cron.list', 'crons.list', 'schedule.list', 'schedules.list'],
       [{ includeDisabled: true }, {}]
-    ).then(
-      (payload) =>
-        this.normalizeList<unknown>(payload, ['items', 'list', 'data', 'jobs', 'tasks', 'crons', 'schedules'])
-          .map((item) => this.normalizeCronItem(item))
-          .filter((item) => !!item.id)
+    ).then((payload) =>
+      this.normalizeList<unknown>(payload, [
+        'items',
+        'list',
+        'data',
+        'jobs',
+        'tasks',
+        'crons',
+        'schedules'
+      ])
+        .map((item) => this.normalizeCronItem(item))
+        .filter((item) => !!item.id)
     )
   }
 
@@ -2866,7 +2964,11 @@ export class RPCClient {
   listCronRuns(jobId: string, limit = 50): Promise<CronRunLogEntry[]> {
     return this.callWithMethodAndParamsFallback<unknown>(
       ['cron.runs', 'crons.runs', 'cron.history', 'crons.history'],
-      [{ id: jobId, limit }, { jobId, limit }, { taskId: jobId, limit }]
+      [
+        { id: jobId, limit },
+        { jobId, limit },
+        { taskId: jobId, limit }
+      ]
     ).then((payload) =>
       this.normalizeList<unknown>(payload, ['entries', 'items', 'list', 'data', 'runs', 'history'])
         .map((item) => this.normalizeCronRunItem(item))
@@ -2886,13 +2988,25 @@ export class RPCClient {
     const patch = params as Record<string, unknown>
     return this.callWithMethodAndParamsFallback(
       ['cron.update', 'crons.update', 'schedule.update', 'schedules.update'],
-      [{ id, ...patch }, { id, patch }, { jobId: id, ...patch }, { taskId: id, ...patch }]
+      [
+        { id, ...patch },
+        { id, patch },
+        { jobId: id, ...patch },
+        { taskId: id, ...patch }
+      ]
     )
   }
 
   deleteCron(id: string): Promise<void> {
     return this.callWithMethodAndParamsFallback(
-      ['cron.remove', 'cron.delete', 'crons.remove', 'crons.delete', 'schedule.delete', 'schedules.delete'],
+      [
+        'cron.remove',
+        'cron.delete',
+        'crons.remove',
+        'crons.delete',
+        'schedule.delete',
+        'schedules.delete'
+      ],
       [{ id }, { jobId: id }, { taskId: id }]
     )
   }
@@ -2900,7 +3014,14 @@ export class RPCClient {
   runCron(id: string, mode: 'force' | 'due' = 'force'): Promise<void> {
     return this.callWithMethodAndParamsFallback(
       ['cron.run', 'crons.run', 'cron.trigger', 'crons.trigger'],
-      [{ id, mode }, { jobId: id, mode }, { taskId: id, mode }, { id }, { jobId: id }, { taskId: id }],
+      [
+        { id, mode },
+        { jobId: id, mode },
+        { taskId: id, mode },
+        { id },
+        { jobId: id },
+        { taskId: id }
+      ],
       160000
     )
   }
@@ -2925,12 +3046,18 @@ export class RPCClient {
       ['desktop.list', 'remote-desktop.list', 'vnc.list'],
       {}
     )
-    const sessions = this.normalizeList<unknown>(payload, ['sessions', 'items', 'list', 'data'])
-      .map((item) => this.normalizeDesktopSession(item))
+    const sessions = this.normalizeList<unknown>(payload, [
+      'sessions',
+      'items',
+      'list',
+      'data'
+    ]).map((item) => this.normalizeDesktopSession(item))
     return { sessions }
   }
 
-  async createDesktopSession(params: import('./types').RemoteDesktopCreateParams): Promise<import('./types').RemoteDesktopCreateResult> {
+  async createDesktopSession(
+    params: import('./types').RemoteDesktopCreateParams
+  ): Promise<import('./types').RemoteDesktopCreateResult> {
     const payload = await this.callWithFallback<unknown>(
       ['desktop.create', 'remote-desktop.create', 'vnc.create'],
       {
@@ -2938,7 +3065,7 @@ export class RPCClient {
         width: params.width || 1024,
         height: params.height || 768,
         depth: params.depth || 24,
-        timeout: params.timeout,
+        timeout: params.timeout
       }
     )
     const row = this.asRecord(payload)
@@ -2948,7 +3075,7 @@ export class RPCClient {
       message: this.asString(row.message || row.error),
       vncPort: this.asNumber(row.vncPort || row.port),
       websocketPort: this.asNumber(row.websocketPort || row.wsPort),
-      password: this.asString(row.password),
+      password: this.asString(row.password)
     }
   }
 
@@ -2983,7 +3110,7 @@ export class RPCClient {
       password: this.asString(row.password),
       createdAt: this.asNumber(row.createdAt || row.created, Date.now()),
       lastActivityAt: this.asNumber(row.lastActivityAt || row.lastActivity, Date.now()),
-      error: this.asString(row.error),
+      error: this.asString(row.error)
     }
   }
 

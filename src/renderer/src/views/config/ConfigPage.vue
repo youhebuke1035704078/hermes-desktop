@@ -18,7 +18,7 @@ import {
   NAlert,
   NCode,
   NScrollbar,
-  useMessage,
+  useMessage
 } from 'naive-ui'
 import { GitNetworkOutline, RefreshOutline, SaveOutline } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
@@ -92,9 +92,15 @@ watch(
 // Mark a section dirty the moment the user changes any of its bound refs so
 // the merged watcher above stops overwriting the local state mid-edit. The
 // corresponding save handler clears the flag after a successful patch.
-watch([primaryModel, gatewayPort, workspace], () => { generalDirty.value = true })
-watch([toolProfile, allowedTools, deniedTools], () => { toolsDirty.value = true })
-watch([sessionResetMode, sessionResetHour, sessionIdleMinutes, queueMode], () => { sessionDirty.value = true })
+watch([primaryModel, gatewayPort, workspace], () => {
+  generalDirty.value = true
+})
+watch([toolProfile, allowedTools, deniedTools], () => {
+  toolsDirty.value = true
+})
+watch([sessionResetMode, sessionResetHour, sessionIdleMinutes, queueMode], () => {
+  sessionDirty.value = true
+})
 
 async function saveGeneralSettings() {
   const patches: ConfigPatch[] = []
@@ -126,7 +132,7 @@ async function saveToolSettings() {
   const patches: ConfigPatch[] = [
     { path: 'tools.profile', value: toolProfile.value },
     { path: 'tools.allow', value: allowedTools.value },
-    { path: 'tools.deny', value: deniedTools.value },
+    { path: 'tools.deny', value: deniedTools.value }
   ]
 
   try {
@@ -141,7 +147,7 @@ async function saveToolSettings() {
 async function saveSessionSettings() {
   const patches: ConfigPatch[] = [
     { path: 'session.reset.mode', value: sessionResetMode.value },
-    { path: 'session.queue.mode', value: queueMode.value },
+    { path: 'session.queue.mode', value: queueMode.value }
   ]
   if (sessionResetMode.value === 'daily') {
     patches.push({ path: 'session.reset.hour', value: sessionResetHour.value })
@@ -173,26 +179,26 @@ const modelOptions = [
   { label: 'Claude Opus 4', value: 'anthropic/claude-opus-4' },
   { label: 'Claude Haiku 3.5', value: 'anthropic/claude-haiku-3-5' },
   { label: 'GPT-4o', value: 'openai/gpt-4o' },
-  { label: 'GPT-4o Mini', value: 'openai/gpt-4o-mini' },
+  { label: 'GPT-4o Mini', value: 'openai/gpt-4o-mini' }
 ]
 
-const profileOptions = computed(() => ([
+const profileOptions = computed(() => [
   { label: t('pages.config.toolProfiles.minimal'), value: 'minimal' },
   { label: t('pages.config.toolProfiles.coding'), value: 'coding' },
-  { label: t('pages.config.toolProfiles.full'), value: 'full' },
-]))
+  { label: t('pages.config.toolProfiles.full'), value: 'full' }
+])
 
-const resetModeOptions = computed(() => ([
+const resetModeOptions = computed(() => [
   { label: t('pages.config.resetModes.off'), value: 'off' },
   { label: t('pages.config.resetModes.daily'), value: 'daily' },
-  { label: t('pages.config.resetModes.idle'), value: 'idle' },
-]))
+  { label: t('pages.config.resetModes.idle'), value: 'idle' }
+])
 
-const queueModeOptions = computed(() => ([
+const queueModeOptions = computed(() => [
   { label: t('pages.config.queueModes.sequential'), value: 'sequential' },
   { label: t('pages.config.queueModes.concurrent'), value: 'concurrent' },
-  { label: t('pages.config.queueModes.collect'), value: 'collect' },
-]))
+  { label: t('pages.config.queueModes.collect'), value: 'collect' }
+])
 
 function goToChannels() {
   router.push({ name: 'Channels' })
@@ -205,17 +211,26 @@ function goToChannels() {
       <NCard :title="t('pages.config.title')" class="app-card">
         <template #header-extra>
           <NSpace :size="8" class="app-toolbar">
-            <NButton size="small" class="app-toolbar-btn app-toolbar-btn--refresh" @click="configStore.fetchConfig()">
+            <NButton
+              size="small"
+              class="app-toolbar-btn app-toolbar-btn--refresh"
+              @click="configStore.fetchConfig()"
+            >
               <template #icon><NIcon :component="RefreshOutline" /></template>
               {{ t('common.refresh') }}
             </NButton>
-            <NButton size="small" type="warning" class="app-toolbar-btn app-toolbar-btn--apply" @click="handleApply">
+            <NButton
+              size="small"
+              type="warning"
+              class="app-toolbar-btn app-toolbar-btn--apply"
+              @click="handleApply"
+            >
               {{ t('pages.config.applyAndReload') }}
             </NButton>
           </NSpace>
         </template>
 
-        <NAlert type="info" :bordered="false" style="margin-top: 12px;">
+        <NAlert type="info" :bordered="false" style="margin-top: 12px">
           <NSpace justify="space-between" align="center">
             <span>{{ t('pages.config.channelsMigratedHint') }}</span>
             <NButton size="tiny" type="primary" ghost @click="goToChannels">
@@ -226,10 +241,13 @@ function goToChannels() {
         </NAlert>
 
         <NTabs v-model:value="activeTab" type="line" animated>
-
           <!-- General -->
           <NTabPane name="general" :tab="t('pages.config.tabs.general')">
-            <NForm label-placement="left" label-width="120" style="max-width: 600px; margin-top: 16px;">
+            <NForm
+              label-placement="left"
+              label-width="120"
+              style="max-width: 600px; margin-top: 16px"
+            >
               <NFormItem :label="t('pages.config.labels.primaryModel')">
                 <NSelect
                   v-model:value="primaryModel"
@@ -243,10 +261,13 @@ function goToChannels() {
                 <NInputNumber v-model:value="gatewayPort" :min="1" :max="65535" />
               </NFormItem>
               <NFormItem :label="t('pages.config.labels.workspacePath')">
-                <NInput v-model:value="workspace" :placeholder="t('pages.config.placeholders.workspacePath')" />
+                <NInput
+                  v-model:value="workspace"
+                  :placeholder="t('pages.config.placeholders.workspacePath')"
+                />
               </NFormItem>
               <NFormItem>
-                <NButton type="primary" @click="saveGeneralSettings" :loading="configStore.saving">
+                <NButton type="primary" :loading="configStore.saving" @click="saveGeneralSettings">
                   <template #icon><NIcon :component="SaveOutline" /></template>
                   {{ t('common.save') }}
                 </NButton>
@@ -256,7 +277,11 @@ function goToChannels() {
 
           <!-- Tools -->
           <NTabPane name="tools" :tab="t('pages.config.tabs.tools')">
-            <NForm label-placement="left" label-width="120" style="max-width: 600px; margin-top: 16px;">
+            <NForm
+              label-placement="left"
+              label-width="120"
+              style="max-width: 600px; margin-top: 16px"
+            >
               <NFormItem :label="t('pages.config.labels.toolProfile')">
                 <NSelect v-model:value="toolProfile" :options="profileOptions" />
               </NFormItem>
@@ -267,7 +292,7 @@ function goToChannels() {
                 <NDynamicTags v-model:value="deniedTools" />
               </NFormItem>
               <NFormItem>
-                <NButton type="primary" @click="saveToolSettings" :loading="configStore.saving">
+                <NButton type="primary" :loading="configStore.saving" @click="saveToolSettings">
                   <template #icon><NIcon :component="SaveOutline" /></template>
                   {{ t('common.save') }}
                 </NButton>
@@ -277,21 +302,31 @@ function goToChannels() {
 
           <!-- Sessions -->
           <NTabPane name="sessions" :tab="t('pages.config.tabs.sessions')">
-            <NForm label-placement="left" label-width="120" style="max-width: 600px; margin-top: 16px;">
+            <NForm
+              label-placement="left"
+              label-width="120"
+              style="max-width: 600px; margin-top: 16px"
+            >
               <NFormItem :label="t('pages.config.labels.resetMode')">
                 <NSelect v-model:value="sessionResetMode" :options="resetModeOptions" />
               </NFormItem>
-              <NFormItem v-if="sessionResetMode === 'daily'" :label="t('pages.config.labels.resetHourUtc')">
+              <NFormItem
+                v-if="sessionResetMode === 'daily'"
+                :label="t('pages.config.labels.resetHourUtc')"
+              >
                 <NInputNumber v-model:value="sessionResetHour" :min="0" :max="23" />
               </NFormItem>
-              <NFormItem v-if="sessionResetMode === 'idle'" :label="t('pages.config.labels.idleMinutes')">
+              <NFormItem
+                v-if="sessionResetMode === 'idle'"
+                :label="t('pages.config.labels.idleMinutes')"
+              >
                 <NInputNumber v-model:value="sessionIdleMinutes" :min="1" :max="1440" />
               </NFormItem>
               <NFormItem :label="t('pages.config.labels.queueMode')">
                 <NSelect v-model:value="queueMode" :options="queueModeOptions" />
               </NFormItem>
               <NFormItem>
-                <NButton type="primary" @click="saveSessionSettings" :loading="configStore.saving">
+                <NButton type="primary" :loading="configStore.saving" @click="saveSessionSettings">
                   <template #icon><NIcon :component="SaveOutline" /></template>
                   {{ t('common.save') }}
                 </NButton>
@@ -301,11 +336,11 @@ function goToChannels() {
 
           <!-- Raw JSON -->
           <NTabPane name="raw" :tab="t('pages.config.tabs.raw')">
-            <NAlert type="info" :bordered="false" style="margin: 16px 0 12px;">
+            <NAlert type="info" :bordered="false" style="margin: 16px 0 12px">
               {{ t('pages.config.rawReadonlyHint') }}
             </NAlert>
-            <NScrollbar style="max-height: 500px;">
-              <NCode :code="rawJsonEdit" language="json" style="font-size: 13px;" />
+            <NScrollbar style="max-height: 500px">
+              <NCode :code="rawJsonEdit" language="json" style="font-size: 13px" />
             </NScrollbar>
           </NTabPane>
         </NTabs>

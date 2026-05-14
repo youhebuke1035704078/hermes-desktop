@@ -293,8 +293,8 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // @ts-ignore
+  // @ts-ignore - fallback path for non-isolated preload contexts.
   window.electron = electronAPI
-  // @ts-ignore
+  // @ts-ignore - fallback path for non-isolated preload contexts.
   window.api = api
 }

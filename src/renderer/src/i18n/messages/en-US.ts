@@ -419,7 +419,7 @@ export default {
         notCreated: 'Not created',
         exists: 'Exists'
       },
-      emptyDocHtml: 'This file is empty. Click \"Edit\" to start.',
+      emptyDocHtml: 'This file is empty. Click "Edit" to start.',
       editor: {
         stats: '{lines} lines · {chars} chars',
         placeholder: 'Maintain docs in Markdown. Saving empty content will write an empty file.',
@@ -431,7 +431,7 @@ export default {
         saveDoc: 'Save',
         restore: 'Restore'
       },
-      readonlyHint: 'Read-only mode. Click \"Edit\" to enable editing.',
+      readonlyHint: 'Read-only mode. Click "Edit" to enable editing.',
       infoCard: {
         title: 'Document info',
         workspace: 'Workspace',
@@ -575,7 +575,7 @@ export default {
         title: 'Jobs',
         count: '{count} jobs',
         searchPlaceholder: 'Search name / description / payload',
-        emptyHint: 'No jobs yet. Use a template above or click \"Create job\".'
+        emptyHint: 'No jobs yet. Use a template above or click "Create job".'
       },
       jobStatus: {
         enabled: 'Enabled',

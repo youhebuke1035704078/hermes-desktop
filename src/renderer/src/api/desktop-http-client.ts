@@ -14,19 +14,31 @@ export function getBaseURL(): string {
 export function setAuthToken(token: string): void {
   authToken = token
   // Persist token to sessionStorage so it survives page refreshes
-  try { sessionStorage.setItem('oc_token', token) } catch {}
+  try {
+    sessionStorage.setItem('oc_token', token)
+  } catch {
+    // Ignore unavailable storage, for example in restricted renderer contexts.
+  }
 }
 
 export function getAuthToken(): string {
   if (!authToken) {
-    try { authToken = sessionStorage.getItem('oc_token') || '' } catch {}
+    try {
+      authToken = sessionStorage.getItem('oc_token') || ''
+    } catch {
+      // Ignore unavailable storage, for example in restricted renderer contexts.
+    }
   }
   return authToken
 }
 
 export function clearAuthToken(): void {
   authToken = ''
-  try { sessionStorage.removeItem('oc_token') } catch {}
+  try {
+    sessionStorage.removeItem('oc_token')
+  } catch {
+    // Ignore unavailable storage, for example in restricted renderer contexts.
+  }
 }
 
 /** Register a callback invoked on 401 responses (e.g. redirect to login) */
@@ -45,7 +57,9 @@ export function setOnGlobalError(fn: (message: string) => void): void {
  */
 export async function triggerUnauthorized(): Promise<void> {
   clearAuthToken()
-  try { await Promise.resolve(onUnauthorized?.()) } catch (e) {
+  try {
+    await Promise.resolve(onUnauthorized?.())
+  } catch (e) {
     console.error('[triggerUnauthorized] handler error:', e)
   }
 }
@@ -96,7 +110,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     ...init,
     headers,
     cache: 'no-store',
-    signal: combineWithTimeout(init?.signal),
+    signal: combineWithTimeout(init?.signal)
   })
 
   if (!res.ok) {
@@ -106,7 +120,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     if (res.status === 401) {
       clearAuthToken()
       // Invoke async handler safely — catch errors to avoid unhandled rejections
-      try { await Promise.resolve(onUnauthorized?.()) } catch (e) {
+      try {
+        await Promise.resolve(onUnauthorized?.())
+      } catch (e) {
         console.error('[apiFetch] onUnauthorized handler error:', e)
       }
     } else {
@@ -139,11 +155,12 @@ export async function authFetch(path: string, init?: RequestInit): Promise<Respo
 
   if (res.status === 401) {
     clearAuthToken()
-    try { await Promise.resolve(onUnauthorized?.()) } catch (e) {
+    try {
+      await Promise.resolve(onUnauthorized?.())
+    } catch (e) {
       console.error('[authFetch] onUnauthorized handler error:', e)
     }
   }
 
   return res
 }
-

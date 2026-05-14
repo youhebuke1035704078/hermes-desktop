@@ -68,7 +68,7 @@ const pageTitle = computed(() => {
 const fallbackModelLabel = computed(() => modelStore.state.fallbackChain[0] || '')
 
 function goNotifications() {
-  router.push({ name: 'Settings' })
+  router.push({ name: 'Settings', query: { section: 'diagnostics' } })
 }
 </script>
 

@@ -741,7 +741,7 @@ async function connectLocalHermes() {
 
         <!-- Manual probe button -->
         <NFormItem v-if="!probeResult && normalizedUrl" :show-label="false">
-          <NButton size="small" :loading="probing" @click="probeServer" style="width: 100%">
+          <NButton size="small" :loading="probing" style="width: 100%" @click="probeServer">
             <template #icon><NIcon :component="FlashOutline" /></template>
             {{ t('pages.connection.probeButton') }}
           </NButton>

@@ -1936,7 +1936,7 @@ function looksLikeMarkdown(value: string): boolean {
   if (/`[^`\n]+`/.test(text)) return true
   if (/\[[^\]]+]\((https?:\/\/[^)\s]+)\)/.test(text)) return true
   if (/\*\*[^*\n]+\*\*/.test(text)) return true
-  if (/(^|[\s(（\[{【'"""'])\*[^*\n]+\*(?=$|[\s)\]）}】'".,!?，。！？：:、"'"])/u.test(text))
+  if (/(^|[\s(（[{【'"""'])\*[^*\n]+\*(?=$|[\s)\]）}】'".,!?，。！？：:、"'"])/u.test(text))
     return true
   if (/^\s{0,3}#{1,6}\s+\S+/m.test(text)) return true
   if (/^\s{0,3}>\s+\S+/m.test(text)) return true

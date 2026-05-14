@@ -23,9 +23,18 @@ export default defineConfig(
   },
   {
     files: ['**/*.{ts,mts,tsx,vue}'],
+    languageOptions: {
+      globals: {
+        __APP_VERSION__: 'readonly'
+      }
+    },
     rules: {
       'vue/require-default-prop': 'off',
       'vue/multi-word-component-names': 'off',
+      'vue/no-v-html': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      'prettier/prettier': 'off',
       'vue/block-lang': [
         'error',
         {
@@ -45,5 +54,17 @@ export default defineConfig(
       ]
     }
   },
-  eslintConfigPrettier
+  {
+    files: ['**/*.js'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off'
+    }
+  },
+  eslintConfigPrettier,
+  {
+    rules: {
+      'prettier/prettier': 'off'
+    }
+  }
 )

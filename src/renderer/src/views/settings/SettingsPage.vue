@@ -543,118 +543,130 @@ async function probeChatModel(
 async function runModelDiagnostic() {
   modelDiagnosticLoading.value = true
   const items: ModelDiagnosticItem[] = []
-
-  const tokenPresent = !!connectionStore.hermesAuthToken
-  items.push({
-    key: 'token',
-    label: '访问令牌',
-    value: tokenPresent ? '已配置' : '未配置',
-    detail: tokenPresent ? 'Desktop 会在 REST 请求中附带 Bearer token' : '受保护接口可能返回 401',
-    type: tokenPresent ? 'success' : 'warning'
-  })
-
   try {
-    const health = await hermesRestRequest<any>('/health')
+    const tokenPresent = !!connectionStore.hermesAuthToken
     items.push({
-      key: 'health',
-      label: '服务健康',
-      value: health?.status || health?.ok ? '可访问' : '有响应',
-      detail: currentServer.value?.url || 'Hermes REST',
-      type: health?.ok === false ? 'warning' : 'success'
+      key: 'token',
+      label: '访问令牌',
+      value: tokenPresent ? '已配置' : '未配置',
+      detail: tokenPresent ? 'Desktop 会在 REST 请求中附带 Bearer token' : '受保护接口可能返回 401',
+      type: tokenPresent ? 'success' : 'warning'
     })
-  } catch (e: any) {
+
+    try {
+      const health = await hermesRestRequest<any>('/health')
+      items.push({
+        key: 'health',
+        label: '服务健康',
+        value: health?.status || health?.ok ? '可访问' : '有响应',
+        detail: currentServer.value?.url || 'Hermes REST',
+        type: health?.ok === false ? 'warning' : 'success'
+      })
+    } catch (e: any) {
+      items.push({
+        key: 'health',
+        label: '服务健康',
+        value: '失败',
+        detail: e?.message || 'health probe failed',
+        type: 'error'
+      })
+    }
+
+    try {
+      const models = await hermesRestRequest<any>('/v1/models')
+      const modelIds = Array.isArray(models?.data)
+        ? models.data.map((row: any) => row?.id || row?.name).filter(Boolean)
+        : []
+      items.push({
+        key: 'models',
+        label: '模型接口',
+        value: modelIds[0] || connectionStore.hermesRealModel || '已响应',
+        detail: modelIds.length
+          ? `可见模型 ${modelIds.slice(0, 3).join(', ')}`
+          : '接口响应中未包含模型列表',
+        type: modelIds.length || connectionStore.hermesRealModel ? 'success' : 'warning'
+      })
+    } catch (e: any) {
+      items.push({
+        key: 'models',
+        label: '模型接口',
+        value: '失败',
+        detail: e?.message || 'models probe failed',
+        type: 'error'
+      })
+    }
+
+    if (canManage.value && !configYaml.value && !configYamlLoading.value && !envLoading.value) {
+      try {
+        await loadConfigFiles()
+      } catch (e: any) {
+        items.push({
+          key: 'config-load',
+          label: '配置读取',
+          value: '失败',
+          detail: e?.message || '读取 config.yaml/.env 失败',
+          type: 'warning'
+        })
+      }
+    }
+
+    const configuredDefault = extractYamlScalar(configYaml.value, 'default')
+    const configuredProvider = extractYamlScalar(configYaml.value, 'provider')
+    const fallbackModelList = parseFallbackModels(configYaml.value)
+    const fallbackModels = fallbackModelList.slice(0, 3).join(', ')
     items.push({
-      key: 'health',
-      label: '服务健康',
-      value: '失败',
-      detail: e?.message || 'health probe failed',
-      type: 'error'
+      key: 'config-main',
+      label: '主模型配置',
+      value: configuredDefault || connectionStore.hermesRealModel || '未识别',
+      detail: configuredProvider
+        ? `provider: ${configuredProvider}`
+        : '未从 config.yaml 解析到 provider',
+      type: configuredDefault || connectionStore.hermesRealModel ? 'success' : 'warning'
     })
+    items.push({
+      key: 'config-fallback',
+      label: '备用模型',
+      value: fallbackModels || '未配置',
+      detail: fallbackModels
+        ? 'fallback_providers 已配置'
+        : '建议保留可用备用模型，避免主模型凭据失败时中断',
+      type: fallbackModels ? 'success' : 'warning'
+    })
+    items.push({
+      key: 'gemini-key',
+      label: 'GEMINI_API_KEY',
+      value: hasEnvValue(envContent.value, 'GEMINI_API_KEY') ? '已配置' : '未配置',
+      detail: '用于 Gemini 备用模型可用性',
+      type: hasEnvValue(envContent.value, 'GEMINI_API_KEY') ? 'success' : 'warning'
+    })
+    items.push({
+      key: 'server-key',
+      label: 'API_SERVER_KEY',
+      value: hasEnvValue(envContent.value, 'API_SERVER_KEY') ? '已配置' : '未配置',
+      detail: '用于 Desktop 访问受保护的 Hermes REST 接口',
+      type: hasEnvValue(envContent.value, 'API_SERVER_KEY') || tokenPresent ? 'success' : 'warning'
+    })
+
+    const primaryModel = configuredDefault || connectionStore.hermesRealModel || 'hermes-agent'
+    items.push(await probeChatModel('主模型调用', 'probe-primary', primaryModel))
+    items.push(await probeChatModel('备用模型调用', 'probe-fallback', fallbackModelList[0] || ''))
+
+    modelDiagnosticItems.value = items
+    modelDiagnosticCheckedAt.value = Date.now()
+    const hasError = items.some((item) => item.type === 'error')
+    opsStore.pushNotice({
+      title: hasError ? '模型与凭据诊断发现异常' : '模型与凭据诊断通过',
+      detail:
+        items
+          .filter((item) => item.type === 'error' || item.type === 'warning')
+          .map((item) => `${item.label}: ${item.detail}`)
+          .join('；') || '主模型、备用模型、服务健康和关键凭据检查完成。',
+      severity: hasError ? 'warning' : 'success',
+      source: '模型诊断'
+    })
+  } finally {
+    modelDiagnosticLoading.value = false
   }
-
-  try {
-    const models = await hermesRestRequest<any>('/v1/models')
-    const modelIds = Array.isArray(models?.data)
-      ? models.data.map((row: any) => row?.id || row?.name).filter(Boolean)
-      : []
-    items.push({
-      key: 'models',
-      label: '模型接口',
-      value: modelIds[0] || connectionStore.hermesRealModel || '已响应',
-      detail: modelIds.length
-        ? `可见模型 ${modelIds.slice(0, 3).join(', ')}`
-        : '接口响应中未包含模型列表',
-      type: modelIds.length || connectionStore.hermesRealModel ? 'success' : 'warning'
-    })
-  } catch (e: any) {
-    items.push({
-      key: 'models',
-      label: '模型接口',
-      value: '失败',
-      detail: e?.message || 'models probe failed',
-      type: 'error'
-    })
-  }
-
-  if (canManage.value && !configYaml.value && !configYamlLoading.value && !envLoading.value) {
-    await loadConfigFiles()
-  }
-
-  const configuredDefault = extractYamlScalar(configYaml.value, 'default')
-  const configuredProvider = extractYamlScalar(configYaml.value, 'provider')
-  const fallbackModelList = parseFallbackModels(configYaml.value)
-  const fallbackModels = fallbackModelList.slice(0, 3).join(', ')
-  items.push({
-    key: 'config-main',
-    label: '主模型配置',
-    value: configuredDefault || connectionStore.hermesRealModel || '未识别',
-    detail: configuredProvider
-      ? `provider: ${configuredProvider}`
-      : '未从 config.yaml 解析到 provider',
-    type: configuredDefault || connectionStore.hermesRealModel ? 'success' : 'warning'
-  })
-  items.push({
-    key: 'config-fallback',
-    label: '备用模型',
-    value: fallbackModels || '未配置',
-    detail: fallbackModels
-      ? 'fallback_providers 已配置'
-      : '建议保留可用备用模型，避免主模型凭据失败时中断',
-    type: fallbackModels ? 'success' : 'warning'
-  })
-  items.push({
-    key: 'gemini-key',
-    label: 'GEMINI_API_KEY',
-    value: hasEnvValue(envContent.value, 'GEMINI_API_KEY') ? '已配置' : '未配置',
-    detail: '用于 Gemini 备用模型可用性',
-    type: hasEnvValue(envContent.value, 'GEMINI_API_KEY') ? 'success' : 'warning'
-  })
-  items.push({
-    key: 'server-key',
-    label: 'API_SERVER_KEY',
-    value: hasEnvValue(envContent.value, 'API_SERVER_KEY') ? '已配置' : '未配置',
-    detail: '用于 Desktop 访问受保护的 Hermes REST 接口',
-    type: hasEnvValue(envContent.value, 'API_SERVER_KEY') || tokenPresent ? 'success' : 'warning'
-  })
-
-  const primaryModel = configuredDefault || connectionStore.hermesRealModel || 'hermes-agent'
-  items.push(await probeChatModel('主模型调用', 'probe-primary', primaryModel))
-  items.push(await probeChatModel('备用模型调用', 'probe-fallback', fallbackModelList[0] || ''))
-
-  modelDiagnosticItems.value = items
-  modelDiagnosticCheckedAt.value = Date.now()
-  const hasError = items.some((item) => item.type === 'error')
-  opsStore.pushNotice({
-    title: hasError ? '模型与凭据诊断发现异常' : '模型与凭据诊断通过',
-    detail:
-      items
-        .filter((item) => item.type === 'error' || item.type === 'warning')
-        .map((item) => `${item.label}: ${item.detail}`)
-        .join('；') || '主模型、备用模型、服务健康和关键凭据检查完成。',
-    severity: hasError ? 'warning' : 'success',
-    source: '模型诊断'
-  })
-  modelDiagnosticLoading.value = false
 }
 
 async function copyModelDiagnostic(): Promise<void> {

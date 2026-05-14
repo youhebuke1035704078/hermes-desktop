@@ -14,7 +14,7 @@ import {
   NInput,
   NScrollbar,
   NPopconfirm,
-  useMessage,
+  useMessage
 } from 'naive-ui'
 import {
   ArrowBackOutline,
@@ -23,7 +23,7 @@ import {
   CreateOutline,
   DownloadOutline,
   RefreshOutline,
-  TrashOutline,
+  TrashOutline
 } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import { useSessionStore } from '@/stores/session'
@@ -71,7 +71,12 @@ function formatTokenK(value: number | undefined): string {
   if (value === undefined || value === null) return '-'
   const k = Math.max(0, value) / 1000
   const digits = k >= 100 ? 0 : k >= 10 ? 1 : 2
-  return k.toFixed(digits).replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1') + 'K'
+  return (
+    k
+      .toFixed(digits)
+      .replace(/\.0+$/, '')
+      .replace(/(\.\d*[1-9])0+$/, '$1') + 'K'
+  )
 }
 
 onMounted(() => {
@@ -114,21 +119,31 @@ async function handleExport() {
 
 function roleColor(role: string): string {
   switch (role) {
-    case 'user': return '#2080f0'
-    case 'assistant': return '#18a058'
-    case 'tool': return '#f0a020'
-    case 'system': return '#909399'
-    default: return '#666'
+    case 'user':
+      return '#2080f0'
+    case 'assistant':
+      return '#18a058'
+    case 'tool':
+      return '#f0a020'
+    case 'system':
+      return '#909399'
+    default:
+      return '#666'
   }
 }
 
 function roleLabel(role: string): string {
   switch (role) {
-    case 'user': return t('pages.sessions.roles.user')
-    case 'assistant': return t('pages.sessions.roles.assistant')
-    case 'tool': return t('pages.sessions.roles.tool')
-    case 'system': return t('pages.sessions.roles.system')
-    default: return role
+    case 'user':
+      return t('pages.sessions.roles.user')
+    case 'assistant':
+      return t('pages.sessions.roles.assistant')
+    case 'tool':
+      return t('pages.sessions.roles.tool')
+    case 'system':
+      return t('pages.sessions.roles.system')
+    default:
+      return role
   }
 }
 
@@ -140,7 +155,7 @@ const hermesChatStore = useHermesChatStore()
 const hermesConversation = computed(() => {
   if (!isHermesRest.value) return null
   const key = route.params.key as string
-  return hermesChatStore.conversations.find(c => c.id === key) || null
+  return hermesChatStore.conversations.find((c) => c.id === key) || null
 })
 
 const editingTitle = ref(false)
@@ -191,7 +206,7 @@ function handleHermesDeleteDetail() {
             <NIcon :component="ArrowBackOutline" />
           </template>
         </NButton>
-        <NText strong style="font-size: 18px;">{{ t('pages.sessions.detail.title') }}</NText>
+        <NText strong style="font-size: 18px">{{ t('pages.sessions.detail.title') }}</NText>
         <NTag size="small" type="info" round :bordered="false">{{ parsed.agent }}</NTag>
         <NTag size="small" round :bordered="false">{{ parsed.channel }}</NTag>
         <NText depth="3">{{ parsed.peer }}</NText>
@@ -211,8 +226,8 @@ function handleHermesDeleteDetail() {
               {{ session.peer || parsed.peer || '-' }}
             </NDescriptionsItem>
             <NDescriptionsItem :label="t('pages.sessions.detail.meta.model')">
-              <NText code v-if="session.model">{{ session.model }}</NText>
-              <NText depth="3" v-else>-</NText>
+              <NText v-if="session.model" code>{{ session.model }}</NText>
+              <NText v-else depth="3">-</NText>
             </NDescriptionsItem>
             <NDescriptionsItem :label="t('pages.sessions.detail.meta.label')">
               <NSpace v-if="!editingLabel" align="center" :size="4">
@@ -222,7 +237,12 @@ function handleHermesDeleteDetail() {
                 </NButton>
               </NSpace>
               <NSpace v-else align="center" :size="4">
-                <NInput v-model:value="editLabelValue" size="small" style="width: 200px;" @keyup.enter="saveLabel" />
+                <NInput
+                  v-model:value="editLabelValue"
+                  size="small"
+                  style="width: 200px"
+                  @keyup.enter="saveLabel"
+                />
                 <NButton text size="tiny" type="success" @click="saveLabel">
                   <template #icon><NIcon :component="CheckmarkOutline" /></template>
                 </NButton>
@@ -236,10 +256,10 @@ function handleHermesDeleteDetail() {
             </NDescriptionsItem>
             <NDescriptionsItem :label="t('pages.sessions.detail.meta.tokens')">
               <NSpace v-if="session.tokenUsage" :size="8">
-                <NText depth="3" style="font-size: 12px;">
+                <NText depth="3" style="font-size: 12px">
                   In: {{ formatTokenK(session.tokenUsage.totalInput) }}
                 </NText>
-                <NText depth="3" style="font-size: 12px;">
+                <NText depth="3" style="font-size: 12px">
                   Out: {{ formatTokenK(session.tokenUsage.totalOutput) }}
                 </NText>
               </NSpace>
@@ -252,7 +272,7 @@ function handleHermesDeleteDetail() {
         </NCard>
 
         <!-- Transcript card -->
-        <NCard class="app-card" style="margin-top: 12px;">
+        <NCard class="app-card" style="margin-top: 12px">
           <template #header>
             <NSpace align="center">
               <NText>{{ t('pages.sessions.detail.transcript') }}</NText>
@@ -263,11 +283,19 @@ function handleHermesDeleteDetail() {
           </template>
           <template #header-extra>
             <NSpace :size="8" class="app-toolbar">
-              <NButton size="small" class="app-toolbar-btn app-toolbar-btn--refresh" @click="sessionStore.fetchSession(sessionKey)">
+              <NButton
+                size="small"
+                class="app-toolbar-btn app-toolbar-btn--refresh"
+                @click="sessionStore.fetchSession(sessionKey)"
+              >
                 <template #icon><NIcon :component="RefreshOutline" /></template>
                 {{ t('common.refresh') }}
               </NButton>
-              <NButton size="small" class="app-toolbar-btn app-toolbar-btn--refresh" @click="handleExport">
+              <NButton
+                size="small"
+                class="app-toolbar-btn app-toolbar-btn--refresh"
+                @click="handleExport"
+              >
                 <template #icon><NIcon :component="DownloadOutline" /></template>
                 {{ t('common.export') }}
               </NButton>
@@ -292,41 +320,50 @@ function handleHermesDeleteDetail() {
             </NSpace>
           </template>
 
-          <NScrollbar style="max-height: calc(100vh - 360px);">
+          <NScrollbar style="max-height: calc(100vh - 360px)">
             <div
               v-if="session?.transcript?.length"
-              style="display: flex; flex-direction: column; gap: 12px; padding: 4px 0;"
+              style="display: flex; flex-direction: column; gap: 12px; padding: 4px 0"
             >
               <div
                 v-for="(msg, index) in session.transcript"
                 :key="`${msg.role}:${msg.timestamp ?? ''}:${index}:${msg.content?.length ?? 0}`"
-                style="display: flex; gap: 12px; padding: 12px; border-radius: 8px;"
-                :style="{ backgroundColor: msg.role === 'assistant' ? 'var(--bg-secondary)' : 'transparent' }"
+                style="display: flex; gap: 12px; padding: 12px; border-radius: 8px"
+                :style="{
+                  backgroundColor: msg.role === 'assistant' ? 'var(--bg-secondary)' : 'transparent'
+                }"
               >
                 <NTag
                   size="small"
                   :bordered="false"
                   round
                   :color="{ color: roleColor(msg.role) + '18', textColor: roleColor(msg.role) }"
-                  style="flex-shrink: 0; height: 22px;"
+                  style="flex-shrink: 0; height: 22px"
                 >
                   {{ roleLabel(msg.role) }}
                 </NTag>
-                <div style="flex: 1; min-width: 0;">
-                  <div style="white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.6;">
+                <div style="flex: 1; min-width: 0">
+                  <div
+                    style="
+                      white-space: pre-wrap;
+                      word-break: break-word;
+                      font-size: 14px;
+                      line-height: 1.6;
+                    "
+                  >
                     {{ msg.content }}
                   </div>
                   <NText
                     v-if="msg.timestamp"
                     depth="3"
-                    style="font-size: 11px; margin-top: 4px; display: block;"
+                    style="font-size: 11px; margin-top: 4px; display: block"
                   >
                     {{ formatDate(msg.timestamp) }}
                   </NText>
                 </div>
               </div>
             </div>
-            <div v-else style="text-align: center; padding: 60px 0; color: var(--text-secondary);">
+            <div v-else style="text-align: center; padding: 60px 0; color: var(--text-secondary)">
               {{ t('common.noMessages') }}
             </div>
           </NScrollbar>
@@ -340,7 +377,7 @@ function handleHermesDeleteDetail() {
     <!-- Not found -->
     <NSpace v-if="!hermesConversation" vertical :size="16">
       <NCard class="app-card">
-        <NSpace vertical align="center" justify="center" style="padding: 40px 0;">
+        <NSpace vertical align="center" justify="center" style="padding: 40px 0">
           <NText depth="3">{{ t('pages.sessions.hermesRest.notFound') }}</NText>
           <NButton @click="router.push({ name: 'Sessions' })">
             <template #icon><NIcon :component="ArrowBackOutline" /></template>
@@ -353,7 +390,7 @@ function handleHermesDeleteDetail() {
     <NSpace v-else vertical :size="16">
       <!-- Header card -->
       <NCard class="app-card" size="small">
-        <NSpace align="center" justify="space-between" style="width: 100%;">
+        <NSpace align="center" justify="space-between" style="width: 100%">
           <NSpace align="center">
             <NButton quaternary circle @click="router.push({ name: 'Sessions' })">
               <template #icon>
@@ -361,7 +398,7 @@ function handleHermesDeleteDetail() {
               </template>
             </NButton>
             <template v-if="!editingTitle">
-              <NText strong style="font-size: 18px; cursor: pointer;" @click="startEditTitle">
+              <NText strong style="font-size: 18px; cursor: pointer" @click="startEditTitle">
                 {{ hermesConversation.title || t('pages.sessions.hermesRest.untitled') }}
               </NText>
               <NButton text size="tiny" @click="startEditTitle">
@@ -372,7 +409,7 @@ function handleHermesDeleteDetail() {
               <NInput
                 v-model:value="titleDraft"
                 size="small"
-                style="width: 300px;"
+                style="width: 300px"
                 @keyup.enter="saveTitle"
                 @blur="saveTitle"
               />
@@ -406,7 +443,9 @@ function handleHermesDeleteDetail() {
             {{ hermesConversation.messages?.length || 0 }}
           </NDescriptionsItem>
           <NDescriptionsItem :label="t('pages.sessions.list.columns.model')">
-            <NText code>{{ connectionStore.hermesRealModel || hermesConversation.model || '-' }}</NText>
+            <NText code>{{
+              connectionStore.hermesRealModel || hermesConversation.model || '-'
+            }}</NText>
           </NDescriptionsItem>
           <NDescriptionsItem label="Created">
             {{ hermesConversation.createdAt ? formatDate(hermesConversation.createdAt) : '-' }}
@@ -422,41 +461,52 @@ function handleHermesDeleteDetail() {
         <template #header>
           <NText>{{ t('pages.sessions.detail.transcript') }}</NText>
         </template>
-        <NScrollbar style="max-height: calc(100vh - 420px);">
+        <NScrollbar style="max-height: calc(100vh - 420px)">
           <div
             v-if="hermesConversation.messages?.length"
-            style="display: flex; flex-direction: column; gap: 12px; padding: 4px 0;"
+            style="display: flex; flex-direction: column; gap: 12px; padding: 4px 0"
           >
             <div
               v-for="(msg, index) in hermesConversation.messages"
               :key="`${msg.role}:${msg.timestamp ?? ''}:${index}:${msg.content?.length ?? 0}`"
-              style="display: flex; gap: 12px; padding: 12px; border-radius: 8px;"
-              :style="{ backgroundColor: msg.role === 'assistant' ? 'var(--bg-secondary)' : 'transparent' }"
+              style="display: flex; gap: 12px; padding: 12px; border-radius: 8px"
+              :style="{
+                backgroundColor: msg.role === 'assistant' ? 'var(--bg-secondary)' : 'transparent'
+              }"
             >
               <NTag
                 size="small"
                 :bordered="false"
                 round
-                :type="msg.role === 'user' ? 'info' : msg.role === 'assistant' ? 'success' : 'default'"
-                style="flex-shrink: 0; height: 22px;"
+                :type="
+                  msg.role === 'user' ? 'info' : msg.role === 'assistant' ? 'success' : 'default'
+                "
+                style="flex-shrink: 0; height: 22px"
               >
                 {{ msg.role }}
               </NTag>
-              <div style="flex: 1; min-width: 0;">
+              <div style="flex: 1; min-width: 0">
                 <NText
                   v-if="msg.timestamp"
                   depth="3"
-                  style="font-size: 11px; margin-bottom: 4px; display: block;"
+                  style="font-size: 11px; margin-bottom: 4px; display: block"
                 >
                   {{ formatDate(msg.timestamp) }}
                 </NText>
-                <div style="white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.6;">
+                <div
+                  style="
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                    font-size: 14px;
+                    line-height: 1.6;
+                  "
+                >
                   {{ msg.content }}
                 </div>
               </div>
             </div>
           </div>
-          <div v-else style="text-align: center; padding: 60px 0; color: var(--text-secondary);">
+          <div v-else style="text-align: center; padding: 60px 0; color: var(--text-secondary)">
             {{ t('common.noMessages') }}
           </div>
         </NScrollbar>

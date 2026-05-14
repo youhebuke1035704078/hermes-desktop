@@ -211,7 +211,7 @@ onUnmounted(() => {
       </template>
       <template #header-extra>
         <NSpace :size="8">
-          <NButton secondary size="small" @click="handleRefresh" :loading="logsStore.loading">
+          <NButton secondary size="small" :loading="logsStore.loading" @click="handleRefresh">
             <template #icon><NIcon :component="RefreshOutline" /></template>
             {{ t('pages.logs.refresh') }}
           </NButton>

@@ -1173,6 +1173,7 @@ export const useChatStore = defineStore('chat', () => {
         ...initialFallbackStamp(modelStore.state)
       }
       messages.value = capMessages([...messages.value, assistantMessage])
+      let scopedMessages = capMessages([...messages.value])
       setAgentStatusPhase(agentId, 'replying', { runId: idempotencyKey, detail: null })
       activeHermesRestRequestId = requestId
       hermesRestAbortRequested = false
@@ -1182,13 +1183,25 @@ export const useChatStore = defineStore('chat', () => {
       let stopFallbackWatch: (() => void) | null = null
       let cleanupChunkListener: (() => void) | null = null
       let persistTimer: ReturnType<typeof setTimeout> | null = null
+      const syncScopedMessagesToActive = (): void => {
+        if (conversationId && hermesChatStore.activeId !== conversationId) return
+        messages.value = capMessages([...scopedMessages])
+      }
+      const updateScopedAssistant = (updater: (message: ChatMessage) => ChatMessage): boolean => {
+        const idx = scopedMessages.findIndex((m) => m.id === assistantMsgId)
+        if (idx < 0) return false
+        scopedMessages[idx] = updater(scopedMessages[idx])
+        scopedMessages = capMessages([...scopedMessages])
+        syncScopedMessagesToActive()
+        return true
+      }
       const persistConversation = (immediate = false): void => {
         if (!conversationId) return
         const flush = (): void => {
           persistTimer = null
           hermesChatStore.setMessagesFor(
             conversationId,
-            [...messages.value],
+            [...scopedMessages],
             connectionStore.hermesRealModel || undefined
           )
         }
@@ -1209,19 +1222,17 @@ export const useChatStore = defineStore('chat', () => {
         stopFallbackWatch = watch(
           () => modelStore.state.kind,
           () => {
-            const idx = messages.value.findIndex((m) => m.id === assistantMsgId)
-            if (idx < 0) return
-            const stamped = applyFallbackStamp(messages.value[idx], modelStore.state)
-            if (!stamped) return
-            messages.value[idx] = stamped
-            messages.value = [...messages.value] // trigger Vue reactivity
-            persistConversation()
+            const changed = updateScopedAssistant((current) => {
+              const stamped = applyFallbackStamp(current, modelStore.state)
+              return stamped ?? current
+            })
+            if (changed) persistConversation()
           },
           { flush: 'sync' }
         )
 
         // Build OpenAI-format messages from local history (exclude the empty assistant placeholder)
-        const apiMessages = messages.value
+        const apiMessages = scopedMessages
           .filter(
             (m) =>
               (m.role === 'user' || m.role === 'assistant') && m.id !== assistantMsgId && m.content
@@ -1245,15 +1256,12 @@ export const useChatStore = defineStore('chat', () => {
           if (errorMessage) streamError = errorMessage
           const content = extractAssistantContentFromChunk(chunk.data)
           if (content) {
-            const idx = messages.value.findIndex((m) => m.id === assistantMsgId)
-            if (idx >= 0) {
-              const existing = messages.value[idx]
+            const changed = updateScopedAssistant((existing) => {
               const stamped = applyFallbackStamp(existing, modelStore.state)
               const base = stamped ?? existing
-              messages.value[idx] = { ...base, content: base.content + content }
-              messages.value = [...messages.value] // trigger Vue reactivity
-              persistConversation()
-            }
+              return { ...base, content: base.content + content }
+            })
+            if (changed) persistConversation()
           }
           // Capture resolved model name from chunk (gateway echoes it in every chunk)
           const chunkModel = (chunk.data as { model?: unknown } | null)?.model
@@ -1287,23 +1295,19 @@ export const useChatStore = defineStore('chat', () => {
           throw new Error(result.error || 'Chat request failed')
         }
         const finalContent = reconcileFinalAssistantContent(
-          messages.value.find((item) => item.id === assistantMsgId)?.content || '',
+          scopedMessages.find((item) => item.id === assistantMsgId)?.content || '',
           result.finalContent
         )
         if (finalContent) {
-          const idx = messages.value.findIndex((item) => item.id === assistantMsgId)
-          if (idx >= 0) {
-            messages.value[idx] = { ...messages.value[idx], content: finalContent }
-            messages.value = [...messages.value]
-            persistConversation(true)
-          }
+          const changed = updateScopedAssistant((item) => ({ ...item, content: finalContent }))
+          if (changed) persistConversation(true)
         }
         if (streamError) {
           throw new Error(streamError)
         }
 
-        const assistantIndex = messages.value.findIndex((m) => m.id === assistantMsgId)
-        if (assistantIndex >= 0 && !messages.value[assistantIndex]?.content.trim()) {
+        const assistantIndex = scopedMessages.findIndex((m) => m.id === assistantMsgId)
+        if (assistantIndex >= 0 && !scopedMessages[assistantIndex]?.content.trim()) {
           throw new Error(
             byLocale(
               'Hermes Agent 没有返回助手内容。请检查服务端模型调用日志，常见原因是模型请求超时、凭据失效或后备模型未配置。',
@@ -1331,18 +1335,16 @@ export const useChatStore = defineStore('chat', () => {
         setAgentStatusPhase(agentId, 'done', { runId: null, detail: null })
       } catch (error) {
         lastError.value = formatChatRequestError(error)
-        const assistantIndex = messages.value.findIndex((item) => item.id === assistantMsgId)
-        if (assistantIndex >= 0) {
-          messages.value[assistantIndex] = {
-            ...messages.value[assistantIndex],
-            isError: true,
-            content: byLocale(
-              `发送失败：${lastError.value}`,
-              `Send failed: ${lastError.value}`,
-              getActiveLocale()
-            )
-          }
-          messages.value = [...messages.value]
+        const changed = updateScopedAssistant((item) => ({
+          ...item,
+          isError: true,
+          content: byLocale(
+            `发送失败：${lastError.value}`,
+            `Send failed: ${lastError.value}`,
+            getActiveLocale()
+          )
+        }))
+        if (changed) {
           persistConversation(true)
         }
         setAgentStatusPhase(agentId, 'error', { runId: null, detail: lastError.value })
