@@ -2674,7 +2674,8 @@ async function handleSend() {
       <aside class="chat-list">
         <NSpace vertical :size="12">
           <div class="chat-side-heading">
-            <NText strong class="chat-side-heading-title">会话</NText>
+            <NText strong class="chat-side-heading-title">会话管理</NText>
+            <NText depth="3" class="chat-side-heading-note">会话不再是独立主入口。</NText>
           </div>
 
           <!-- Hermes REST: New conversation button -->
@@ -3429,7 +3430,10 @@ async function handleSend() {
       <aside class="chat-tools">
         <NSpace vertical :size="12">
           <div>
-            <NText strong class="chat-tools-title">运行详情</NText>
+            <NText strong class="chat-tools-title">右侧调试抽屉</NText>
+            <NText depth="3" class="chat-tools-note">
+              模型、Skill、token、工具调用详情集中到这里，不挤占聊天主区域。
+            </NText>
           </div>
 
           <div class="chat-tools-grid">
@@ -3546,7 +3550,7 @@ async function handleSend() {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 248px minmax(520px, 1fr) 252px;
+  grid-template-columns: 280px minmax(520px, 1fr) 280px;
   gap: var(--ui-gap);
   align-items: stretch;
 }
