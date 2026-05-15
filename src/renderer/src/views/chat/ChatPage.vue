@@ -1617,17 +1617,26 @@ function handleChatMainWheel(event: WheelEvent) {
   const transcript = transcriptRef.value
   const currentTarget = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
   if (!transcript || !currentTarget || event.defaultPrevented) return
-  if (transcript.contains(event.target as Node | null)) return
 
   const nestedScrollable = findNestedScrollable(event.target, currentTarget)
-  if (nestedScrollable && canScrollInDirection(nestedScrollable, event.deltaY)) return
-  if (transcript.scrollHeight <= transcript.clientHeight + 1) return
+  if (
+    nestedScrollable &&
+    nestedScrollable !== transcript &&
+    canScrollInDirection(nestedScrollable, event.deltaY)
+  ) {
+    return
+  }
 
-  transcript.scrollBy({
-    top: event.deltaY,
-    left: event.deltaX,
-    behavior: 'auto'
-  })
+  const maxTop = transcript.scrollHeight - transcript.clientHeight
+  if (maxTop <= 1) return
+
+  const nextTop = Math.min(Math.max(transcript.scrollTop + event.deltaY, 0), maxTop)
+  if (nextTop === transcript.scrollTop) return
+
+  transcript.scrollTop = nextTop
+  if (event.deltaX) {
+    transcript.scrollLeft += event.deltaX
+  }
   handleTranscriptScroll()
   event.preventDefault()
 }
@@ -2821,7 +2830,7 @@ async function handleSend() {
         </NSpace>
       </aside>
 
-      <section class="chat-main" @wheel="handleChatMainWheel">
+      <section class="chat-main" @wheel.capture="handleChatMainWheel">
         <div class="chat-main-column">
           <NCard embedded :bordered="false" class="chat-transcript-card">
             <NSpace
@@ -4244,10 +4253,16 @@ async function handleSend() {
 }
 
 :deep(.chat-transcript-card.n-card) {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: transparent;
 }
 
 :deep(.chat-transcript-card .n-card__content) {
+  flex: 1;
   height: 100%;
   display: flex;
   flex-direction: column;
