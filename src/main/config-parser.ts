@@ -13,6 +13,11 @@
  *     provider: gemini
  *     model: gemini-2.5-pro
  *
+ *   # Provider-list form (current Hermes config):
+ *   fallback_providers:
+ *     - provider: gemini
+ *       model: gemini-3-flash-preview
+ *
  *   # Plain-string:
  *   model: openai-codex/gpt-5.4
  *   fallback_model: google/gemini-2.5-pro
@@ -55,7 +60,7 @@ const EMPTY: HermesConfigSummary = {
   fullModel: null,
   provider: null,
   fallback_chain: [],
-  fallback_chain_full: [],
+  fallback_chain_full: []
 }
 
 function shortName(full: string): string {
@@ -93,6 +98,10 @@ function extractProvider(node: unknown): string | null {
   return null
 }
 
+function uniqueList(items: string[]): string[] {
+  return Array.from(new Set(items.filter(Boolean)))
+}
+
 function extractFallbackList(node: unknown): string[] {
   if (node == null) return []
   if (Array.isArray(node)) {
@@ -102,6 +111,14 @@ function extractFallbackList(node: unknown): string[] {
   }
   const single = extractModel(node)
   return single ? [single] : []
+}
+
+function extractAllFallbacks(obj: Record<string, unknown>): string[] {
+  return uniqueList([
+    ...extractFallbackList(obj.fallback_model),
+    ...extractFallbackList(obj.fallback_providers),
+    ...extractFallbackList(obj.fallback)
+  ])
 }
 
 /**
@@ -128,15 +145,27 @@ function extractFallbackListFull(node: unknown, defaultProvider: string | null):
         (typeof obj.default === 'string' && obj.default.trim()) ||
         ''
       if (!model) continue
-      if (model.includes('/')) { out.push(model); continue }
+      if (model.includes('/')) {
+        out.push(model)
+        continue
+      }
       const prov =
-        (typeof obj.provider === 'string' && obj.provider.trim()) ||
-        defaultProvider ||
-        ''
+        (typeof obj.provider === 'string' && obj.provider.trim()) || defaultProvider || ''
       out.push(prov ? `${prov}/${model}` : model)
     }
   }
   return out
+}
+
+function extractAllFallbacksFull(
+  obj: Record<string, unknown>,
+  defaultProvider: string | null
+): string[] {
+  return uniqueList([
+    ...extractFallbackListFull(obj.fallback_model, defaultProvider),
+    ...extractFallbackListFull(obj.fallback_providers, defaultProvider),
+    ...extractFallbackListFull(obj.fallback, defaultProvider)
+  ])
 }
 
 export function parseHermesConfig(raw: string): HermesConfigSummary {
@@ -155,15 +184,18 @@ export function parseHermesConfig(raw: string): HermesConfigSummary {
   const fullModel = extractFullModel(obj.model)
   const provider = extractProvider(obj.model)
 
-  const fallbacks = extractFallbackList(obj.fallback_model)
-  const fallback_chain = primary ? [primary, ...fallbacks] : fallbacks
+  const fallbacks = extractAllFallbacks(obj)
+  const fallback_chain = primary ? uniqueList([primary, ...fallbacks]) : fallbacks
 
   // Full-form chain for the /model picker in the renderer.
   // Primary: use fullModel if already qualified, else build `<provider>/<primary>`.
-  const primaryFull = fullModel && fullModel.includes('/')
-    ? fullModel
-    : primary && provider ? `${provider}/${primary}` : primary
-  const fallbackFull = extractFallbackListFull(obj.fallback_model, provider)
+  const primaryFull =
+    fullModel && fullModel.includes('/')
+      ? fullModel
+      : primary && provider
+        ? `${provider}/${primary}`
+        : primary
+  const fallbackFull = extractAllFallbacksFull(obj, provider)
   const fallback_chain_full: string[] = []
   if (primaryFull) fallback_chain_full.push(primaryFull)
   for (const f of fallbackFull) if (!fallback_chain_full.includes(f)) fallback_chain_full.push(f)

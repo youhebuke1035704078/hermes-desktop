@@ -21,24 +21,26 @@ const badgeContent = computed(() => {
   const s = modelStore.state
   switch (s.kind) {
     case 'normal':
-      return { icon: '●', main: s.currentModel ?? 'unknown', sub: null }
+      return { icon: '●', prefix: '主模型', main: s.currentModel ?? 'unknown', sub: null }
     case 'fallback':
       return {
         icon: '⚠',
+        prefix: '备用',
         main: s.currentModel ?? 'unknown',
-        sub: s.fallbackFrom ? `via ${s.fallbackFrom}` : null,
+        sub: s.fallbackFrom ? `via ${s.fallbackFrom}` : null
       }
     case 'exhausted':
       return {
         icon: '⚠',
+        prefix: '',
         main: `all ${s.attemptedModels.length} models failed`,
-        sub: null,
+        sub: null
       }
     case 'stale':
-      return { icon: '', main: s.currentModel ?? 'unknown', sub: null }
+      return { icon: '', prefix: '模型', main: s.currentModel ?? 'unknown', sub: null }
     case 'unknown':
     default:
-      return { icon: '?', main: 'unknown', sub: null }
+      return { icon: '?', prefix: '', main: 'unknown', sub: null }
   }
 })
 
@@ -55,13 +57,9 @@ const tooltipText = computed(() => {
 <template>
   <NPopover placement="bottom-end" trigger="click" :show-arrow="false">
     <template #trigger>
-      <button
-        class="model-state-badge"
-        :class="`is-${kind}`"
-        :title="tooltipText"
-        type="button"
-      >
+      <button class="model-state-badge" :class="`is-${kind}`" :title="tooltipText" type="button">
         <span v-if="badgeContent.icon" class="badge-icon">{{ badgeContent.icon }}</span>
+        <span v-if="badgeContent.prefix" class="badge-prefix">{{ badgeContent.prefix }}</span>
         <span class="badge-main">{{ badgeContent.main }}</span>
         <span v-if="badgeContent.sub" class="badge-sub">{{ badgeContent.sub }}</span>
       </button>
@@ -114,6 +112,9 @@ const tooltipText = computed(() => {
 }
 .badge-main {
   font-weight: 500;
+}
+.badge-prefix {
+  opacity: 0.82;
 }
 .badge-sub {
   font-size: 9px;

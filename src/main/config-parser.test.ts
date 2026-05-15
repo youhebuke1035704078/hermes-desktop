@@ -47,11 +47,7 @@ fallback_model:
 `
     const result = parseHermesConfig(raw)
     expect(result.primary).toBe('gpt-5.4')
-    expect(result.fallback_chain).toEqual([
-      'gpt-5.4',
-      'gemini-2.5-pro',
-      'claude-3.5-sonnet',
-    ])
+    expect(result.fallback_chain).toEqual(['gpt-5.4', 'gemini-2.5-pro', 'claude-3.5-sonnet'])
   })
 
   it('handles list of structured objects for fallback_model', () => {
@@ -65,10 +61,23 @@ fallback_model:
     model: claude-3.5-sonnet
 `
     const result = parseHermesConfig(raw)
-    expect(result.fallback_chain).toEqual([
-      'gpt-5.4',
-      'gemini-2.5-pro',
-      'claude-3.5-sonnet',
+    expect(result.fallback_chain).toEqual(['gpt-5.4', 'gemini-2.5-pro', 'claude-3.5-sonnet'])
+  })
+
+  it('handles fallback_providers from current Hermes config', () => {
+    const raw = `
+model:
+  default: gpt-5.4
+  provider: openai-codex
+fallback_providers:
+  - provider: gemini
+    model: gemini-3-flash-preview
+`
+    const result = parseHermesConfig(raw)
+    expect(result.fallback_chain).toEqual(['gpt-5.4', 'gemini-3-flash-preview'])
+    expect(result.fallback_chain_full).toEqual([
+      'openai-codex/gpt-5.4',
+      'gemini/gemini-3-flash-preview'
     ])
   })
 

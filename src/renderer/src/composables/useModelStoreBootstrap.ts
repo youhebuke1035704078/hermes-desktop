@@ -46,6 +46,7 @@ import { useConnectionStore } from '@/stores/connection'
 import { useModelStore } from '@/stores/model'
 import { useNotificationStore } from '@/stores/notification'
 import { useWebSocketStore } from '@/stores/websocket'
+import { parseHermesConfigSummary } from '@/utils/hermes-config-parser'
 import type {
   FallbackActivatedPayload,
   PrimaryRestoredPayload,
@@ -280,16 +281,58 @@ export function useModelStoreBootstrap(): void {
 
     try {
       const resp = await window.api.httpFetch(`${serverUrl}/v1/hermes/config`, { headers })
-      if (!resp.ok) return null
-      const data = JSON.parse(typeof resp.body === 'string' ? resp.body : '{}') as {
-        primary?: unknown
-        fallback_chain?: unknown
+      if (resp.ok) {
+        const data = JSON.parse(typeof resp.body === 'string' ? resp.body : '{}') as {
+          primary?: unknown
+          fallback_chain?: unknown
+        }
+        if (typeof data.primary === 'string' && data.primary.length > 0) {
+          const chain = Array.isArray(data.fallback_chain)
+            ? data.fallback_chain.filter((x): x is string => typeof x === 'string')
+            : []
+          return { primary: data.primary, fallback_chain: chain }
+        }
       }
-      if (typeof data.primary !== 'string' || data.primary.length === 0) return null
-      const chain = Array.isArray(data.fallback_chain)
-        ? data.fallback_chain.filter((x): x is string => typeof x === 'string')
-        : []
-      return { primary: data.primary, fallback_chain: chain }
+    } catch {
+      /* fall through to YAML config endpoints */
+    }
+
+    const yamlConfig =
+      (await fetchRemoteConfigYaml(`${serverUrl}/v1/hermes/settings/config/yaml`, headers)) ||
+      (await fetchLegacyMgmtConfigYaml(serverUrl, headers))
+    if (!yamlConfig) return null
+
+    const parsed = parseHermesConfigSummary(yamlConfig)
+    if (!parsed.primary) return null
+    return parsed
+  }
+
+  async function fetchRemoteConfigYaml(
+    url: string,
+    headers: Record<string, string>
+  ): Promise<string | null> {
+    try {
+      const resp = await window.api?.httpFetch(url, { headers })
+      if (!resp?.ok) return null
+      const data = JSON.parse(typeof resp.body === 'string' ? resp.body : '{}') as {
+        ok?: unknown
+        content?: unknown
+      }
+      if (data.ok === false) return null
+      return typeof data.content === 'string' ? data.content : null
+    } catch {
+      return null
+    }
+  }
+
+  async function fetchLegacyMgmtConfigYaml(
+    serverUrl: string,
+    headers: Record<string, string>
+  ): Promise<string | null> {
+    try {
+      const u = new URL(serverUrl)
+      u.port = '8643'
+      return await fetchRemoteConfigYaml(`${u.origin}/config/yaml`, headers)
     } catch {
       return null
     }
@@ -310,7 +353,7 @@ export function useModelStoreBootstrap(): void {
         primary: config.primary,
         // Validate fallback_chain: the IPC result is untyped at runtime,
         // so guard against undefined / non-array values.
-        fallback_chain: Array.isArray(config.fallback_chain) ? config.fallback_chain : [],
+        fallback_chain: Array.isArray(config.fallback_chain) ? config.fallback_chain : []
       }
     } catch (err) {
       console.warn('[lifecycle] hermesConfig bootstrap failed', err)

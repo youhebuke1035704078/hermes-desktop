@@ -65,7 +65,19 @@ const pageTitle = computed(() => {
   return currentRouteLabel.value
 })
 
-const fallbackModelLabel = computed(() => modelStore.state.fallbackChain[0] || '')
+const fallbackModelLabel = computed(() => {
+  const state = modelStore.state
+  const primary = state.primaryModel || connectionStore.hermesRealModel || ''
+  const current = state.currentModel || ''
+  return (
+    state.fallbackChain.find((model, index) => {
+      if (!model) return false
+      if (primary && model === primary) return false
+      if (state.kind === 'normal' && current && model === current) return false
+      return index > 0 || !primary
+    }) || ''
+  )
+})
 
 function goNotifications() {
   router.push({ name: 'Settings', query: { section: 'diagnostics' } })
@@ -89,6 +101,30 @@ function goNotifications() {
 
     <NSpace :size="8" align="center" class="app-header-actions">
       <ModelStateBadge v-if="showModelBadge" />
+      <NPopover
+        v-if="showModelBadge && fallbackModelLabel"
+        trigger="click"
+        placement="bottom-end"
+        class="app-header-status-popover"
+      >
+        <template #trigger>
+          <button class="app-header-fallback-pill" type="button">
+            <span class="fallback-pill-label">备用</span>
+            <strong>{{ fallbackModelLabel }}</strong>
+          </button>
+        </template>
+        <div class="app-header-status-panel app-header-fallback-panel">
+          <div class="app-header-status-title">备用模型</div>
+          <div class="app-header-status-row">
+            <span>当前备用</span>
+            <strong>{{ fallbackModelLabel }}</strong>
+          </div>
+          <div class="app-header-status-row">
+            <span>切换链</span>
+            <strong>{{ modelStore.state.fallbackChain.join(' → ') }}</strong>
+          </div>
+        </div>
+      </NPopover>
       <ConnectionStatus />
 
       <NPopover trigger="click" placement="bottom-end" class="app-header-status-popover">
@@ -179,6 +215,39 @@ function goNotifications() {
 
 .app-header-actions {
   flex-shrink: 0;
+}
+
+.app-header-fallback-pill {
+  height: 30px;
+  max-width: 280px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.12);
+  color: #7dd3fc;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.app-header-fallback-pill:hover {
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.app-header-fallback-pill strong {
+  min-width: 0;
+  max-width: 190px;
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fallback-pill-label {
+  color: rgba(186, 230, 253, 0.76);
 }
 
 .app-header-status-panel {
