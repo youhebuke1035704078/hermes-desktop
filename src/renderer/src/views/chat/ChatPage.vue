@@ -75,6 +75,7 @@ const autoFollowBottom = ref(true)
 const transcriptRef = ref<HTMLElement | null>(null)
 const showAgentDetails = ref(false)
 const showChatToolsDrawer = ref(false)
+const activeChatToolsPanel = ref<'model' | 'token' | 'tool'>('model')
 const aborting = ref(false)
 const nowMs = ref(Date.now())
 let nowTimer: ReturnType<typeof setInterval> | null = null
@@ -2636,38 +2637,27 @@ const chatToolActivityCount = computed(() => {
   return steps + (currentToolProgress.value ? 1 : 0)
 })
 
+function openChatToolsDrawer(panel: 'model' | 'token' | 'tool') {
+  activeChatToolsPanel.value = panel
+  showChatToolsDrawer.value = true
+}
+
 async function handleSend() {
   const content = draft.value.trim()
   if (!content) return
   if (agentBusy.value) return
-  const conversationId = isHermesRest.value ? hermesChatStore.activeId : null
 
   try {
     const key = ensureSessionKey()
     chatStore.setSessionKey(key)
     const sendModel = isHermesRest.value ? hermesModel.value : undefined
     await chatStore.sendMessage(content, sendModel)
-    // Persist conversation in Hermes REST mode
-    if (isHermesRest.value && conversationId) {
-      hermesChatStore.setMessagesFor(
-        conversationId,
-        [...chatStore.messages],
-        connectionStore.hermesRealModel || undefined
-      )
-    }
     void fetchSessionTokenUsage(key)
     draft.value = ''
     await nextTick()
     autoFollowBottom.value = true
     requestScrollToBottom({ force: true })
   } catch (error) {
-    if (isHermesRest.value && conversationId) {
-      hermesChatStore.setMessagesFor(
-        conversationId,
-        [...chatStore.messages],
-        connectionStore.hermesRealModel || undefined
-      )
-    }
     const reason = chatStore.lastError || (error instanceof Error ? error.message : String(error))
     message.error(reason)
   }
@@ -2836,7 +2826,7 @@ async function handleSend() {
                 >
                 <span>{{ autoFollowBottom ? '自动跟随' : '手动浏览' }}</span>
               </div>
-              <NButton size="tiny" secondary @click="showChatToolsDrawer = true">
+              <NButton size="tiny" secondary @click="openChatToolsDrawer('tool')">
                 查看工具调用
               </NButton>
             </div>
@@ -3459,29 +3449,57 @@ async function handleSend() {
 
       <aside class="chat-tools-rail">
         <button
-          class="chat-rail-button is-active"
+          class="chat-rail-button"
+          :class="{ 'is-active': showChatToolsDrawer && activeChatToolsPanel === 'model' }"
           type="button"
-          @click="showChatToolsDrawer = true"
+          title="点击查看模型详情"
+          aria-label="查看模型详情"
+          @click="openChatToolsDrawer('model')"
         >
           <strong>模型</strong>
           <span>{{ connectionStore.hermesRealModel || hermesModel }}</span>
+          <small>详情</small>
         </button>
-        <button class="chat-rail-button" type="button" @click="showChatToolsDrawer = true">
+        <button
+          class="chat-rail-button"
+          :class="{ 'is-active': showChatToolsDrawer && activeChatToolsPanel === 'token' }"
+          type="button"
+          title="点击查看 Token 统计"
+          aria-label="查看 Token 统计"
+          @click="openChatToolsDrawer('token')"
+        >
           <strong>Token</strong>
           <span>{{
             currentSessionTokenUsage ? formatTokenCount(currentSessionTokenUsage.total) : '-'
           }}</span>
+          <small>详情</small>
         </button>
-        <button class="chat-rail-button" type="button" @click="showChatToolsDrawer = true">
+        <button
+          class="chat-rail-button"
+          :class="{ 'is-active': showChatToolsDrawer && activeChatToolsPanel === 'tool' }"
+          type="button"
+          title="点击查看工具调用"
+          aria-label="查看工具调用"
+          @click="openChatToolsDrawer('tool')"
+        >
           <strong>工具</strong>
           <span>{{ chatToolActivityCount }}</span>
+          <small>调用</small>
         </button>
       </aside>
 
       <aside v-if="showChatToolsDrawer" class="chat-tools-drawer">
         <div class="chat-tools-drawer-head">
           <div>
-            <NText strong class="chat-tools-title">运行详情</NText>
+            <NText strong class="chat-tools-title">
+              {{
+                activeChatToolsPanel === 'model'
+                  ? '模型详情'
+                  : activeChatToolsPanel === 'token'
+                    ? 'Token 统计'
+                    : '工具调用'
+              }}
+            </NText>
             <NText depth="3" class="chat-tools-note">
               模型、Skill、token、工具调用详情集中到这里，需要排障时再展开。
             </NText>
@@ -3603,11 +3621,13 @@ async function handleSend() {
 
 .chat-layout {
   flex: 1;
+  height: 100%;
   min-height: 0;
   display: grid;
   grid-template-columns: 300px minmax(820px, 1fr) 96px;
   gap: var(--ui-gap);
   align-items: stretch;
+  overflow: hidden;
   position: relative;
 }
 
@@ -3655,12 +3675,26 @@ async function handleSend() {
   gap: 3px;
   cursor: pointer;
   text-align: center;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    transform 0.15s;
 }
 
 .chat-rail-button:hover,
+.chat-rail-button:focus-visible,
 .chat-rail-button.is-active {
   border-color: rgba(94, 224, 179, 0.48);
   background: rgba(94, 224, 179, 0.12);
+}
+
+.chat-rail-button:hover {
+  transform: translateY(-1px);
+}
+
+.chat-rail-button:focus-visible {
+  outline: 2px solid rgba(94, 224, 179, 0.65);
+  outline-offset: 2px;
 }
 
 .chat-rail-button strong {
@@ -3681,6 +3715,12 @@ async function handleSend() {
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chat-rail-button small {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
 }
 
 .chat-tools-drawer {
@@ -4067,6 +4107,7 @@ async function handleSend() {
 .chat-main-column {
   flex: 1;
   width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -4215,25 +4256,38 @@ async function handleSend() {
 .chat-transcript-shell {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-transcript-spin {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 :deep(.chat-transcript-shell .n-spin-container),
 :deep(.chat-transcript-shell .n-spin-content) {
+  flex: 1;
   height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .chat-transcript {
   border: 0;
   border-radius: 0;
   flex: 1;
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 32px 18px;
+  padding: 8px 32px 24px;
   overflow-anchor: none;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   background: transparent;
 }
 
