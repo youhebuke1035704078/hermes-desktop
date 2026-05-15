@@ -4261,7 +4261,8 @@ async function handleSend() {
   background: transparent;
 }
 
-:deep(.chat-transcript-card .n-card__content) {
+:deep(.chat-transcript-card .n-card__content),
+:deep(.chat-transcript-card .n-card-content) {
   flex: 1;
   height: 100%;
   display: flex;
@@ -4356,7 +4357,8 @@ async function handleSend() {
   box-shadow: var(--shadow-sm);
 }
 
-:deep(.chat-compose-card .n-card__content) {
+:deep(.chat-compose-card .n-card__content),
+:deep(.chat-compose-card .n-card-content) {
   padding: var(--ui-panel-padding-sm) !important;
 }
 

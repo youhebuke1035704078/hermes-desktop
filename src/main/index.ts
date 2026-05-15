@@ -96,9 +96,14 @@ let isQuitting = false
 const hermesChatRequests = new Map<string, AbortController>()
 
 function createWindow(): void {
+  const testWidth = Number(process.env.HERMES_DESKTOP_TEST_WIDTH)
+  const testHeight = Number(process.env.HERMES_DESKTOP_TEST_HEIGHT)
+  const initialWidth = Number.isFinite(testWidth) && testWidth >= 900 ? testWidth : 1200
+  const initialHeight = Number.isFinite(testHeight) && testHeight >= 600 ? testHeight : 800
+
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: initialWidth,
+    height: initialHeight,
     minWidth: 900,
     minHeight: 600,
     show: false,
@@ -117,7 +122,7 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
-    if (is.dev) {
+    if (is.dev && process.env.HERMES_DESKTOP_SCROLL_TEST !== '1') {
       mainWindow?.webContents.openDevTools()
       // Forward renderer errors to main process stdout for diagnostics
       mainWindow?.webContents.on('console-message', (_event, level, message) => {

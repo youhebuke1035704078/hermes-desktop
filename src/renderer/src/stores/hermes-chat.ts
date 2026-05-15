@@ -30,6 +30,7 @@ export interface HermesConversation {
 }
 
 const STORAGE_KEY = 'hermes_conversations'
+const DISABLE_SERVER_SYNC_KEY = 'hermes_chat_disable_server_sync_v1'
 const MAX_CONVERSATIONS = 50
 
 const SYNC_DEBOUNCE = 2000
@@ -245,6 +246,11 @@ export const useHermesChatStore = defineStore('hermes-chat', () => {
     }
     if (!activeId.value || !conversations.value.find((c) => c.id === activeId.value)) {
       activeId.value = conversations.value[0]?.id || null
+    }
+
+    if (safeGet(DISABLE_SERVER_SYNC_KEY) === '1') {
+      serverSyncAvailable.value = false
+      return
     }
 
     // Async: probe server sync and merge. After the server merge completes,
