@@ -1594,6 +1594,44 @@ function handleTranscriptScroll() {
   autoFollowBottom.value = isNearBottom()
 }
 
+function canScrollInDirection(el: HTMLElement, deltaY: number): boolean {
+  if (deltaY < 0) return el.scrollTop > 0
+  if (deltaY > 0) return el.scrollTop + el.clientHeight < el.scrollHeight
+  return false
+}
+
+function findNestedScrollable(target: EventTarget | null, stopAt: HTMLElement): HTMLElement | null {
+  let el = target instanceof HTMLElement ? target : null
+  while (el && el !== stopAt) {
+    const style = window.getComputedStyle(el)
+    const overflowY = style.overflowY
+    const canScroll =
+      (overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1
+    if (canScroll) return el
+    el = el.parentElement
+  }
+  return null
+}
+
+function handleChatMainWheel(event: WheelEvent) {
+  const transcript = transcriptRef.value
+  const currentTarget = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  if (!transcript || !currentTarget || event.defaultPrevented) return
+  if (transcript.contains(event.target as Node | null)) return
+
+  const nestedScrollable = findNestedScrollable(event.target, currentTarget)
+  if (nestedScrollable && canScrollInDirection(nestedScrollable, event.deltaY)) return
+  if (transcript.scrollHeight <= transcript.clientHeight + 1) return
+
+  transcript.scrollBy({
+    top: event.deltaY,
+    left: event.deltaX,
+    behavior: 'auto'
+  })
+  handleTranscriptScroll()
+  event.preventDefault()
+}
+
 function looksLikeStreamingPayload(payload: unknown): boolean {
   const queue: Array<{ value: unknown; depth: number }> = [{ value: payload, depth: 0 }]
   const visited = new Set<unknown>()
@@ -2783,7 +2821,7 @@ async function handleSend() {
         </NSpace>
       </aside>
 
-      <section class="chat-main">
+      <section class="chat-main" @wheel="handleChatMainWheel">
         <div class="chat-main-column">
           <NCard embedded :bordered="false" class="chat-transcript-card">
             <NSpace
@@ -3650,6 +3688,8 @@ async function handleSend() {
 
 .chat-main {
   display: flex;
+  height: 100%;
+  min-height: 0;
   padding: 0;
   overflow: hidden;
   position: relative;
@@ -4108,8 +4148,8 @@ async function handleSend() {
   flex: 1;
   width: 100%;
   height: 100%;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 0;
   min-height: 0;
   overflow: hidden;
@@ -4196,7 +4236,7 @@ async function handleSend() {
 }
 
 .chat-transcript-card {
-  flex: 1;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   background: transparent;
@@ -4259,12 +4299,14 @@ async function handleSend() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .chat-transcript-spin {
   flex: 1;
   min-height: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 :deep(.chat-transcript-shell .n-spin-container),
